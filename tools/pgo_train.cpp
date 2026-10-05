@@ -128,6 +128,9 @@ int main() {
         const std::string text = kFactoryPresets[i].text;
         e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(text.size()), const_cast<char*>(text.data()), 0.0f);
         play(e, 2.2);
+        option(e, P_LP_CAPTURE, 0);   // REC, Capture Last: a kept loop for the scenes that play it
+        e->setParameter(e, P_LP_REC, 1.0f);
+        play(e, 0.1);
         const bool mixer = !std::strcmp(kFactoryPresets[i].name, "Perform Mixer");
         for (int sc = 1; sc < (mixer ? kNumScenes : 2); ++sc) {
             option(e, P_SCENE_B, sc);

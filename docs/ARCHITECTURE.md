@@ -48,7 +48,7 @@ flowchart LR
 | `dsp/reverb.*`, `pitch.h` | Predelay, diffusion, an 8-line feedback delay network, modulation, freeze; the shimmer's pitch shifter |
 | `dsp/mod.h` | LFOs (free or beat-locked), the envelope follower |
 | `dsp/rack.*` | The order, on / off fades, the reorder dip, levels, the global mix, the modules' sends, the looper's place |
-| `dsp/looper.*` | The looper: an always-on recorder ring, the grab on the beat grid, slices, speed, crossfaded jumps |
+| `dsp/looper.*` | The looper: an always-on recorder ring, REC on the beat grid (next or last cell), the grab, slices, speed, crossfaded jumps and loop changes |
 | `plugin/plugin.cpp` | VST2 glue for an insert effect, the suspend rule, the output guard, the CPU meter |
 | `plugin/engine.*` | The chunk loop: the scenes' morph (the fader's glide), modulation sources, the matrix, the rack |
 | `plugin/scenes.*` | The eight scenes' locks (atomics, a generation counter) and the morph rules |
@@ -57,6 +57,7 @@ flowchart LR
 | `plugin/state.*`, `presets.*`, `library.*`, `paths.*` | Saved state, preset files and the factory set, file libraries, folders |
 | `plugin/trace.*` | Device diagnostics while `/tmp/effectforce.trace` exists |
 | `presets/Factory/` | Factory presets: `NN_Category/NN_Name.efp` |
+| `presets/FX/`, `tools/make_fx.py` | The FX library: `N_Bank/NN_Name.eff`, scenes the PERFORM page picks from |
 | `test/` | Every module's suite, the rack, modulation, the plugin through a fake MPC (`host.h`) |
 | `tools/bench.cpp` | `efbench`: CPU per module and all at once, through the built `.so` |
 | `tools/pgo_train.cpp` | The profile-guided build's trainer: every module's options, everything at once, every preset |

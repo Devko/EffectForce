@@ -17,6 +17,7 @@ stop). Built on the Shimmer / Pulse / Grain branch, merged with it as it moves.
 | Looper (dsp/looper.*) | ✅ 44 module checks on x86 and ARM (`make test-module M=looper`) |
 | Scenes, the engine's morph, sends, EDIT A / B, state (plugin/scenes.*, engine, surface, state, rack) | ✅ 80 checks (test/scenes_test.cpp), the whole suite green on x86 and ARM |
 | PERFORM page, 10 Perform presets, bench and PGO cases | ✅ layout checked and previewed; presets level-matched |
+| The Octatrack Performance Mixer's workflow: REC on the grid (Capture Next / Last, a late press forgiven, replacing a playing loop without a gap), 8-bar loops, Swap / Layer blend, the looper's line; an FX library of 64 named effects in 4 banks picked into scene B; the LOOPER page; 10 Perform mixers built from the library | ✅ 61 looper checks, test/fx_test.cpp |
 | On the device | 🔜 learn the Force's crossfader to Crossfader on an insert (on the master too: an open probe item), `make bench-device` with the two performance cases, play the Perform presets |
 
 ### Hand-off (2026-10-05, branch `shimmer-grain-pulse`)

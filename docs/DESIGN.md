@@ -152,6 +152,17 @@ parameter, also on a Q-Link and on the PERFORM page.
   (the surface writes on MPC's UI thread, the engine reads on the audio thread). A generation
   counter tells the engine to rebuild its list of locked parameters (the union of A's and B's).
 
+### The FX library
+
+64 effects in four banks of 16 (Filter, Space, Loop, Rhythm), `presets/FX/N_Bank/NN_Name.eff`,
+written by `tools/make_fx.py`, checked by `surface.py` like the presets and embedded
+(`build/fx_library.h`). An effect is a scene's text: `name=` and the locks, nothing else. A tap on an
+FX tile (PERFORM page) loads it into the scene at B, or the scene being edited: the new locks go in
+first, then what the scene locked and the effect doesn't is unlocked, so the engine never plays it
+half empty. Scenes keep a name (saved as `sceneN.name=`), marked `*` once edited; the tile of the effect
+scene B holds as it came is lit. Effects use LFO 2 and matrix slot 8 only, so LFO 1 and slots 1-7
+stay the user's; an effect with `lp_` locks switches the looper on (the plugin then makes its buffers).
+
 ### Looper
 
 A fixed stage, not one of the chain's modules: **Pre** (default) sits before everything (the loop
@@ -162,11 +173,23 @@ what the rack plays; the effects go on with the live input underneath).
 |---|---|---|
 | `lp_on` Looper | Off · On | Arms the recorder: it records the stage's input all the time. Not lockable |
 | `lp_pos` Position | Pre · Post | Where the stage sits |
-| `lp_mix` Loop | 0..100% | Live ↔ loop, linear. Leaving 0 **grabs a loop**; back at 0 it lets go |
-| `lp_len` Length | 1/16 · 1/8 · 1/4 · 1/2 · 1 bar · 2 bars · 4 bars | The loop's length (ordered steps) |
+| `lp_mix` Loop | 0..100% | How much loop. Plays the kept loop; without one, leaving 0 **grabs a loop** (back at 0 it lets go) |
+| `lp_blend` Blend | Swap · Layer | Swap: live (1 - m) + loop m. Layer: live + loop m (the live input stays) |
+| `lp_len` Length | 1/16 · 1/8 · 1/4 · 1/2 · 1 bar · 2 bars · 4 bars · 8 bars | The loop's length (ordered steps); shorter than the kept loop, a slice of it |
+| `lp_capture` Capture | Last · Next | What REC takes: the cell just played, or the coming one on the grid |
+| `lp_rec` REC | button | Captures a loop of Length and keeps it (turns Hold on); a second press while waiting cancels |
 | `lp_rep` Repeat | Off · 1/2 · 1/4 · 1/8 · 1/16 · 1/32 | Repeats the slice that was playing, on the grid: a roll (ordered steps) |
 | `lp_speed` Speed | -1..2× | 1 plays as recorded, 0.5 half speed an octave down, 0 stops (tape stop), below 0 backwards |
-| `lp_hold` Hold | Off · On | Leaving 0 again plays the last loop instead of grabbing a new one |
+| `lp_hold` Hold | Off · On | Keeps the loop: Loop plays it again instead of grabbing a new one. Off forgets it |
+| `lp_info` | readout | The looper's line: listening, REC 4 BARS IN 3 BEATS / 2 OF 16 BEATS, LOOP KEPT, PLAYING 4 BARS, ROLL 1/16, 0.50X |
+
+- **REC, Capture Next** (the Octatrack's quantized recording): the cell from the grid's next line of
+  Length (4 bars start on a 4-bar line), ready the moment it ends. A press up to min(1 beat, a quarter
+  of the cell) after a line takes the cell that line began: the recorder has its start already. The
+  wait counts recorded samples, not beats, so a sequence looping back meanwhile doesn't lose it.
+  **Capture Last** keeps the last complete cell at once. A capture while a loop plays replaces it at
+  once: the old loop plays on in the old head (from the loop buffer) while the new one fades in on the
+  grid (read from the ring); the copy into the loop buffer waits for the 5 ms crossfade to end.
 
 - **The grab:** the last complete cell of Length on MPC's beat grid (Length 1 bar: the bar just
   played, from its downbeat), found from the song position at that moment and the tempo:
@@ -185,14 +208,14 @@ what the rack plays; the effects go on with the live input underneath).
   grid) is a 5 ms crossfade: the old head plays on past the edge (the loop buffer keeps 512 frames
   of what came before and after the cell) while the new one fades in. The live / loop crossfade is
   smoothed over 3 ms.
-- **Memory, only where used:** a 2^20-frame stereo ring (23.8 s, 8 MB) records; the grabbed cell
-  is copied into a 10 s loop buffer (3.5 MB) at 8× real time in the background (1024 frames a
-  block), and until a frame is copied it is read from the ring, which still holds it: the oldest
-  frame a grab needs is 2 lengths back, and the ring is 2.38 longest loops long. Both are allocated
-  on MPC's UI thread **the first time Looper On is switched on** in that instance (and handed to
-  the audio thread through an atomic pointer), so an EffectForce without the looper costs nothing
-  more. The longest loop is 10 s: a Length longer than that at the tempo is halved until it fits
-  (4 bars from 96 BPM up).
+- **Memory, only where used:** a 2^21-frame stereo ring (47.5 s, 16.8 MB) records; a loop is
+  copied into a 20 s loop buffer (7 MB) at 8× real time in the background (1024 frames a block),
+  and until a frame is copied it is read from the ring, which still holds it: the oldest frame a
+  capture needs is 2 lengths back, and the ring is 2.38 longest loops long. Both are allocated on
+  MPC's UI thread **the first time Looper On is switched on** in that instance (and handed to the
+  audio thread through an atomic pointer), so an EffectForce without the looper costs nothing more.
+  The longest loop is 20 s: a Length longer than that at the tempo is halved until it fits (8 bars
+  from 96 BPM up).
 - **Tempo changes** while a loop plays: it keeps its length in samples (no resampling); the grid
   lock only applies while the loop is still as long as Length at the current tempo.
 
@@ -202,7 +225,7 @@ Five groups (MPC's tab strip shows five without a pager), each page with its own
 
 | Group | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order as 10 tiles in two rows of five (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PERFORM**: the scene tiles of each end (lit = picked, the lock count), EDIT A / B, CLEAR, the scenes' line, the Crossfader knob and its bar; the LOOPER card. Q-Link 1 is the crossfader. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
+| CHAIN | **CHAIN**: the order as 10 tiles in two rows of five (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PERFORM**: the scene tiles of each end (lit = picked, the lock count), EDIT A / B, CLEAR, the scenes' line (by name), the Crossfader knob and its bar; the FX library (16 tiles of a bank, the bank arrows). Q-Link 1 is the crossfader. **LOOPER**: On, Place, Length, Capture, REC, Hold, the looper's line; Loop, Blend, Repeat, Speed, the crossfader. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
 | TONE | **DRIVE+FILTER** (a card each), **EQ**, **COMP** (Comp and OTT cards) |
 | MOTION | **CHORUS+PHASE** (a card each), **PULSE** (the LFO and the GATE card) |
 | SPACE | **DELAY**, **GRAIN**, **REVERB** (with its shimmer) |

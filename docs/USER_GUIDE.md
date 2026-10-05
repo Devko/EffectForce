@@ -32,7 +32,7 @@ overlay shows the name without the page.
 
 | Tab | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order, MOVE and ON / OFF, Input, Output, Mix, the macros, the preset stepper. **PERFORM**: the scenes, the crossfader and the looper. **PRESETS**: the browser |
+| CHAIN | **CHAIN**: the order, MOVE and ON / OFF, Input, Output, Mix, the macros, the preset stepper. **PERFORM**: the scenes, the crossfader and the FX library. **LOOPER**: REC, the loop and how it plays. **PRESETS**: the browser |
 | TONE | **DRIVE+FILTER**, **EQ**, **COMP** |
 | MOTION | **CHORUS+PHASE**, **PULSE** |
 | SPACE | **DELAY**, **GRAIN**, **REVERB** |
@@ -195,19 +195,50 @@ LFO 1 synced to 1/8 → Filter Cutoff (a rhythmic filter).
 
 ## Performance: scenes and the looper
 
-The Octatrack's performance-mixer setup in one insert: put EffectForce on the **master** (or any track),
-and the Force's **crossfader** moves between two **scenes**, each a set of settings for the rack, while the
-**looper** grabs the bar that just played and plays it on the beat. Everything is on the **PERFORM** page
-(CHAIN tab, second page).
+The Octatrack's performance-mixer setup in one insert: put EffectForce on the **master** (or on a drum
+submix and a melodic submix, one each), and the Force's **crossfader** moves between two **scenes**: a
+clean one at A and an effect at B, picked from a library of 64. The **looper** records the next 4 or 8
+bars on the grid (or keeps the bar just played) and you crossfade into it, roll it, stop it, reverse it.
+Two pages, both in the CHAIN tab: **PERFORM** (scenes, crossfader, the FX library) and **LOOPER**.
+
+### Playing it, the Octatrack way
+
+1. Load a **Perform** preset (say Perform Mixer, or Loop Mixer 4 Bar) and learn the crossfader (below).
+2. **Pick an effect:** on PERFORM, tap a tile of the FX library: it goes into scene B. Push the fader:
+   the effect fades in; pull back: it fades out, a delay's or reverb's tail ringing on.
+3. **Loop:** on LOOPER, set **Length** (4 bars, 8 bars, ...) and press **REC**. It records the next
+   4 bars from the next 4-bar line (the line shows "REC 4 BARS IN 3 BEATS", then the bars as they
+   record) and keeps them. Push **Loop** (or the fader into a scene that turns Loop up, like the Loop
+   Mixer presets' scene 2): the loop plays, in time. Press REC again whenever you like: the next 4 bars
+   replace the loop when they are done, without a gap.
+4. **Mix:** **Blend Swap** crossfades the live input with the loop; **Layer** keeps the live input and
+   plays the loop on top. Rolls, a tape stop, half speed and reverse are effects of the Loop bank: pick
+   one into scene B and the fader does it.
 
 ### The crossfader
 
 **Crossfader** (Q-Link 1 on the PERFORM page) runs from scene A (0%) to scene B (100%); the bar under it
 shows where it is. To play it with the Force's own crossfader, assign it there: MPC can learn any of a
 plugin's automatable parameters to the crossfader (hold **ASSIGN A** or **ASSIGN B** and move the
-parameter, here Crossfader). One crossfader can drive several EffectForce instances that way.
-EffectForce glides after the fader over 15 ms, so a fast flick is smooth and a Q-Link's steps don't
-click.
+parameter, here Crossfader). One crossfader can drive several EffectForce instances that way (a drum
+bus and a melodic bus, each with its own effects). EffectForce glides after the fader over 15 ms, so a
+fast flick is smooth and a Q-Link's steps don't click.
+
+### The FX library
+
+64 effects in four banks of 16: **Filter** (sweeps, resonant and band filters, wobbles, flangers, a comb
+riser, kills), **Space** (washes, freezes, shimmer, dub and tape echoes, an echo freeze, grain clouds),
+**Loop** (rolls from 1/2 to 1/32, loops of a bar or half, tape stop, half and double speed, reverse, beat
+repeat, a build roll, stutter, a layered loop) and **Rhythm** (a sidechain-style pump, trance and offbeat
+gates, tremolo, auto-pan, bit crush, drive, fold, OTT, destroy).
+
+- **< BANK** and **BANK >** page through the banks. A tap on a tile puts the effect into the scene at
+  the B end (or into the scene you are editing), replacing what was there; its tile lights while scene
+  B holds it as it came. The scenes' line shows each end's effect by name.
+- An effect is a scene: it switches its modules on and sets them, and leaves everything else to the
+  knobs. Effects that need an LFO or the matrix use **LFO 2** and **matrix slot 8**, so LFO 1 and slots
+  1-7 stay yours. Effects of the Loop bank switch the looper on.
+- Change a picked effect like any scene (EDIT B, turn knobs): its name gets a `*`.
 
 ### Scenes
 
@@ -215,8 +246,8 @@ There are eight scenes. The two rows of tiles pick the one at each end: **A** (t
 A tile shows how many settings its scene **locks**, in brackets. Changing the scene at the end the fader
 is away from changes nothing you hear: line up the next move, then bring the fader over.
 
-- **Making a scene:** tap **EDIT B** (or EDIT A). Every page now shows scene B, and you hear it in
-  full. Whatever you move, on any page, is **locked** in the scene: a filter's cutoff, a delay's
+- **Making a scene yourself:** tap **EDIT B** (or EDIT A). Every page now shows scene B, and you hear it
+  in full. Whatever you move, on any page, is **locked** in the scene: a filter's cutoff, a delay's
   feedback, a module switched on, the looper's Loop, a macro. Tap **EDIT B** again when done: the knobs
   come back as they were. Tapping another tile in the edited row switches the edit to that scene.
 - **CLEAR** (while editing) removes every lock of the scene being edited.
@@ -230,38 +261,45 @@ is away from changes nothing you hear: line up the next move, then bring the fad
   out**: push the fader into a delay or reverb scene and pull back, and the echoes carry on (a dub throw).
   A module at the Off end costs no CPU once its tail has died away.
 - Modulation (LFOs, the envelope, the macros) still works on top of whatever the fader sets.
-- Scenes are saved with the project and in presets. Loading a preset ends an edit.
+- Scenes (with their names) are saved with the project and in presets. Loading a preset ends an edit.
 
 ### The looper
 
-- **Looper On** arms it: from then on it records all the time (the first time, it takes 11 MB of
-  memory, only in that instance). **Place**: **Pre** loops the input and sends the loop through every
-  module, **Post** loops what the rack plays.
-- **Loop** crossfades the live input with the loop. As soon as it leaves 0, it grabs the **last whole
-  bar** (or whatever **Length** says: 1/16 to 4 bars) and plays it **in time**: push it in the middle of
-  a bar and it carries on from the middle of the bar, one bar earlier. Back at 0 it lets go; the next
-  push grabs a fresh one (**Hold** keeps the last one instead).
+The **LOOPER** page; its line says what it is doing.
+
+- **On** arms it: from then on it records all the time (the first time, it takes 24 MB of memory, only
+  in that instance). **Place**: **Pre** loops the input and sends the loop through every module,
+  **Post** loops what the rack plays.
+- **Length**: 1/16 to 8 bars. **REC** takes a loop of that length and keeps it (Hold turns on):
+  **Capture Next** (the default) records the coming one from the grid's next line of that length, as the
+  Octatrack does: a 4-bar loop starts on a 4-bar line. A press up to a beat late still takes the bars
+  that have just begun (the recorder already has their start). **Capture Last** keeps the bars just
+  played, at once. Press REC again while it waits to cancel.
+- **Loop** plays the kept loop, in time with the beat (Swap: crossfading the live input; Layer: on top
+  of it). Without a kept loop, pushing Loop grabs the last bars on the spot (a quick roll). Back at 0 it
+  stops; a kept loop stays for the next push. **Hold** off forgets it.
 - **Repeat** (1/2 to 1/32) repeats the part of the loop that was playing, on the grid: a roll. Lock
-  Repeat 1/32 in scene B and the fader rolls in 1/2, 1/4, 1/8, 1/16, 1/32 as it moves.
+  Repeat 1/32 in scene B and the fader rolls in 1/2, 1/4, 1/8, 1/16, 1/32 as it moves. A **Length**
+  shorter than the kept loop plays that much of it.
 - **Speed**: 1.00x as recorded, 0.50x half speed (an octave down), 0 stops it (lock 0 in scene B: the
   fader is a tape stop), below 0 backwards.
-- Right after arming, a grab waits until a whole bar has been recorded. A loop longer than 10 seconds
-  at the tempo is halved (4 bars fit from 96 BPM up).
+- Right after arming, a loop waits until its bars have been recorded. A loop longer than 20 seconds at
+  the tempo is halved (8 bars fit from 96 BPM up).
 
-### Recipes
+### The Perform presets
 
-The **Perform** presets are ready-made setups (scene A clean, scene B the effect): **Perform Mixer**
-has a different effect in each of scenes 2 to 8 (pick it in the B row): a low-pass sweep, a high-pass
-with reverb, an echo throw, a 1/16 roll, a tape stop, half speed, a frozen wash. The others do one thing
-each: DJ Filter, Loop Roll, Tape Stop, Half Speed, Reverse Bar, Echo Throw, Wash Out, Build Up, Lo-Fi
-Drop. To make your own: start from Init, tap EDIT B, switch modules on and set them, tap EDIT B again,
-and play the fader.
+Ready-made mixers: scene 1 clean at A, scenes 2 to 8 effects of the library (pick one in the B row).
+**Perform Mixer** (a low-pass sweep, a resonant high-pass, an echo throw, a 1/16 roll, a tape stop, a
+hall wash, a pump), **Loop Mixer 4 Bar** and **Loop Mixer 8 Bar** (REC records 4 or 8 bars; scene 2 plays
+the loop; rolls, half speed, reverse, a build roll, a layered loop), **DJ Mixer** (filters and kills),
+**Dub Mixer**, **Build and Drop**, **Glitch Mixer**, **Rhythm Mixer**, **Space Mixer**, **Crush Mixer**.
 
 ### More than one EffectForce
 
-Load as many as you like: on a synth track for its own sound and on the master for the performance,
-for example. Each has its own scenes and looper; a module that is off costs nothing, and the looper's
-memory is only taken where it is armed.
+Load as many as you like: one on a drum submix and one on a melodic submix with the same crossfader
+(the Octatrack template's two buses), one on a synth track for its own sound and one on the master for
+the performance. Each has its own scenes and looper; a module that is off costs nothing, and the
+looper's memory is only taken where it is armed.
 
 ## Presets
 

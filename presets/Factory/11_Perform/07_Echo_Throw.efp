@@ -1,9 +1,0 @@
-effectforce 1
-dly_mode=Ping-Pong
-dly_div=1/8.
-dly_fb=0.7
-dly_mix=0.45
-dly_lc=250
-dly_hc=6000
-dly_wow=0.15
-scene2.dly_on=On
