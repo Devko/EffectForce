@@ -1,0 +1,9 @@
+effectforce 1
+lp_on=On
+flt_type=HP 12
+flt_cut=20
+scene2.lp_mix=1
+scene2.lp_len=1 bar
+scene2.lp_rep=1/32
+scene2.flt_on=On
+scene2.flt_cut=900

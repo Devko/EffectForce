@@ -1,0 +1,11 @@
+effectforce 1
+rev_mode=Space
+rev_size=0.85
+rev_decay=9
+rev_mix=0.6
+rev_shim=0.35
+scene2.rev_on=On
+scene2.flt_on=On
+scene2.flt_type=HP 12
+scene2.flt_cut=600
+scene2.rev_freeze=On

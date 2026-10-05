@@ -1,0 +1,12 @@
+effectforce 1
+flt_type=LP 24
+flt_cut=20000
+flt_res=0.35
+scene_b=2
+scene2.flt_on=On
+scene2.flt_cut=120
+scene2.flt_res=0.55
+scene3.flt_on=On
+scene3.flt_type=HP 24
+scene3.flt_cut=3000
+scene3.flt_res=0.45

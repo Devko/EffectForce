@@ -153,7 +153,42 @@ preset("Rhythm", "Choppy Pads", pls_on="On", pls_mode="Gate", pls_div="1/8", pls
 preset("Rhythm", "Stereo Trem", pls_on="On", pls_mode="Tremolo", pls_div="1/16", pls_depth=0.8,
        pls_stereo=180, chr_on="On", chr_mode="Dimension", chr_mix=0.3)
 
-CATS = ["Utility", "Synth", "Pads", "Bass", "Drums", "Lo-Fi", "Space", "Creative", "Texture", "Rhythm"]
+# --- Perform: the Octatrack's performance-mixer templates (docs/DESIGN.md "Performance: scenes and the
+# looper"). Put on the master (or a track), learn the Force's crossfader to Crossfader: scene A (1, clean)
+# at one end, the effect scene at the other. The knobs stay clean; the scenes switch modules in (as sends,
+# so delay and reverb tails ring out when the fader comes back) and move what they lock. ---
+def scene(n, **kv):
+    return {"scene%d.%s" % (n, k): v for k, v in kv.items()}
+
+ARMED = dict(lp_on="On")                                   # the looper records from the start
+OPEN_LP = dict(flt_type="LP 24", flt_cut=20000, flt_res=0.35)   # a filter that does nothing until locked
+preset("Perform", "Perform Mixer", **ARMED, **OPEN_LP, scene_b="2",
+       s2=scene(2, flt_on="On", flt_cut=180, flt_res=0.5),
+       s3=scene(3, flt_on="On", flt_type="HP 24", flt_cut=1800, rev_on="On", rev_mix=0.45),
+       s4=scene(4, dly_on="On", dly_div="1/8.", dly_fb=0.75, dly_mix=0.5, dly_hc=5000),
+       s5=scene(5, lp_mix=1, lp_rep="1/16"),
+       s6=scene(6, lp_mix=1, lp_speed=0),
+       s7=scene(7, lp_mix=1, lp_len="2 bars", lp_speed=0.5),
+       s8=scene(8, rev_on="On", rev_mode="Space", rev_freeze="On", rev_mix=0.8, flt_on="On", flt_type="HP 12",
+                flt_cut=400))
+preset("Perform", "DJ Filter", **OPEN_LP, scene_b="2",
+       s2=scene(2, flt_on="On", flt_cut=120, flt_res=0.55),
+       s3=scene(3, flt_on="On", flt_type="HP 24", flt_cut=3000, flt_res=0.45))
+preset("Perform", "Loop Roll", **ARMED, flt_type="HP 12", flt_cut=20,
+       s2=scene(2, lp_mix=1, lp_len="1 bar", lp_rep="1/32", flt_on="On", flt_cut=900))
+preset("Perform", "Tape Stop", **ARMED, s2=scene(2, lp_mix=1, lp_speed=0))
+preset("Perform", "Half Speed", **ARMED, s2=scene(2, lp_mix=1, lp_len="2 bars", lp_speed=0.5))
+preset("Perform", "Reverse Bar", **ARMED, s2=scene(2, lp_mix=1, lp_len="1 bar", lp_speed=-1))
+preset("Perform", "Echo Throw", dly_mode="Ping-Pong", dly_div="1/8.", dly_fb=0.7, dly_mix=0.45, dly_lc=250,
+       dly_hc=6000, dly_wow=0.15, s2=scene(2, dly_on="On"))
+preset("Perform", "Wash Out", rev_mode="Space", rev_size=0.85, rev_decay=9, rev_mix=0.6, rev_shim=0.35,
+       s2=scene(2, rev_on="On", flt_on="On", flt_type="HP 12", flt_cut=600, rev_freeze="On"))
+preset("Perform", "Build Up", **ARMED, flt_type="HP 24", flt_cut=20, flt_res=0.3,
+       s2=scene(2, flt_on="On", flt_cut=2500, rev_on="On", rev_mix=0.4, lp_mix=1, lp_len="1 bar", lp_rep="1/32"))
+preset("Perform", "Lo-Fi Drop", drv_type="Crush", drv_amt=20, drv_mix=1, flt_type="LP 12", flt_cut=20000,
+       s2=scene(2, drv_on="On", flt_on="On", flt_cut=2500, flt_res=0.3))
+
+CATS = ["Utility", "Synth", "Pads", "Bass", "Drums", "Lo-Fi", "Space", "Creative", "Texture", "Rhythm", "Perform"]
 
 
 def fmt(v):

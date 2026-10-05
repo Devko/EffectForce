@@ -582,8 +582,35 @@ def build_layout():
     for cx, k in zip(R4, ("mac_1", "mac_2", "mac_3", "mac_4")):
         L.knob(cx, R2 + 126, k)
 
+    # PERFORM (docs/DESIGN.md "Performance: scenes and the looper"): the scene at each end of the
+    # crossfader, EDIT A / B and CLEAR, the fader (its knob, its bar); the looper. The first Q-Link is the
+    # fader; the Force's own crossfader can be learned to it (ASSIGN A / B).
+    L.page("PERFORM", bank(("xfade", "scene_a", "scene_b"), pad=("mac_1", "mac_2", "mac_3", "mac_4", "mix"))
+           + ["lp_mix", "lp_speed", "lp_len", "lp_rep", "lp_hold", "lp_pos", "lp_on"])
+    L.header(status_w=700)
+    L.stepper(998, 121, 516, "preset")
+    L.card(24, R1, 1232, 270, "SCENES")
+    for row, (label, key) in enumerate((("A", "sca"), ("B", "scb"))):
+        L.text(52, 226 + 64 * row, label)
+        L.tiles(76, 212 + 64 * row, 700, 8, 1, 48, 8, key)
+    L.readout(426, 372, 700, "scn_info", h=36)
+    L.toggle(880, 236, "edit_a")
+    L.toggle(880, 318, "edit_b")
+    L.button(880, 392, "CLEAR", "scn_clear")
+    L.knob(1090, 262, "xfade")
+    L.readout(1100, 392, 280, "xf_bar", h=36)
+    L.card(24, R2, 1232, 270, "LOOPER")
+    on_seg(L, S8[0], R2, "lp_on")
+    L.vseg(S8[1], R2 + 160, "lp_pos", sw=110, label="PLACE")
+    L.knob(S8[2], R2 + 126, "lp_mix")
+    L.knob(S8[3], R2 + 126, "lp_speed")
+    for cx, label, key in ((S8[4], "LENGTH", "lp_len"), (S8[5], "REPEAT", "lp_rep")):
+        L.text(cx, R2 + 82, label)
+        L.popup(cx, R2 + 126, 140, key)
+    L.vseg(S8[6], R2 + 160, "lp_hold", sw=110, label="HOLD")
+
     # The browser has no knobs of its own: the Q-Links keep the preset stepper, the macros and the levels.
-    L.page("PRESETS", ["preset", "mac_1", "mac_2", "mac_3", "mac_4", "in_gain", "out_gain", "mix"])
+    L.page("PRESETS",["preset", "mac_1", "mac_2", "mac_3", "mac_4", "in_gain", "out_gain", "mix"])
     L.header()
     L.card(24, R1, 360, 552, "CATEGORIES")
     L.tiles(44, 206, 320, 2, 8, 48, 8, "cat")
@@ -1341,7 +1368,8 @@ def factory_presets():
             for pre, mod in MODULES:
                 used = [k for k in values if k.startswith(pre + "_") and k != pre + "_on"
                         or (pre == "cmp" and k.startswith("ott_"))]
-                if used and values.get(pre + "_on") != "On":
+                by_scene = any(re.match(r"scene\d+\.%s_on$" % pre, k) and v == "On" for k, v in values.items())
+                if used and values.get(pre + "_on") != "On" and not by_scene:   # a scene switching it on counts
                     errors.append("%s: sets %s but leaves %s off" % (where, ", ".join(used), mod))
             name = _shown(f)
             if name in seen:
