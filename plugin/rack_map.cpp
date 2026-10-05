@@ -18,6 +18,8 @@ static_assert(kNumDelayDivisions == kNumDelayDivs && kNumLfoDivisions == kNumLfo
 static_assert(PARAM_INFO[P_PLS_PATTERN].nopts == Pulse::kPatterns, "surface.py PULSE_PATTERNS must match dsp/pulse.h");
 static_assert(PARAM_INFO[P_L2_WAVE].key[0] == 'l' && P_L2_PHASE - P_L2_WAVE == P_L1_PHASE - P_L1_WAVE,
               "LFO 2's parameters must mirror LFO 1's");
+static_assert(kNumLoopLengths == kNumLoopLens && kNumLoopRepeats == kNumLoopReps,
+              "surface.py LOOP_LENGTHS / LOOP_REPEATS must match dsp/looper.h");
 
 namespace {
 
@@ -242,6 +244,14 @@ void setField(RackPatch& p, int id, float v) {
         case P_GRN_FB: p.grain.feedback = v; break;
         case P_GRN_HOLD: p.grain.hold = on; break;
         case P_GRN_MIX: p.grain.mix = v; break;
+
+        case P_LP_ON: p.looper.on = on; break;
+        case P_LP_POS: p.looperPost = opt == 1; break;
+        case P_LP_MIX: p.looper.loop = v; break;
+        case P_LP_LEN: p.looper.lengthBeats = kLoopLens[std::clamp(opt, 0, kNumLoopLens - 1)].beats; break;
+        case P_LP_REP: p.looper.repeatBeats = kLoopReps[std::clamp(opt, 0, kNumLoopReps - 1)].beats; break;
+        case P_LP_SPEED: p.looper.speed = v; break;
+        case P_LP_HOLD: p.looper.hold = on; break;
 
         case P_ENV_ATT: p.envAttackS = v; break;
         case P_ENV_REL: p.envReleaseS = v; break;

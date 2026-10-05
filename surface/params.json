@@ -2968,6 +2968,338 @@
    "max": 1,
    "momentary": true,
    "type": "trigger"
+  },
+  {
+   "key": "xfade",
+   "name": "Crossfader",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "scene_a",
+   "name": "Scene A",
+   "options": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8"
+   ],
+   "default": "1"
+  },
+  {
+   "key": "scene_b",
+   "name": "Scene B",
+   "options": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8"
+   ],
+   "default": "2"
+  },
+  {
+   "key": "edit_a",
+   "name": "Edit A",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "edit_b",
+   "name": "Edit B",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "scn_clear",
+   "name": "Clear Scene",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "sca_1",
+   "name": "Scene A 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_2",
+   "name": "Scene A 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_3",
+   "name": "Scene A 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_4",
+   "name": "Scene A 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_5",
+   "name": "Scene A 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_6",
+   "name": "Scene A 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_7",
+   "name": "Scene A 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "sca_8",
+   "name": "Scene A 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_1",
+   "name": "Scene B 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_2",
+   "name": "Scene B 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_3",
+   "name": "Scene B 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_4",
+   "name": "Scene B 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_5",
+   "name": "Scene B 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_6",
+   "name": "Scene B 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_7",
+   "name": "Scene B 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scb_8",
+   "name": "Scene B 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "scn_info",
+   "name": "Scene Info",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "xf_bar",
+   "name": "Fader Pos",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "lp_on",
+   "name": "Looper On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "lp_pos",
+   "name": "Looper Place",
+   "options": [
+    "Pre",
+    "Post"
+   ],
+   "default": "Pre"
+  },
+  {
+   "key": "lp_mix",
+   "name": "Loop",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "lp_len",
+   "name": "Loop Length",
+   "options": [
+    "1/16",
+    "1/8",
+    "1/4",
+    "1/2",
+    "1 bar",
+    "2 bars",
+    "4 bars"
+   ],
+   "default": "1 bar"
+  },
+  {
+   "key": "lp_len__open",
+   "name": "Loop Length List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "lp_len",
+   "type": "enum"
+  },
+  {
+   "key": "lp_rep",
+   "name": "Loop Repeat",
+   "options": [
+    "Off",
+    "1/2",
+    "1/4",
+    "1/8",
+    "1/16",
+    "1/32"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "lp_rep__open",
+   "name": "Loop Repeat List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "lp_rep",
+   "type": "enum"
+  },
+  {
+   "key": "lp_speed",
+   "name": "Loop Speed",
+   "min": 0,
+   "max": 1,
+   "default": 0.666667,
+   "display": "string"
+  },
+  {
+   "key": "lp_hold",
+   "name": "Loop Hold",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
   }
  ]
 }

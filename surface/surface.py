@@ -324,6 +324,52 @@ readout("br_now", "Loaded")
 toggle("fav", "Favorite")
 button("rnd", "Random Pick")
 
+# --- performance: the crossfader, the scenes and the looper (docs/DESIGN.md "Performance: scenes and the
+# looper"). Appended after everything else, so every index before stays where it was. ---
+SCENES = 8
+SCENE_NAMES = [str(k) for k in range(1, SCENES + 1)]
+LOOP_LENGTHS = ["1/16", "1/8", "1/4", "1/2", "1 bar", "2 bars", "4 bars"]   # dsp/looper.h kLoopLens
+LOOP_REPEATS = ["Off", "1/2", "1/4", "1/8", "1/16", "1/32"]                 # dsp/looper.h kLoopReps
+num("xfade", "Crossfader", "lin", 0, 1, 0, "pct")   # 0 = scene A, 1 = scene B: learn it to the Force's fader
+enum("scene_a", "Scene A", SCENE_NAMES, "1")
+enum("scene_b", "Scene B", SCENE_NAMES, "2")
+toggle("edit_a", "Edit A")
+toggle("edit_b", "Edit B")
+button("scn_clear", "Clear Scene")
+for k in range(1, SCENES + 1):
+    tile("sca_%d" % k, "Scene A %d" % k)
+for k in range(1, SCENES + 1):
+    tile("scb_%d" % k, "Scene B %d" % k)
+readout("scn_info", "Scene Info")
+readout("xf_bar", "Fader Pos")
+enum("lp_on", "Looper On", ON_OFF, "Off")
+enum("lp_pos", "Looper Place", ["Pre", "Post"], "Pre")
+num("lp_mix", "Loop", "lin", 0, 1, 0, "pct")
+enum("lp_len", "Loop Length", LOOP_LENGTHS, "1 bar")
+popup_flag("lp_len")
+enum("lp_rep", "Loop Repeat", LOOP_REPEATS, "Off")
+popup_flag("lp_rep")
+num("lp_speed", "Loop Speed", "lin", -1, 2, 1, "mult")
+enum("lp_hold", "Loop Hold", ON_OFF, "Off")
+
+# How a scene's lock moves with the fader (plugin/scenes.h SceneMorph): never locked; a straight line in
+# the knob's 0..1 space (continuous knobs, and ordered steps: an enum's value is its index / (options - 1),
+# so the line walks the steps in order); the other end's value from the middle on (unordered choices); a
+# module's On as a send (dsp/rack.h).
+SCENE_FIXED = ("xfade", "scene_a", "scene_b", "lp_on")   # the fader, the picks, the recorder's arming
+ORDERED = ("phs_div", "dly_div", "pls_div", "grn_div", "l1_div", "l2_div", "lp_len", "lp_rep")
+MODULE_ON_KEYS = ["%s_on" % pre for pre, _ in MODULES]
+
+
+def scene_morph(p):
+    if p["kind"] != "synth" or p["key"] in SCENE_FIXED:
+        return "None"
+    if p["key"] in MODULE_ON_KEYS:
+        return "Send"
+    if p["curve"] == "enum" and p["key"] not in ORDERED:
+        return "Switch"
+    return "Line"
+
 
 def norm(p):
     """The default as MPC's 0..1 value."""
@@ -1221,7 +1267,15 @@ def _shown(entry):
 
 
 def check_preset_line(params, key, val):
-    """None if key=val is a valid sound line, else what is wrong with it. Options go by name (or index)."""
+    """None if key=val is a valid sound line, else what is wrong with it. Options go by name (or index).
+    A scene's lock is sceneN.key=value (N 1..SCENES) for a parameter a scene can lock."""
+    scene = re.match(r"scene(\d+)\.(.+)$", key)
+    if scene:
+        if not 1 <= int(scene.group(1)) <= SCENES:
+            return "%r: scenes are 1..%d" % (key, SCENES)
+        if scene.group(2) not in params or scene_morph(params[scene.group(2)]) == "None":
+            return "%r: a scene can't lock %s" % (key, scene.group(2))
+        key = scene.group(2)
     p = params.get(key)
     if not p or p["kind"] not in ("synth", "chain"):
         return "%r is not a sound parameter" % key
@@ -1320,6 +1374,24 @@ constexpr int kNumFactoryPresets = %d;
 """ % (rows, len(presets))
 
 
+def perform_header():
+    """The performance layer's part of param_ids.h: how each parameter's scene lock moves with the fader."""
+    morph = ", ".join("SceneMorph::%s" % scene_morph(p) for p in P)
+    return """
+namespace ef {
+
+// The performance layer (surface.py "performance"): how a scene's lock of each parameter moves with
+// the fader (plugin/scenes.h).
+enum class SceneMorph : unsigned char { None, Line, Switch, Send };
+static constexpr SceneMorph kSceneMorph[P_COUNT] = {%s};
+constexpr int kNumScenes = %d;
+constexpr int kNumLoopLengths = %d;
+constexpr int kNumLoopRepeats = %d;
+
+} // namespace ef
+""" % (morph, SCENES, len(LOOP_LENGTHS), len(LOOP_REPEATS))
+
+
 def main():
     keys = [p["key"] for p in P]
     assert len(set(keys)) == len(keys), "duplicate parameter key"
@@ -1336,7 +1408,7 @@ def main():
         ("vst.json", json.dumps(VST, indent=1)),
         (os.path.join("build", "skin_style.json"), json.dumps(skin_style(), indent=1)),
         (os.path.join("build", "factory_presets.h"), presets_header(presets)),
-        (os.path.join("build", "param_ids.h"), header()),   # last: make's target, newer than the rest
+        (os.path.join("build", "param_ids.h"), header() + perform_header()),   # last: make's target, newer than the rest
     ]
     os.makedirs(os.path.join(HERE, "build"), exist_ok=True)
     for name, text in outputs:

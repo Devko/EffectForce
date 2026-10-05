@@ -244,6 +244,7 @@ int main() {
     grainTests();
     delayTests();
     reverbTests();
+    looperTests();
     rackTests();
     modTests();
 
@@ -254,6 +255,7 @@ int main() {
     testStatus();
     testLists();
     chainTests();
+    scenesTests();
     presetTests();
     testStress();
 

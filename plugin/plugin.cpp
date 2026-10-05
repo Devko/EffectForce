@@ -143,12 +143,19 @@ float getParameter(AEffect* e, int32_t i) {
     }
 }
 
+// The looper's buffers (11 MB) are made the first time it is armed, here on MPC's UI thread, so an
+// EffectForce that never uses it costs nothing more. Cheap once they exist.
+void armLooper(Plugin* p) {
+    if (p->surface.get(P_LP_ON) > 0.5f) p->engine.armLooper();
+}
+
 void setParameter(AEffect* e, int32_t i, float v) {
     try {
         Surface& s = self(e)->surface;
         const bool traced = i >= 0 && i < P_COUNT && tracing();
         const float before = traced ? s.get(i) : 0.0f;   // what MPC last read back
         s.set(i, v);
+        armLooper(self(e));   // Looper On, or a preset that has it on
         if (traced)
             trace("%p set %3d %-18s %.4f  read %.4f -> %.4f  \"%s\"", static_cast<void*>(e), static_cast<int>(i),
                   PARAM_INFO[i].key, static_cast<double>(v), static_cast<double>(before), static_cast<double>(s.get(i)),
@@ -344,7 +351,9 @@ intptr_t dispatch(Plugin* p, int32_t op, int32_t idx, intptr_t val, void* ptr) {
             if (!ptr || val <= 0 || val > (1 << 20)) return 0;   // a state is ~4 KB; more is not ours
             std::string s(static_cast<const char*>(ptr), static_cast<size_t>(val));
             while (!s.empty() && s.back() == '\0') s.pop_back();
-            return loadState(p->surface, s, false) ? 1 : 0;
+            const bool ok = loadState(p->surface, s, false);
+            armLooper(p);
+            return ok ? 1 : 0;
         }
         default: return 0;
     }
@@ -378,6 +387,7 @@ AEffect* createPlugin(audioMasterCallback master) {
     Plugin* p = new Plugin();
     p->master = master;
     const uint32_t seed = instanceSeed(p);
+    p->engine.attachScenes(&p->surface.scenes());
     p->engine.seed(seed);
     p->surface.seed(seed * 0x2545F491u + 1u);
 

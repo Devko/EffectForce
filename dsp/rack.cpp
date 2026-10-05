@@ -10,6 +10,7 @@ constexpr float kDipStep = 1.0f / (0.003f * kRate);    // a new order: 3 ms out,
 
 // 0 dB is exactly 1: an empty chain at unity passes the input through bit for bit.
 float gainOf(float db) { return db == 0.0f ? 1.0f : dbToGain(db); }
+float unit(float v) { return v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f; }   // 0..1, NaN 0
 }
 
 bool validOrder(const int* order) {
@@ -25,6 +26,7 @@ Rack::Rack() = default;
 
 void Rack::reset() {
     for (int m = 0; m < RM_COUNT; ++m) resetModule(m);
+    looper_.reset();
     fresh_ = true;
 }
 
@@ -45,6 +47,22 @@ void Rack::resetModule(int m) {
     dirty_[m] = false;
 }
 
+int Rack::moduleTail(int m) const {
+    switch (m) {
+        case RM_DRIVE: return drive_.tailSamples();
+        case RM_FILTER: return filter_.tailSamples();
+        case RM_EQ: return eq_.tailSamples();
+        case RM_COMP: return comp_.tailSamples();
+        case RM_CHORUS: return chorus_.tailSamples();
+        case RM_PHASER: return phaser_.tailSamples();
+        case RM_PULSE: return pulse_.tailSamples();
+        case RM_GRAIN: return grain_.tailSamples();
+        case RM_DELAY: return delay_.tailSamples();
+        case RM_REVERB: return reverb_.tailSamples();
+        default: return 0;
+    }
+}
+
 int Rack::tailSamples() const {
     int t = 0;
     const int tails[RM_COUNT] = {drive_.tailSamples(),  filter_.tailSamples(), eq_.tailSamples(),
@@ -61,13 +79,34 @@ int Rack::running() const { return running_; }
 void Rack::runModule(int m, const RackPatch& p, const Transport& t, float* L, float* R, int n) {
     const float target = p.on[m] ? 1.0f : 0.0f;
     if (fade_[m] == 0.0f && target == 0.0f) return;   // off: no CPU at all
+    // The send: a module the scenes' fader moves in and out.
+    const float s0 = send_[m], s1 = unit(p.send[m]);
+    const bool sending = s0 < 1.0f || s1 < 1.0f;
+    if (sending) {
+        if (s0 == 0.0f && s1 == 0.0f) {   // sent nothing: the tail rings out, then the module rests
+            if (rest_[m] > moduleTail(m)) return;
+            rest_[m] += n;
+        } else {
+            rest_[m] = 0;
+        }
+    }
     if (fade_[m] == 0.0f && dirty_[m]) resetModule(m);   // back on: from cleared state
     dirty_[m] = true;
     ++running_;
     const bool fading = fade_[m] != target;
-    if (fading) {
+    if (fading || sending) {
         std::memcpy(inL_, L, sizeof(float) * static_cast<size_t>(n));
         std::memcpy(inR_, R, sizeof(float) * static_cast<size_t>(n));
+    }
+    if (sending) {   // the module hears in x s, gliding from the last chunk's s across this one
+        const float ds = (s1 - s0) / static_cast<float>(n);
+        for (int i = 0; i < n; ++i) {
+            const float g = s0 + ds * static_cast<float>(i + 1);
+            sendGain_[i] = g;
+            L[i] *= g;
+            R[i] *= g;
+        }
+        send_[m] = s1;
     }
     switch (m) {
         case RM_DRIVE: drive_.set(p.drive, t); drive_.process(L, R, n); break;
@@ -82,6 +121,11 @@ void Rack::runModule(int m, const RackPatch& p, const Transport& t, float* L, fl
         case RM_REVERB: reverb_.set(p.reverb, t); reverb_.process(L, R, n); break;
         default: break;
     }
+    if (sending)   // what the module didn't hear passes it by
+        for (int i = 0; i < n; ++i) {
+            L[i] += inL_[i] * (1.0f - sendGain_[i]);
+            R[i] += inR_[i] * (1.0f - sendGain_[i]);
+        }
     if (!fading) return;
     float g = fade_[m];
     const float step = target > g ? kFadeStep : -kFadeStep;
@@ -100,7 +144,11 @@ void Rack::process(const RackPatch& p, const Transport& t, float* L, float* R, i
         in_.jump(gainOf(p.inDb));
         out_.jump(gainOf(p.outDb));
         mix_.jump(std::clamp(p.mix, 0.0f, 1.0f));
-        for (int m = 0; m < RM_COUNT; ++m) fade_[m] = p.on[m] ? 1.0f : 0.0f;
+        for (int m = 0; m < RM_COUNT; ++m) {
+            fade_[m] = p.on[m] ? 1.0f : 0.0f;
+            send_[m] = unit(p.send[m]);
+            rest_[m] = 0;
+        }
         if (orderOk) std::copy(p.order, p.order + RM_COUNT, order_);
         dip_ = 1.0f;
         dipDir_ = 0;
@@ -121,6 +169,10 @@ void Rack::process(const RackPatch& p, const Transport& t, float* L, float* R, i
         else dipDir_ = -1;
     }
 
+    if (!p.looperPost) {   // Pre: the loop goes through everything below
+        looper_.set(p.looper, t);
+        looper_.process(L, R, n);
+    }
     std::memcpy(dryL_, L, sizeof(float) * static_cast<size_t>(n));
     std::memcpy(dryR_, R, sizeof(float) * static_cast<size_t>(n));
     for (int i = 0; i < n; ++i) {
@@ -136,6 +188,10 @@ void Rack::process(const RackPatch& p, const Transport& t, float* L, float* R, i
         const float o = out_.next() * dip_, w = mix_.next();
         L[i] = dryL_[i] + (L[i] * o - dryL_[i]) * w;
         R[i] = dryR_[i] + (R[i] * o - dryR_[i]) * w;
+    }
+    if (p.looperPost) {   // Post: the loop replaces what the rack plays
+        looper_.set(p.looper, t);
+        looper_.process(L, R, n);
     }
     if (dipDir_ < 0 && dip_ == 0.0f) {   // silent: the new order goes in, then fades back
         if (orderOk) std::copy(p.order, p.order + RM_COUNT, order_);

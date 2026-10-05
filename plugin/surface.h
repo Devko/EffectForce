@@ -21,6 +21,7 @@
 // always reads back 0 (it springs back): every 1 is a press, and no release ever follows.
 #include "library.h"
 #include "param_ids.h"
+#include "scenes.h"
 
 #include <atomic>
 #include <mutex>
@@ -70,6 +71,16 @@ public:
 
     void        seed(uint32_t s) { rng_ = s ? s : 1u; }   // RND's random numbers
 
+    // --- the scenes (docs/DESIGN.md "Performance: scenes and the looper") ------------------
+    // EDIT A / B: every page shows the scene picked at that end; what MPC sets while editing is
+    // locked in it. UI thread, but for scenes(), which the engine reads.
+    Scenes&       scenes() { return scenes_; }
+    const Scenes& scenes() const { return scenes_; }
+    int         editSide() const { return editSide_; }   // -1 none, 0 A, 1 B
+    void        endEdit();                               // the knobs back as they were
+    // What the state saves for a parameter: while a scene is edited, the knob, not the scene.
+    float       stateValue(int i) const;
+
     static int  kFine;   // ranges with this many steps or more follow MPC's value
     // Milliseconds for telling gestures apart (null: the steady clock). Tests set one that only
     // moves when they say, so stepping doesn't depend on how fast the machine is.
@@ -86,6 +97,12 @@ private:
     bool toggleBounce(int i, bool on);
     void browserAction(int i);
     void chainAction(int i);   // a slot tile, MOVE < / >, ON / OFF
+    void sceneAction(int i);   // EDIT A / B, a scene tile, CLEAR
+    void startEdit(int side);
+    void loadEdited();         // the edited scene's locks onto the knobs (the knobs hold the base)
+    int  sceneOf(int side) const;
+    std::string sceneInfo() const;
+    std::string faderBar() const;
     int  selected() const;     // the selected chain slot
     // FAVORITES, RECENT, then the library's categories (from L, the listing in use).
     std::vector<Category> categories(const Listing& L) const;
@@ -119,6 +136,11 @@ private:
     std::vector<std::string> tileKeys_;        // what each preset tile holds now
     std::vector<int>         catTiles_;        // which category each category tile holds
     uint32_t                 rng_ = 0x2545F491u;
+
+    // The scenes; the edit (UI thread): which end, which scene, the knobs as they were before it.
+    Scenes                   scenes_;
+    int                      editSide_ = -1, editScene_ = 0;
+    float                    editBase_[P_COUNT] = {};
 
     // Every write of a value MPC should see goes through here.
     void put(int i, float v) {

@@ -7,6 +7,12 @@
 //   - A new order of the modules that sound dips the chain's output to silence over 3 ms, swaps, and
 //     fades back over 3 ms; moving modules that are off changes nothing you hear, so no dip.
 //   - Everything off with unity gains passes the input through bit for bit.
+//   - A module's send (the scenes' crossfader, docs/DESIGN.md "Performance: scenes and the looper"): its
+//     input level s, gliding across the chunk; out = in (1 - s) + module(in s). Below 1 the module's
+//     tail rings on as s falls; once s has been 0 for the module's tail time it rests (no CPU) until s
+//     rises. A send of 1 is the plain module, bit for bit.
+//   - The looper wraps the rest: Pre before everything (the loop goes through the modules and the
+//     Mix), Post after the Mix.
 #include "common.h"
 #include "chorus.h"
 #include "comp.h"
@@ -15,12 +21,22 @@
 #include "eq.h"
 #include "filter.h"
 #include "grain.h"
+#include "looper.h"
 #include "mod.h"
 #include "phaser.h"
 #include "pulse.h"
 #include "reverb.h"
 
+#include <array>
+
 namespace ef {
+
+template <size_t N>
+constexpr std::array<float, N> filled(float v) {
+    std::array<float, N> a{};
+    for (float& x : a) x = v;
+    return a;
+}
 
 // The modules, in their default order (= surface.py MODULES; plugin/rack_map.cpp checks it).
 enum RackModule : int { RM_DRIVE, RM_FILTER, RM_EQ, RM_COMP, RM_CHORUS, RM_PHASER, RM_PULSE, RM_GRAIN, RM_DELAY,
@@ -40,6 +56,9 @@ struct RackPatch {
     Grain::Params grain{};
     Delay::Params delay{};
     Reverb::Params reverb{};
+    std::array<float, RM_COUNT> send = filled<RM_COUNT>(1.0f);   // 0..1, see above
+    Looper::Params looper{};
+    bool looperPost = false;   // the looper after the Mix instead of before everything
     // The modulation sources' settings: the engine uses them, the rack doesn't.
     LfoParams lfo[2];
     float envAttackS = 0.01f, envReleaseS = 0.2f, envGainDb = 12.0f;
@@ -59,9 +78,14 @@ public:
     int tailSamples() const;   // the longest tail among the modules running now
     int running() const;       // modules processed in the last chunk (on, or fading out)
 
+    // The looper's buffers are made on the UI thread when it is first armed (Looper::allocate()).
+    Looper& looper() { return looper_; }
+    const Looper& looper() const { return looper_; }
+
 private:
     void runModule(int m, const RackPatch& p, const Transport& t, float* L, float* R, int n);
     void resetModule(int m);
+    int moduleTail(int m) const;
 
     Drive drive_;
     Filter filter_;
@@ -73,16 +97,19 @@ private:
     Grain grain_;
     Delay delay_;
     Reverb reverb_;
+    Looper looper_;
 
     bool fresh_ = true;
     Ramp in_, out_, mix_;
     float fade_[RM_COUNT] = {};    // each module's share of its slot: 0 off .. 1 on
     bool dirty_[RM_COUNT] = {};    // processed since its last reset
+    std::array<float, RM_COUNT> send_ = filled<RM_COUNT>(1.0f);   // each module's send now
+    int rest_[RM_COUNT] = {};      // samples its send has been 0
     int order_[RM_COUNT] = {RM_DRIVE, RM_FILTER, RM_EQ, RM_COMP, RM_CHORUS, RM_PHASER, RM_PULSE, RM_GRAIN, RM_DELAY, RM_REVERB};
     float dip_ = 1.0f;             // the chain's level while the order changes
     int dipDir_ = 0;               // -1 fading out for a new order, +1 fading back in, 0 none
     int running_ = 0;
-    float dryL_[kChunk] = {}, dryR_[kChunk] = {}, inL_[kChunk] = {}, inR_[kChunk] = {};
+    float dryL_[kChunk] = {}, dryR_[kChunk] = {}, inL_[kChunk] = {}, inR_[kChunk] = {}, sendGain_[kChunk] = {};
 };
 
 } // namespace ef

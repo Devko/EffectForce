@@ -32,6 +32,12 @@ bool parse(const std::string& s, float& out) {
     return true;
 }
 
+// A parameter's value as a state line writes it: the real value, or the option's name.
+std::string valueText(int i, float norm) {
+    const float v = paramValue(i, norm);
+    return PARAM_INFO[i].nopts > 0 ? std::string(PARAM_INFO[i].opts[static_cast<int>(v)]) : number(v);
+}
+
 // An option by its name ("Ping-Pong", "Reverb") or its index; -1 if it is neither.
 int option(int i, const std::string& val) {
     for (int o = 0; o < PARAM_INFO[i].nopts; ++o)
@@ -40,6 +46,35 @@ int option(int i, const std::string& val) {
     if (parse(val, v) && v == std::floor(v) && v >= 0.0f && v < static_cast<float>(PARAM_INFO[i].nopts))
         return static_cast<int>(v);
     return -1;
+}
+
+// A line's value as parameter i's 0..1, or -1 if it isn't one.
+float normOf(int i, const std::string& val) {
+    if (PARAM_INFO[i].nopts > 0) {
+        const int o = option(i, val);
+        return o >= 0 ? paramNorm(i, static_cast<float>(o)) : -1.0f;
+    }
+    float v = 0.0f;
+    return parse(val, v) ? paramNorm(i, v) : -1.0f;
+}
+
+int savedParam(const std::string& key) {
+    for (int i = 0; i < P_COUNT; ++i)
+        if (saved(i) && key == PARAM_INFO[i].key) return i;
+    return -1;
+}
+
+// "scene3.flt_cut" -> scene 2 (0-based) and the parameter; false if the key isn't a scene's lock.
+bool sceneKey(const std::string& key, int& scene, int& param) {
+    if (key.compare(0, 5, "scene") != 0) return false;
+    const size_t dot = key.find('.');
+    if (dot == std::string::npos || dot == 5) return false;
+    int n = 0;
+    const auto r = std::from_chars(key.data() + 5, key.data() + dot, n);
+    if (r.ec != std::errc() || r.ptr != key.data() + dot || n < 1 || n > kNumScenes) return false;
+    scene = n - 1;
+    param = savedParam(key.substr(dot + 1));
+    return param >= 0 && Scenes::lockable(param);
 }
 } // namespace
 
@@ -58,10 +93,16 @@ std::string saveState(const Surface& s, bool asPreset) {
         if (!saved(i)) continue;
         out += PARAM_INFO[i].key;
         out += '=';
-        const float v = paramValue(i, s.get(i));
-        out += PARAM_INFO[i].nopts > 0 ? std::string(PARAM_INFO[i].opts[static_cast<int>(v)]) : number(v);
+        out += valueText(i, s.stateValue(i));   // while a scene is edited: the knobs, not the scene
         out += '\n';
     }
+    // The scenes' locks: sceneN.key=value.
+    for (int sc = 0; sc < kNumScenes; ++sc)
+        for (int i = 0; i < P_COUNT; ++i) {
+            const float n = s.scenes().value(sc, i);
+            if (n < 0.0f) continue;
+            out += "scene" + std::to_string(sc + 1) + "." + PARAM_INFO[i].key + "=" + valueText(i, n) + "\n";
+        }
     if (!asPreset && !s.presetKey().empty()) out += "preset=" + s.presetKey() + "\n";
     return out;
 }
@@ -69,6 +110,8 @@ std::string saveState(const Surface& s, bool asPreset) {
 bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
     if (!isStateText(textIn)) return false;
     const std::string text = textIn.compare(0, 3, "\xEF\xBB\xBF") == 0 ? textIn.substr(3) : textIn;
+    s.endEdit();               // a scene being edited: its knobs go back first
+    s.scenes().clearAll();     // the state's scenes replace the ones there were (none listed: none)
     Surface::Batch batch(s);   // the audio thread never plays a half-loaded sound
     if (asPreset)
         for (int i = 0; i < P_COUNT; ++i)
@@ -88,17 +131,16 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
             preset = val;
             continue;
         }
-        for (int i = 0; i < P_COUNT; ++i)
-            if (saved(i) && key == PARAM_INFO[i].key) {
-                if (PARAM_INFO[i].nopts > 0) {
-                    const int o = option(i, val);
-                    if (o >= 0) s.setValue(i, paramNorm(i, static_cast<float>(o)));
-                } else {
-                    float v = 0.0f;
-                    if (parse(val, v)) s.setValue(i, paramNorm(i, v));
-                }
-                break;
-            }
+        int scene = 0, param = -1;
+        if (sceneKey(key, scene, param)) {
+            const float n = normOf(param, val);
+            if (n >= 0.0f) s.scenes().lock(scene, param, n);
+            continue;
+        }
+        const int i = savedParam(key);
+        if (i < 0) continue;
+        const float n = normOf(i, val);
+        if (n >= 0.0f) s.setValue(i, n);
     }
     // The order must name every module once; anything else (an old or hand-edited state) is the default.
     int order[kNumModules];

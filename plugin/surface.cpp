@@ -131,7 +131,17 @@ void Surface::set(int i, float n) {
     apply(i, n);
     shown();
     // A sound parameter's text is computed when MPC asks; a module's on / off also lights its chain tile.
-    if (k != Kind::Synth || isModuleOn(i)) refresh();
+    bool texts = k != Kind::Synth || isModuleOn(i);
+    if (editSide_ >= 0 && Scenes::lockable(i)) {   // editing a scene: what MPC sets is locked in it
+        scenes_.lock(editScene_, i, want_[i].load());
+        texts = true;
+    }
+    if (i == P_SCENE_A || i == P_SCENE_B) {   // another scene at an end (a Q-Link): the edit follows it
+        if (editSide_ == (i == P_SCENE_A ? 0 : 1) && sceneOf(editSide_) != editScene_) loadEdited();
+        texts = true;
+    }
+    if (i == P_XFADE) textGen_.fetch_add(1, std::memory_order_release);   // the fader's bar
+    if (texts) refresh();
 }
 
 void Surface::beginBatch() {
@@ -204,6 +214,7 @@ void Surface::apply(int i, float n) {
             if (i == P_PRE_SAVE) savePreset();
             if (i == P_CAT_PREV || i == P_CAT_NEXT || i == P_ITEM_PREV || i == P_ITEM_NEXT || i == P_RND) browserAction(i);
             if (i == P_MOVE_L || i == P_MOVE_R || i == P_SEL_ON) chainAction(i);
+            if (i == P_SCN_CLEAR) sceneAction(i);
             break;
         case Kind::Tile:
         case Kind::Toggle: {
@@ -211,6 +222,9 @@ void Surface::apply(int i, float n) {
             const bool lit = want_[i].load() > 0.5f;
             if (on == lit || toggleBounce(i, on)) break;   // nothing new, or the release echo
             if (i >= P_SLOT_1 && i < P_SLOT_1 + kNumModules) chainAction(i);
+            else if (i == P_EDIT_A || i == P_EDIT_B || (i >= P_SCA_1 && i < P_SCA_1 + kNumScenes) ||
+                     (i >= P_SCB_1 && i < P_SCB_1 + kNumScenes))
+                sceneAction(i);
             else browserAction(i);
             break;
         }
@@ -370,6 +384,108 @@ void Surface::chainAction(int i) {
     }
 }
 
+// --- the scenes -----------------------------------------------------------------------------
+
+static_assert(P_SCA_8 - P_SCA_1 == kNumScenes - 1 && P_SCB_8 - P_SCB_1 == kNumScenes - 1,
+              "the scene tiles must be in order");
+
+int Surface::sceneOf(int side) const {
+    const int id = side ? P_SCENE_B : P_SCENE_A;
+    return clampi(static_cast<int>(paramValue(id, want_[id].load())), 0, kNumScenes - 1);
+}
+
+float Surface::stateValue(int i) const {
+    if (i < 0 || i >= P_COUNT) return 0.0f;
+    return editSide_ >= 0 && Scenes::lockable(i) ? editBase_[i] : want_[i].load();
+}
+
+void Surface::startEdit(int side) {
+    scenes_.setEditing(true);   // first: the engine stops moving parameters before the knobs change
+    {
+        Batch batch(*this);
+        for (int p = 0; p < P_COUNT; ++p) {
+            if (!Scenes::lockable(p)) continue;
+            if (editSide_ < 0) editBase_[p] = want_[p].load();   // from the knobs
+            else put(p, editBase_[p]);                           // from the other end's scene: the knobs first
+        }
+        editSide_ = side;
+        editScene_ = sceneOf(side);
+        for (int p = 0; p < P_COUNT; ++p) {
+            const float v = scenes_.value(editScene_, p);
+            if (v >= 0.0f) put(p, v);
+        }
+    }
+    refresh();
+}
+
+void Surface::loadEdited() {
+    Batch batch(*this);
+    for (int p = 0; p < P_COUNT; ++p)
+        if (Scenes::lockable(p)) put(p, editBase_[p]);
+    editScene_ = sceneOf(editSide_);
+    for (int p = 0; p < P_COUNT; ++p) {
+        const float v = scenes_.value(editScene_, p);
+        if (v >= 0.0f) put(p, v);
+    }
+}
+
+void Surface::endEdit() {
+    if (editSide_ < 0) return;
+    {
+        Batch batch(*this);
+        for (int p = 0; p < P_COUNT; ++p)
+            if (Scenes::lockable(p)) put(p, editBase_[p]);
+        editSide_ = -1;
+    }
+    scenes_.setEditing(false);   // last: the knobs are back before the engine moves parameters again
+    refresh();
+}
+
+void Surface::sceneAction(int i) {
+    if (i == P_EDIT_A || i == P_EDIT_B) {
+        const int side = i == P_EDIT_A ? 0 : 1;
+        if (editSide_ == side) endEdit();
+        else startEdit(side);
+        return;
+    }
+    for (int side = 0; side < 2; ++side)
+        for (int k = 0; k < kNumScenes; ++k)
+            if (i == (side ? P_SCB_1 : P_SCA_1) + k) {   // a tap picks the scene at that end
+                put(side ? P_SCENE_B : P_SCENE_A, static_cast<float>(k) / static_cast<float>(kNumScenes - 1));
+                if (editSide_ == side) loadEdited();
+                return;
+            }
+    if (i == P_SCN_CLEAR && editSide_ >= 0) {   // the edited scene's locks go; its knobs show the base
+        Batch batch(*this);
+        for (int p = 0; p < P_COUNT; ++p)
+            if (scenes_.locked(editScene_, p)) put(p, editBase_[p]);
+        scenes_.clear(editScene_);
+    }
+}
+
+std::string Surface::sceneInfo() const {
+    char b[96];
+    if (editSide_ >= 0) {
+        std::snprintf(b, sizeof b, "EDIT %c: SCENE %d, %d LOCKS. WHAT YOU MOVE IS LOCKED", 'A' + editSide_, editScene_ + 1,
+                      scenes_.count(editScene_));
+    } else {
+        const int a = sceneOf(0), c = sceneOf(1);
+        std::snprintf(b, sizeof b, "A: SCENE %d, %d LOCKS     B: SCENE %d, %d LOCKS", a + 1, scenes_.count(a), c + 1,
+                      scenes_.count(c));
+    }
+    return b;
+}
+
+std::string Surface::faderBar() const {
+    constexpr int kWidth = 24;
+    const int at = clampi(static_cast<int>(std::lround(want_[P_XFADE].load() * kWidth)), 0, kWidth);
+    std::string s = "A  ";
+    s.append(static_cast<size_t>(at), '=');
+    s += '|';
+    s.append(static_cast<size_t>(kWidth - at), '-');
+    return s + "  B";
+}
+
 // --- presets ------------------------------------------------------------------------------
 
 void Surface::loadPreset(const std::string& key) {
@@ -407,6 +523,7 @@ void Surface::savePreset() {
 
 std::string Surface::display(int i) const {
     if (i < 0 || i >= P_COUNT) return {};
+    if (i == P_XF_BAR) return faderBar();   // follows the fader without a refresh
     switch (PARAM_INFO[i].kind) {
         case Kind::Synth:
         case Kind::Chain:
@@ -497,6 +614,22 @@ void Surface::refresh() {
         const std::string name = upper(PARAM_INFO[P_ORDER_1].opts[m]);
         t[static_cast<size_t>(P_SLOT_1 + k)] = k == sel ? "[ " + name + " ]" : name;
     }
+
+    // The PERFORM page: each end's scene tiles (lit = the scene there, its lock count), the edit
+    // switches, the scenes' line and the fader.
+    for (int side = 0; side < 2; ++side) {
+        const int cur = sceneOf(side);
+        for (int k = 0; k < kNumScenes; ++k) {
+            const int id = (side ? P_SCB_1 : P_SCA_1) + k;
+            put(id, k == cur ? 1.0f : 0.0f);
+            const int locks = scenes_.count(k);
+            t[static_cast<size_t>(id)] = std::to_string(k + 1) + (locks ? "  (" + std::to_string(locks) + ")" : "");
+        }
+    }
+    put(P_EDIT_A, editSide_ == 0 ? 1.0f : 0.0f);
+    put(P_EDIT_B, editSide_ == 1 ? 1.0f : 0.0f);
+    t[P_SCN_INFO] = sceneInfo();
+    t[P_XF_BAR] = faderBar();
 
     char b[64];
     std::snprintf(b, sizeof b, "PAGE %d / %d", itemPage_ + 1, itemPages);

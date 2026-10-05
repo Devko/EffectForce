@@ -152,6 +152,7 @@ struct Turn {
 void rackTests();
 void modTests();
 void chainTests();
+void scenesTests();
 void presetTests();
 
 } // namespace eft
@@ -168,3 +169,4 @@ void pulseTests();
 void grainTests();
 void delayTests();
 void reverbTests();
+void looperTests();

@@ -11,6 +11,14 @@ static_assert(P_M2_SRC - P_M1_SRC == P_M8_SRC - P_M7_SRC && P_M1_DST - P_M1_SRC 
                   P_M1_AMT - P_M1_SRC == P_M8_AMT - P_M8_SRC,
               "the matrix slots' parameters must repeat in the same order");
 constexpr int kSlotStride = P_M2_SRC - P_M1_SRC;
+const float kFaderCoef = 1.0f - std::exp(-static_cast<float>(kChunk) / (0.015f * kRate));   // 15 ms per chunk
+float unit(float v) { return v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f; }                     // NaN: 0
+
+int moduleOf(int param) {
+    for (int m = 0; m < kNumModules; ++m)
+        if (kModuleOnParam[m] == param) return m;
+    return -1;
+}
 }
 
 Engine::Engine() {
@@ -33,9 +41,59 @@ void Engine::reset() {
     std::fill(src_, src_ + MS_COUNT, 0.0f);
 }
 
+void Engine::attachScenes(const Scenes* s) {
+    scenes_ = s;
+    if (haveRaw_) rebuild();
+}
+
+bool Engine::armLooper() { return rack_.looper().allocate(); }
+
 void Engine::setParams(const float* norm) {
-    std::copy(norm, norm + P_COUNT, norm_);
+    // The crossfader alone moved (the common case while it is played): no rebuild, the next chunks
+    // glide to it.
+    xTarget_ = unit(norm[P_XFADE]);
+    if (xFresh_) x_ = xTarget_;   // nothing played yet (a project loading): no glide from 0
+    bool onlyFader = haveRaw_;
+    for (int i = 0; i < P_COUNT && onlyFader; ++i) onlyFader = i == P_XFADE || norm[i] == raw_[i];
+    std::copy(norm, norm + P_COUNT, raw_);
+    haveRaw_ = true;
+    if (!onlyFader) rebuild();
+}
+
+void Engine::rebuild() {
+    std::copy(raw_, raw_ + P_COUNT, norm_);
+    nLocks_ = 0;
+    if (scenes_) {
+        sceneGen_ = scenes_->generation();   // before the values: a change after it rebuilds again
+        if (!scenes_->editing()) {           // while editing, the knobs already show the scene
+            const int sa = static_cast<int>(paramValue(P_SCENE_A, raw_[P_SCENE_A]));
+            const int sb = static_cast<int>(paramValue(P_SCENE_B, raw_[P_SCENE_B]));
+            for (int p = 0; p < P_COUNT; ++p) {
+                if (!Scenes::lockable(p)) continue;
+                const float la = scenes_->value(sa, p), lb = scenes_->value(sb, p);
+                if (la < 0.0f && lb < 0.0f) continue;
+                const float a = la >= 0.0f ? la : raw_[p], b = lb >= 0.0f ? lb : raw_[p];
+                const SceneMorph kind = kSceneMorph[p];
+                const bool moves = kind == SceneMorph::Send ? (a > 0.5f) != (b > 0.5f) : a != b;
+                if (!moves) {   // both ends the same (a lock against an equal knob, or both locked alike)
+                    norm_[p] = a;
+                    continue;
+                }
+                locks_[nLocks_++] = {p, kind == SceneMorph::Send ? moduleOf(p) : -1, a, b, kind};
+                if (kind == SceneMorph::Send) norm_[p] = 1.0f;   // runs while either end has it on
+            }
+        }
+    }
+    for (int k = 0; k < nLocks_; ++k)
+        if (locks_[k].kind != SceneMorph::Send) norm_[locks_[k].param] = Scenes::morph(locks_[k].param, locks_[k].a, locks_[k].b, x_);
     base_ = patchFromParams(norm_);
+    for (int k = 0; k < nLocks_; ++k)
+        if (locks_[k].kind == SceneMorph::Send && locks_[k].module >= 0)
+            base_.send[static_cast<size_t>(locks_[k].module)] = Scenes::send(locks_[k].a, locks_[k].b, x_);
+    routes();
+}
+
+void Engine::routes() {
     nSlots_ = 0;
     for (int k = 0; k < kNumModSlots; ++k) {
         const int at = P_M1_SRC + k * kSlotStride;
@@ -46,6 +104,24 @@ void Engine::setParams(const float* norm) {
         slots_[nSlots_++] = {src, kModTargetParam[dst], amount};
     }
     env_.set(base_.envAttackS, base_.envReleaseS, base_.envGainDb);
+}
+
+void Engine::morph() {
+    bool rerouted = false;
+    for (int k = 0; k < nLocks_; ++k) {
+        const Lock& l = locks_[k];
+        if (l.kind == SceneMorph::Send) {
+            if (l.module >= 0) base_.send[static_cast<size_t>(l.module)] = Scenes::send(l.a, l.b, x_);
+            continue;
+        }
+        const float n = Scenes::morph(l.param, l.a, l.b, x_);
+        if (n == norm_[l.param]) continue;
+        norm_[l.param] = n;
+        setField(base_, l.param, paramValue(l.param, n));
+        rerouted = rerouted || (l.param >= P_M1_SRC && l.param <= P_M8_AMT) || l.param == P_ENV_ATT ||
+                   l.param == P_ENV_REL || l.param == P_ENV_GAIN;
+    }
+    if (rerouted) routes();   // a scene moves the matrix or the envelope follower
 }
 
 void Engine::modulate() {
@@ -71,8 +147,15 @@ void Engine::modulate() {
 }
 
 void Engine::render(float* L, float* R, int n, Transport t) {
+    if (scenes_ && scenes_->generation() != sceneGen_ && haveRaw_) rebuild();   // a lock changed (UI thread)
+    xFresh_ = false;
     for (int pos = 0; pos < n; pos += kChunk) {
         const int m = std::min(kChunk, n - pos);
+        if (x_ != xTarget_) {   // the crossfader glides; the scenes' parameters follow it
+            x_ += (xTarget_ - x_) * kFaderCoef;
+            if (std::fabs(xTarget_ - x_) < 1e-4f) x_ = xTarget_;
+            morph();
+        }
         for (int k = 0; k < 4; ++k) src_[MS_MACRO1 + k] = norm_[P_MAC_1 + k];   // a macro's knob is its value
         const RackPatch* use = &base_;
         if (nSlots_ > 0) {
