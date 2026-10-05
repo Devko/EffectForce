@@ -141,6 +141,8 @@ private:
     Scenes                   scenes_;
     int                      editSide_ = -1, editScene_ = 0;
     float                    editBase_[P_COUNT] = {};
+    static constexpr int     kFaderBarWidth = 24;   // the fader's bar: this many steps from A to B
+    int                      shownBar_ = 0;         // where it was when MPC last redrew it
 
     // Every write of a value MPC should see goes through here.
     void put(int i, float v) {

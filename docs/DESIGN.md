@@ -200,7 +200,7 @@ Five groups (MPC's tab strip shows five without a pager), each page with its own
 
 | Group | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order as 8 tiles (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
+| CHAIN | **CHAIN**: the order as 8 tiles (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PERFORM**: the scene tiles of each end (lit = picked, the lock count), EDIT A / B, CLEAR, the scenes' line, the Crossfader knob and its bar; the LOOPER card. Q-Link 1 is the crossfader. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
 | TONE | **DRIVE+FILTER** (a card each), **EQ**, **COMP** (Comp and OTT cards) |
 | MOTION | **CHORUS+PHASE** (a card each) |
 | SPACE | **DELAY**, **REVERB** |
@@ -228,6 +228,10 @@ Targets on the Force (Cortex-A17), measured with `make bench-device`:
 | Drive (2× oversampled) | ≤ 1.5% |
 | Comp in OTT mode | ≤ 2% |
 | Chorus, Phaser, Delay, Filter, EQ, Comp | ≤ 0.8% each |
+| The performance layer: the looper rolling, the fader sweeping a dozen locks and four sends | ≤ 1.5% on top of what the modules cost |
+
+`make bench-device` has the performance layer's cases: the looper rolling with the fader sweeping (scene 2
+switching four modules in and moving a dozen parameters), alone and with everything on at its heaviest.
 
 ## Code layout
 
@@ -237,7 +241,10 @@ Targets on the Force (Cortex-A17), measured with `make bench-device`:
 | `dsp/simd.h`, `dsp/halfband.h` | SubForce's four-float vectors and halfband (plus the interpolator) |
 | `dsp/drive.*`, `filter.*`, `eq.*`, `comp.*`, `chorus.*`, `phaser.*`, `delay.*`, `reverb.*` | The modules |
 | `dsp/mod.h` | LFOs, envelope follower, matrix sources |
-| `dsp/rack.*` | Order, fades, levels, modulation, the chunk loop |
+| `dsp/rack.*` | Order, fades, levels, the modules' sends, the looper's place, the chunk loop |
+| `dsp/looper.*` | The looper: recorder ring, the grab on the grid, slices, speed, crossfaded jumps |
+| `plugin/scenes.*` | The scenes' locks (lock-free between the threads) and how each kind of parameter morphs |
+| `plugin/engine.*` | The morph (the fader's glide, the locked parameters per chunk) and the modulation |
 | `plugin/` | SubForce's surface (Force input handling, browser, presets, state), the effect glue from the probe, the CHAIN page's actions |
 | `surface/surface.py` | Parameters, pages (PolyForce's layout machinery and checks), factory presets |
 
@@ -249,3 +256,10 @@ under abrupt changes, NaN input, in-place processing, block sizes 1..32, reset. 
 plugin: all-off is bit-exact pass-through, order changes and on/off switching without clicks,
 modulation, state round trip, every factory preset plays finite and level-matched, the Force's
 input behaviour (taps, steppers, tiles), the suspend rule.
+
+The performance layer: the looper against a ramp that carries each sample's index, so every output
+sample names the recorded frame it came from (the grab on the grid, slices, speeds, Hold, the ring
+wrapping under a 10 s loop, a locate, block sizes; `test/looper_test.cpp`); the scenes' morph rules,
+the engine following the fader, a send bit for bit equal to the module switched on by its knob at the
+On end and the input bit for bit at the Off end, a tail ringing out, a module resting; EDIT A / B,
+tiles, CLEAR and the state through the plugin as a Force drives it (`test/scenes_test.cpp`).

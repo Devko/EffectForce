@@ -4,6 +4,21 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### The performance layer (2026-10-05, branch `ccr-eabecd3e-gfq4u1`)
+
+An Octatrack-style performance mixer in the rack ([Design](DESIGN.md#performance-scenes-and-the-looper),
+[User guide](USER_GUIDE.md#performance-scenes-and-the-looper)): eight scenes of parameter locks, A and B
+at the ends of a crossfader parameter for the Force's own crossfader, modules switched in as sends whose
+tails ring out, and a looper that grabs the bar just played and plays it on the grid (rolls, speed, tape
+stop). Built on the Shimmer / Pulse / Grain branch, merged with it as it moves.
+
+| Item | State |
+|---|---|
+| Looper (dsp/looper.*) | ✅ 44 module checks on x86 and ARM (`make test-module M=looper`) |
+| Scenes, the engine's morph, sends, EDIT A / B, state (plugin/scenes.*, engine, surface, state, rack) | ✅ 80 checks (test/scenes_test.cpp), the whole suite green on x86 and ARM |
+| PERFORM page, 10 Perform presets, bench and PGO cases | ✅ layout checked and previewed; presets level-matched |
+| On the device | 🔜 learn the Force's crossfader to Crossfader on an insert (on the master too: an open probe item), `make bench-device` with the two performance cases, play the Perform presets |
+
 ### Hand-off (2026-10-05, branch `shimmer-grain-pulse`)
 
 Work in progress, moved from the local machine to a cloud session. Shimmer, Pulse and Grain are
@@ -93,3 +108,8 @@ Design record: [Design](DESIGN.md).
   or Fade (a crossfade, no bend).
 - 2026-10-05 — **Level-matching by category:** Synth and Pads on chords, Bass on a bass line, Drums
   on drums, the rest on the full mix.
+- 2026-10-05 — **Performance layer:** in EffectForce itself (one insert on the master has every effect,
+  the scenes and the looper), not a plugin of its own. Scenes lock parameters the Octatrack way (each
+  scene only what it locks); a module a scene switches is a send, so tails ring out; the looper is a
+  fixed stage (Pre or Post), not a chain slot; its buffers only where it is armed; new parameters
+  appended after all others.

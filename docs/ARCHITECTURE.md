@@ -45,11 +45,13 @@ flowchart LR
 | `dsp/delay.*` | Double-precision delay time, feedback filters, drive and limiter, wow, ducking |
 | `dsp/reverb.*` | Predelay, diffusion, an 8-line feedback delay network, modulation, freeze |
 | `dsp/mod.h` | LFOs (free or beat-locked), the envelope follower |
-| `dsp/rack.*` | The order, on / off fades, the reorder dip, levels, the global mix |
+| `dsp/rack.*` | The order, on / off fades, the reorder dip, levels, the global mix, the modules' sends, the looper's place |
+| `dsp/looper.*` | The looper: an always-on recorder ring, the grab on the beat grid, slices, speed, crossfaded jumps |
 | `plugin/plugin.cpp` | VST2 glue for an insert effect, the suspend rule, the output guard, the CPU meter |
-| `plugin/engine.*` | The chunk loop: modulation sources, the matrix, the rack |
+| `plugin/engine.*` | The chunk loop: the scenes' morph (the fader's glide), modulation sources, the matrix, the rack |
+| `plugin/scenes.*` | The eight scenes' locks (atomics, a generation counter) and the morph rules |
 | `plugin/rack_map.*` | 0..1 <-> real values, value text, parameters -> the rack's patch |
-| `plugin/surface.*` | SubForce's (PolyForce's, RackForce's): stepping, buttons, tiles, the browser, pushes to MPC; plus the CHAIN page |
+| `plugin/surface.*` | SubForce's (PolyForce's, RackForce's): stepping, buttons, tiles, the browser, pushes to MPC; plus the CHAIN page, and the PERFORM page's scene tiles, EDIT A / B and CLEAR |
 | `plugin/state.*`, `presets.*`, `library.*`, `paths.*` | Saved state, preset files and the factory set, file libraries, folders |
 | `plugin/trace.*` | Device diagnostics while `/tmp/effectforce.trace` exists |
 | `presets/Factory/` | Factory presets: `NN_Category/NN_Name.efp` |
@@ -74,13 +76,18 @@ flowchart LR
 
 Everything runs in **32-sample chunks** (four per MPC block). Per chunk:
 
+0. **The scenes** (`plugin/engine.cpp`): the crossfader glides (15 ms one-pole) toward its parameter;
+   every parameter scene A or B locks is set to its morph at that position (a line in the knob's 0..1
+   space, a switch at the middle, or a module's send). The list of locked parameters is rebuilt only
+   when a parameter or a lock changes.
 1. **Modulation** (`plugin/engine.cpp`): every matrix slot adds amount × source to its target's 0..1
    value, clamped, through the knob's own curve, into a copy of the patch. Sources are the ones of
    the chunk before (0.7 ms: inaudible).
 2. **Sources** for the next chunk: the envelope follower on this chunk's input, both LFOs.
-3. **The rack** (`dsp/rack.cpp`): input gain; each module in order gets `set()` with its real
-   parameters, then `process()` in place; modules fading in or out are blended with their input;
-   output gain; the global mix with the dry input.
+3. **The rack** (`dsp/rack.cpp`): the looper if it is Pre; input gain; each module in order gets
+   `set()` with its real parameters, then `process()` in place (a module with a send below 1 hears
+   its input times the send, and the rest passes it by); modules fading in or out are blended with
+   their input; output gain; the global mix with the dry input; the looper if it is Post.
 
 The **output guard** (`plugin/plugin.cpp`) keeps every sample finite and within ±8 (+18 dBFS).
 
@@ -91,7 +98,11 @@ The **output guard** (`plugin/plugin.cpp`) keeps every sample finite and within 
 | **Audio** (one of MPC's audio workers; which one changes between calls, instances run concurrently) | `processReplacing`: the engine, the CPU meter, every call back into MPC |
 | **UI** (MPC's UI side) | Parameters, display text, saved state (chunks), the browser, preset loads, suspend / resume |
 
-- Nothing on the audio thread allocates, locks or throws. Modules allocate in their constructors.
+- Nothing on the audio thread allocates, locks or throws. Modules allocate in their constructors;
+  the looper allocates its buffers on the UI thread the first time it is armed, and hands them over
+  through an atomic pointer.
+- The scenes' locks are atomics the surface writes and the engine reads; a generation counter tells
+  the engine when to rebuild its list.
 - Host callbacks happen only from `processReplacing`; never from `setParameter` or the dispatcher.
 - A `try`/`catch` stands between every entry point and MPC: an exception never reaches the host.
 - Denormals are flushed to zero while a block renders.
@@ -123,7 +134,9 @@ What MPC does with an insert effect was measured on the device first ([the probe
   buttons, tiles, toggles, popup flags.
 - **Saved state** (projects and `.efp` preset files) is the text format `effectforce 1`: `key=value`
   lines of real values (Hz, seconds, dB), options by name (`dly_mode=Ping-Pong`, `order_3=Comp`), and
-  in a project the preset it came from. Ranges and option lists can change without breaking saved
-  sounds; an order that isn't a permutation of the modules falls back to the default.
+  in a project the preset it came from; then the scenes' locks as `sceneN.key=value` lines. Ranges and
+  option lists can change without breaking saved sounds; an order that isn't a permutation of the
+  modules falls back to the default. While a scene is being edited, the state keeps the knobs as they
+  were before the edit, not the scene on display.
 - **Limits:** `surface.py`'s module, source, wave and division lists must match the C++ enums;
   `plugin/rack_map.cpp` `static_assert`s it.

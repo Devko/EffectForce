@@ -119,6 +119,27 @@ int main() {
         close(e);
     }
 
+    // The performance layer: each Perform preset, the looper recording a bar, then the fader swept from
+    // A to B and back (the morph, the sends, the looper's grab, rolls and speeds); Perform Mixer through
+    // every scene it has.
+    for (int i = 0; i < kNumFactoryPresets; ++i) {
+        if (std::strcmp(kFactoryPresets[i].category, "Perform") != 0) continue;
+        AEffect* e = fresh();
+        const std::string text = kFactoryPresets[i].text;
+        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(text.size()), const_cast<char*>(text.data()), 0.0f);
+        play(e, 2.2);
+        const bool mixer = !std::strcmp(kFactoryPresets[i].name, "Perform Mixer");
+        for (int sc = 1; sc < (mixer ? kNumScenes : 2); ++sc) {
+            option(e, P_SCENE_B, sc);
+            for (int k = 0; k <= 20; ++k) {
+                e->setParameter(e, P_XFADE, k <= 10 ? k / 10.0f : (20 - k) / 10.0f);
+                play(e, 0.05);
+            }
+        }
+        close(e);
+        ++runs;
+    }
+
     // The factory presets, as users will mostly play them, each on a fresh instance.
     for (int i = 0; i < kNumFactoryPresets; ++i) {
         AEffect* e = fresh();

@@ -170,7 +170,16 @@ void matrix(const Setter& set) {
 
 struct Result { double avg, p99, max; };
 
-Result runCase(void* lib, int seconds, const char* name, int module, bool all) {
+// The performance layer at its busiest (docs/DESIGN.md "Performance: scenes and the looper"): scene 2
+// switches four modules in as sends and moves a dozen parameters; the looper rolls 1/16 of a bar; the
+// fader sweeps from A to B and back every 2 s, so every chunk works the morph.
+const char* kPerformState =
+    "effectforce 1\nlp_on=On\nscene_b=2\nscene2.lp_mix=1\nscene2.lp_rep=1/16\nscene2.lp_speed=0.75\n"
+    "scene2.flt_on=On\nscene2.flt_cut=300\nscene2.flt_res=0.6\nscene2.dly_on=On\nscene2.dly_fb=0.8\n"
+    "scene2.rev_on=On\nscene2.rev_mix=0.7\nscene2.rev_freeze=On\nscene2.drv_on=On\nscene2.drv_amt=30\n"
+    "scene2.chr_mix=0.9\nscene2.phs_depth=1\nscene2.mac_1=1\nscene2.in_gain=-6\nscene2.mix=0.8\n";
+
+Result runCase(void* lib, int seconds, const char* name, int module, bool all, bool perform = false) {
     auto entry = reinterpret_cast<AEffect* (*)(audioMasterCallback)>(dlsym(lib, "VSTPluginMain"));
     AEffect* e = entry ? entry(master) : nullptr;
     if (!e) {
@@ -185,6 +194,9 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all) {
     } else if (module >= 0) {
         busy(set, module, false);
     }
+    if (perform)   // a project's state: it changes only what it lists
+        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(std::strlen(kPerformState)),
+                      const_cast<char*>(kPerformState), 0.0f);
     std::vector<float> L(kBlock), R(kBlock);
     float* io[2] = {L.data(), R.data()};
     uint32_t seed = 12345u;
@@ -196,14 +208,20 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all) {
             R[static_cast<size_t>(i)] = 0.7f * x + 0.05f;
         }
     };
-    for (int b = 0; b < 64; ++b) {   // the patch settles, buffers warm up
+    const int warm = perform ? 3 * 44100 / kBlock : 64;   // performing: the looper records a bar first
+    for (int b = 0; b < warm; ++b) {   // the patch settles, buffers warm up
         fill();
         e->processReplacing(e, io, io, kBlock);
+        g_time.ppqPos += kBlock / 44100.0 * g_time.tempo / 60.0;
     }
     const int blocks = seconds * 44100 / kBlock;
     std::vector<double> t(static_cast<size_t>(blocks));
     for (int b = 0; b < blocks; ++b) {
         fill();
+        if (perform) {   // the fader: a triangle, A -> B -> A every 2 s (689 blocks)
+            const double ph = std::fmod(b / 689.0, 1.0);
+            e->setParameter(e, P_XFADE, static_cast<float>(ph < 0.5 ? 2.0 * ph : 2.0 - 2.0 * ph));
+        }
         const double t0 = cpuUs();
         e->processReplacing(e, io, io, kBlock);
         t[static_cast<size_t>(b)] = cpuUs() - t0;
@@ -261,6 +279,8 @@ int main(int argc, char** argv) {
         check(runCase(lib, seconds, name.c_str(), m, false));
     }
     check(runCase(lib, seconds, "everything on, heaviest, 8 mod slots", -1, true));
+    check(runCase(lib, seconds, "looper rolling, fader sweeping", -1, false, true));
+    check(runCase(lib, seconds, "all that, everything on heaviest", -1, true, true));
     dlclose(lib);
     return fail ? 1 : 0;
 }

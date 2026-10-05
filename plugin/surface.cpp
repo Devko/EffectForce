@@ -140,7 +140,13 @@ void Surface::set(int i, float n) {
         if (editSide_ == (i == P_SCENE_A ? 0 : 1) && sceneOf(editSide_) != editScene_) loadEdited();
         texts = true;
     }
-    if (i == P_XFADE) textGen_.fetch_add(1, std::memory_order_release);   // the fader's bar
+    if (i == P_XFADE) {   // the fader's bar: MPC redraws texts only when told, so tell it when the bar moves
+        const int bar = static_cast<int>(std::lround(want_[P_XFADE].load() * kFaderBarWidth));
+        if (bar != shownBar_) {
+            shownBar_ = bar;
+            textGen_.fetch_add(1, std::memory_order_release);
+        }
+    }
     if (texts) refresh();
 }
 
@@ -477,12 +483,11 @@ std::string Surface::sceneInfo() const {
 }
 
 std::string Surface::faderBar() const {
-    constexpr int kWidth = 24;
-    const int at = clampi(static_cast<int>(std::lround(want_[P_XFADE].load() * kWidth)), 0, kWidth);
+    const int at = clampi(static_cast<int>(std::lround(want_[P_XFADE].load() * kFaderBarWidth)), 0, kFaderBarWidth);
     std::string s = "A  ";
     s.append(static_cast<size_t>(at), '=');
     s += '|';
-    s.append(static_cast<size_t>(kWidth - at), '-');
+    s.append(static_cast<size_t>(kFaderBarWidth - at), '-');
     return s + "  B";
 }
 
