@@ -144,6 +144,7 @@ constexpr float kTiny = 1e-18f;               // a DC offset (-360 dB) under eve
 constexpr float kDuckLaw = 16.0f;
 constexpr float kMonoStep = 1.0f / 16.0f;     // Mono's share of R's wow, per segment: 12 ms to switch
 constexpr int kTailForever = 1 << 30;         // feedback 1: 6.8 hours
+constexpr int kFadeSegs = 69;                 // Fade's crossfade: 69 segments, 50 ms
 
 float onePole(float hz) { return 1.0f - std::exp(-2.0f * kPi * hz / kRate); }
 float perSegment(float seconds) { return 1.0f - std::exp(-kSeg / (seconds * kRate)); }
@@ -153,6 +154,27 @@ float perSample(float seconds) { return 1.0f - std::exp(-1.0f / (seconds * kRate
 const float kWowSmooth = perSegment(0.1f), kDuckSmooth = perSegment(0.02f);   // the amounts glide
 const float kRelease = std::exp(1.0f / (0.1f * kRate));                        // the limiter's, per sample
 const float kAttack = perSample(0.005f), kFall = perSample(0.25f);             // the duck's envelope
+
+// Both lines read at their times: the taps at ages i - 1 .. i + 2, four samples in a row, through
+// the Hermite kernel.
+EF_INLINE Lr readLr(const float* bl, const float* br, int w, double teL, double teR) {
+    const int il = std::clamp(static_cast<int>(teL), 2, kMaxAge), ir = std::clamp(static_cast<int>(teR), 2, kMaxAge);
+    const Lr frac = pairLr(static_cast<float>(teL - il), static_cast<float>(teR - ir));
+    int ql = w - il - 2, qr = w - ir - 2;
+    if (ql < 0) ql += kLen;
+    if (qr < 0) qr += kLen;
+    const float* pl = bl + ql;
+    const float* pr = br + qr;
+    return hermiteLr(loadLr(pl + 3, pr + 3), loadLr(pl + 2, pr + 2), loadLr(pl + 1, pr + 1), loadLr(pl, pr), frac);
+}
+
+// Fade's equal-power gains for the old and the new head at the end of segment `fade` of the
+// crossfade (none running: 1 and 0), exact at both ends.
+void fadeGains(int fade, float& a, float& b) {
+    const float x = fade < 0 ? 0.0f : static_cast<float>(fade + 1) / kFadeSegs;
+    a = x <= 0.0f ? 1.0f : (x >= 1.0f ? 0.0f : sinQuarter(0.5f * kPi * (1.0f - x)));
+    b = x <= 0.0f ? 0.0f : (x >= 1.0f ? 1.0f : sinQuarter(0.5f * kPi * x));
+}
 
 // A smoothed amount one segment on; snaps the last bit so it lands (wow 0 is exactly no wow).
 float approach(float cur, float target, float coef) {
@@ -201,11 +223,14 @@ void Delay::reset() {
     env_ = 0.0f;
     phWow_ = phFlutL_ = phFlutR_ = 0.0f;
     segLeft_ = 0;
+    fadeL_ = fadeR_ = -1;
+    fading_ = false;
     fresh_ = true;
 }
 
 void Delay::set(const Params& p, const Transport& t) {
     const int mode = std::clamp(p.mode, 0, kModes - 1);
+    glideType_ = std::clamp(p.glide, 0, kGlides - 1);   // a fade under way finishes first
     double base;
     if (p.sync) {
         const double beats = clampOr(p.divBeats, kDelayDivs[0].beats, kDelayDivs[kNumDelayDivs - 1].beats, 0.75);
@@ -245,10 +270,19 @@ void Delay::set(const Params& p, const Transport& t) {
         duckAmt_ = duckTgt_;
         mono_ = monoTgt_;
         float ml, mr;
-        wowNow(ml, mr);
+        wowNow(tL_, tR_, ml, mr);
         teL_ = teEndL_ = tL_ + ml;
         teR_ = teEndR_ = tR_ + mr;
         teStepL_ = teStepR_ = 0.0;
+        tBL_ = tL_;
+        tBR_ = tR_;
+        teBL_ = teBEndL_ = teL_;
+        teBR_ = teBEndR_ = teR_;
+        teBStepL_ = teBStepR_ = 0.0;
+        for (int k = 0; k < 4; ++k) {
+            gain_[k] = gainEnd_[k] = k < 2 ? 1.0f : 0.0f;
+            gainStep_[k] = 0.0f;
+        }
         duck_ = duckEnd_ = 1.0f / (1.0f + kDuckLaw * duckAmt_ * env_);
         duckStep_ = 0.0f;
         fresh_ = false;
@@ -258,7 +292,7 @@ void Delay::set(const Params& p, const Transport& t) {
     // the longer side's time away (in Ping-Pong too: the sides take turns). Plus the wow and the
     // 20 Hz high-pass's ring. Only when the feedback or the times change (the logs only for the
     // feedback).
-    const double longest = std::max(std::max(tgtL_, tgtR_), std::max(tL_, tR_)) + wowTgt_ * kWowDepth * (1.0f + kFlutter);
+    const double longest = std::max({tgtL_, tgtR_, tL_, tR_, tBL_, tBR_}) + wowTgt_ * kWowDepth * (1.0f + kFlutter);
     if (fb != tailFb_ || longest != tailLongest_) {
         if (fb != tailFb_) {
             tailFb_ = fb;
@@ -270,10 +304,10 @@ void Delay::set(const Params& p, const Transport& t) {
     }
 }
 
-// The wow's offsets (samples) for L and R at the phases and amounts now.
-void Delay::wowNow(float& l, float& r) const {
-    const float depthL = wowAmt_ * std::min(kWowDepth, 0.25f * static_cast<float>(tL_));
-    const float depthR = wowAmt_ * std::min(kWowDepth, 0.25f * static_cast<float>(tR_));
+// The wow's offsets (samples) for heads at times tl and tr, at the phases and amounts now.
+void Delay::wowNow(double tl, double tr, float& l, float& r) const {
+    const float depthL = wowAmt_ * std::min(kWowDepth, 0.25f * static_cast<float>(tl));
+    const float depthR = wowAmt_ * std::min(kWowDepth, 0.25f * static_cast<float>(tr));
     l = depthL * (sinCycle(phWow_) + kFlutter * sinCycle(phFlutL_));
     const float own = depthR * (sinCycle(wrap1(phWow_ + kWowLagR)) + kFlutter * sinCycle(phFlutR_));
     r = (1.0f - mono_) * own + mono_ * l;   // exact at 0 and 1: Mono's R is L
@@ -286,6 +320,9 @@ void Delay::segment() {
 
     teL_ = teEndL_;   // the last segment lands exactly where it was aimed
     teR_ = teEndR_;
+    teBL_ = teBEndL_;
+    teBR_ = teBEndR_;
+    for (int k = 0; k < 4; ++k) gain_[k] = gainEnd_[k];
     duck_ = duckEnd_;
 
     wowAmt_ = approach(wowAmt_, wowTgt_, kWowSmooth);
@@ -295,14 +332,61 @@ void Delay::segment() {
     phFlutL_ = wrap1(phFlutL_ + kFlutIncL);
     phFlutR_ = wrap1(phFlutR_ + kFlutIncR);
 
-    tL_ = glideTime(tL_, tgtL_);
-    tR_ = glideTime(tR_, tgtR_);
+    // Each side's heads. A fade that is over hands the reading to its new head. Then Tape glides;
+    // Fade snaps a change under half a sample, or starts a fade to the target (true).
+    const auto heads = [this](double& t, double& tB, double& te, double& teB, float& gA, float& gB, int& fade,
+                              double target) {
+        if (fade >= 0 && ++fade == kFadeSegs) {
+            t = tB;
+            te = teB;
+            gA = 1.0f;
+            gB = 0.0f;
+            fade = -1;
+        }
+        if (fade >= 0) return false;
+        if (glideType_ == TAPE) {
+            t = glideTime(t, target);
+        } else if (std::fabs(target - t) < 0.5) {
+            t = target;
+        } else {
+            tB = target;
+            fade = 0;
+            return true;
+        }
+        tB = t;
+        return false;
+    };
+    const bool newL = heads(tL_, tBL_, teL_, teBL_, gain_[0], gain_[2], fadeL_, tgtL_);
+    const bool newR = heads(tR_, tBR_, teR_, teBR_, gain_[1], gain_[3], fadeR_, tgtR_);
+
     float ml, mr;
-    wowNow(ml, mr);
+    wowNow(tL_, tR_, ml, mr);
     teEndL_ = tL_ + ml;
     teEndR_ = tR_ + mr;
     teStepL_ = (teEndL_ - teL_) * (1.0 / kSeg);
     teStepR_ = (teEndR_ - teR_) * (1.0 / kSeg);
+
+    fading_ = fadeL_ >= 0 || fadeR_ >= 0;
+    if (fading_) {
+        wowNow(tBL_, tBR_, ml, mr);
+        teBEndL_ = tBL_ + ml;
+        teBEndR_ = tBR_ + mr;
+        if (newL) teBL_ = teBEndL_;   // a new head starts where it will be: its gain is still near 0
+        if (newR) teBR_ = teBEndR_;
+    }
+    if (fadeL_ < 0) {   // no fade on this side: B reads what A does, at gain 0
+        teBL_ = teL_;
+        teBEndL_ = teEndL_;
+    }
+    if (fadeR_ < 0) {
+        teBR_ = teR_;
+        teBEndR_ = teEndR_;
+    }
+    teBStepL_ = (teBEndL_ - teBL_) * (1.0 / kSeg);
+    teBStepR_ = (teBEndR_ - teBR_) * (1.0 / kSeg);
+    fadeGains(fadeL_, gainEnd_[0], gainEnd_[2]);
+    fadeGains(fadeR_, gainEnd_[1], gainEnd_[3]);
+    for (int k = 0; k < 4; ++k) gainStep_[k] = (gainEnd_[k] - gain_[k]) * (1.0f / kSeg);
 
     duckEnd_ = 1.0f / (1.0f + kDuckLaw * duckAmt_ * env_);
     duckStep_ = (duckEnd_ - duck_) * (1.0f / kSeg);
@@ -320,15 +404,20 @@ void Delay::process(float* L, float* R, int n) {
     for (int i = 0; i < n;) {
         if (segLeft_ == 0) segment();
         const int m = std::min(n - i, segLeft_);
-        if (moving) run<true>(L + i, R + i, m);
-        else run<false>(L + i, R + i, m);
+        if (moving) {
+            if (fading_) run<true, true>(L + i, R + i, m);
+            else run<true, false>(L + i, R + i, m);
+        } else {
+            if (fading_) run<false, true>(L + i, R + i, m);
+            else run<false, false>(L + i, R + i, m);
+        }
         segLeft_ -= m;
         i += m;
     }
     for (int k = 0; k < kRamps; ++k) cur_[k] = tgt_[k];   // lands exactly
 }
 
-template <bool Moving>
+template <bool Moving, bool Fading>
 void Delay::run(float* L, float* R, int n) {
     // Locals: the compiler can't keep members in registers across the stores to L, R and the lines.
     float* const bl = lineL_.data();
@@ -342,9 +431,17 @@ void Delay::run(float* L, float* R, int n) {
     Lr monoIn = both(cur_[MONO_IN]), cross = both(cur_[CROSS]), rIn = Lr{1.0f, cur_[R_IN]};
     const Lr sFb = both(step_[FB]), sDrive = both(step_[DRIVE]), sMix = both(step_[MIX]), sLp = both(step_[LP]),
              sHp = both(step_[HP]), sMonoIn = both(step_[MONO_IN]), sCross = both(step_[CROSS]), sRIn = Lr{0.0f, step_[R_IN]};
+    double teBL = teBL_, teBR = teBR_;
+    const double dbl = teBStepL_, dbr = teBStepR_;
+    Lr gainA = {gain_[0], gain_[1]}, gainB = {gain_[2], gain_[3]};
+    const Lr sGainA = {gainStep_[0], gainStep_[1]}, sGainB = {gainStep_[2], gainStep_[3]};
     if (written < kLen) {
         hideOld(bl, w, written, teL, dl, n);
         hideOld(br, w, written, teR, dr, n);
+        if (Fading) {
+            hideOld(bl, w, written, teBL, dbl, n);
+            hideOld(br, w, written, teBR, dbr, n);
+        }
     }
 
     for (int k = 0; k < n; ++k) {
@@ -363,15 +460,14 @@ void Delay::run(float* L, float* R, int n) {
         duck += dDuck;
         const Lr x = finiteLr(loadLr(L + k, R + k));
 
-        // Both lines' taps around their times: ages i - 1 .. i + 2, four samples in a row.
-        const int il = std::clamp(static_cast<int>(teL), 2, kMaxAge), ir = std::clamp(static_cast<int>(teR), 2, kMaxAge);
-        const Lr frac = pairLr(static_cast<float>(teL - il), static_cast<float>(teR - ir));
-        int ql = w - il - 2, qr = w - ir - 2;
-        if (ql < 0) ql += kLen;
-        if (qr < 0) qr += kLen;
-        const float* pl = bl + ql;
-        const float* pr = br + qr;
-        const Lr r = hermiteLr(loadLr(pl + 3, pr + 3), loadLr(pl + 2, pr + 2), loadLr(pl + 1, pr + 1), loadLr(pl, pr), frac);
+        Lr r = readLr(bl, br, w, teL, teR);
+        if (Fading) {   // and the new head, crossfaded in
+            teBL += dbl;
+            teBR += dbr;
+            gainA += sGainA;
+            gainB += sGainB;
+            r = r * gainA + readLr(bl, br, w, teBL, teBR) * gainB;
+        }
 
         // The cuts, at the tap: the wet and the feedback both pass them.
         lp += aLp * (r - lp);
@@ -418,6 +514,14 @@ void Delay::run(float* L, float* R, int n) {
     gainR_ = gain[1];
     env_ = env[0];
     duck_ = duck[0];
+    if (Fading) {
+        teBL_ = teBL;
+        teBR_ = teBR;
+        gain_[0] = gainA[0];
+        gain_[1] = gainA[1];
+        gain_[2] = gainB[0];
+        gain_[3] = gainB[1];
+    }
     if (Moving) {
         cur_[FB] = fb[0];
         cur_[DRIVE] = drive[0];

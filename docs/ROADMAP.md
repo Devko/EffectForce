@@ -6,13 +6,11 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 - ✅ **Device bench** (2026-10-05): everything on at its heaviest with 8 mod slots, p99 11.3% of the
   block ([Performance](PERFORMANCE.md#device-measurements)).
-- 🔜 **On the device:** install, every page with touch and Q-Links, the CHAIN page (tap, MOVE,
-  ON / OFF), presets and the browser, save and reload a project, Stop with tails ringing, the slot's
-  ON button, two instances.
+- ✅ **On the device** (2026-10-05, 0.0.1): installed and played; everything worked and the pages
+  open fast (MPC loads it next to SubForce without a complaint in its log).
+- 🔜 **Still to try on the device:** save and reload a project, two instances, Delay Glide's Fade.
 - 🔜 **Probe items still open** ([Probe](PROBE.md#results)): pads, returns and master as insert
   places; automation playback.
-- ⬜ **Delay time glide:** the behaviour when the time changes is a choice still open
-  ([Probe](PROBE.md#your-part)).
 - ⬜ **v0.1**, the first release: parameter list frozen (append-only from then on), catalog-style
   package from CI.
 
@@ -58,5 +56,7 @@ Design record: [Design](DESIGN.md).
 - 2026-10-05 — **Modules for v0.1:** Drive, Filter, EQ, Comp / OTT, Chorus, Phaser / Flanger, Delay,
   Reverb; 4 macros, 2 LFOs, an envelope follower, an 8-slot matrix.
 - 2026-10-05 — **Suspend rule:** under 250 ms keeps every buffer (Stop), longer clears them (ON button).
+- 2026-10-05 — **Delay time changes:** both behaviours, as Delay Glide: Tape (repeats bend in pitch)
+  or Fade (a crossfade, no bend).
 - 2026-10-05 — **Level-matching by category:** Synth and Pads on chords, Bass on a bass line, Drums
   on drums, the rest on the full mix.

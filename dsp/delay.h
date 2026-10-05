@@ -3,10 +3,16 @@
 // lines, L and R, each read at its own time and fed back through the cuts, a drive and a limiter;
 // the wet ducks under the input.
 //
-// Time: free (1..2000 ms) or synced (divBeats quarter notes at MPC's tempo), in double precision,
-// gliding to new targets (glideTime() below). R's time is L's x (1 + spread), so L stays on the
-// grid and spread -0.5..0.5 makes R half as long .. half again as long. A time within a millionth
-// of a sample of a whole number is made whole: a 1/16T at 100 BPM is 4410 samples, not
+// Time: free (1..2000 ms) or synced (divBeats quarter notes at MPC's tempo), in double precision.
+// A new target (tempo, division, automation, spread, mode) is reached one of two ways (`glide`):
+// Tape glides there (glideTime() below), so the repeats bend in pitch; Fade keeps reading the old
+// time and crossfades to a second read head at the new one over 50 ms, no bend. The crossfade is
+// equal power: steady material keeps its level (a lone pure tone swells or dips by up to 3 dB
+// halfway, as its two copies meet in or out of phase). A target that moves during a fade waits
+// for it to end, then the latest one is faded to: at most two reads per side. A change under half
+// a sample just snaps. R's time is L's x (1 + spread), so L stays on the grid and spread
+// -0.5..0.5 makes R half as long .. half again as long. A time within a millionth of a sample of
+// a whole number is made whole: a 1/16T at 100 BPM is 4410 samples, not
 // 4410.000000000001, and reads the line without interpolating. The lines hold 8 s (1 bar at
 // 30 BPM) plus the wow's depth; a longer time (R with spread at the slowest tempos) is clamped to
 // 8 s, a shorter one to 1 ms (R: 0.5 ms).
@@ -48,6 +54,7 @@ namespace ef {
 class Delay {
 public:
     enum Mode : int { STEREO, PING_PONG, MONO, kModes };
+    enum GlideType : int { TAPE, FADE, kGlides };
 
     struct Params {
         int mode = STEREO;
@@ -62,6 +69,7 @@ public:
         float drive = 0.0f;          // 0..1: saturation in the loop
         float duck = 0.0f;           // 0..1: the wet ducks under the input
         float mix = 0.3f;            // 0..1 dry / wet
+        int glide = TAPE;            // how the time changes: Tape (pitch bends) or Fade (crossfade)
     };
 
     Delay();   // allocates the lines, 2.8 MB (UI thread)
@@ -70,28 +78,29 @@ public:
     void process(float* L, float* R, int n);
     int tailSamples() const { return tail_; }
 
-    // The glided delay time of L (side 0) or R (side 1) in samples, without the wow.
+    // The delay time of L (side 0) or R (side 1) in samples, without the wow: Tape's glided time;
+    // in Fade the head being read (the old one until a fade ends).
     double timeSamples(int side) const { return side ? tR_ : tL_; }
 
 private:
     // The values that move in straight lines across a chunk.
     enum : int { FB, DRIVE, MIX, LP, HP, MONO_IN, CROSS, R_IN, kRamps };
 
-    // How the delay time follows a new target (a tempo or division change, automation): the time
-    // one segment (32 samples) on, the samples between in a straight line. The probe's 60 ms
+    // Tape: how the delay time follows a new target (a tempo or division change, automation): the
+    // time one segment (32 samples) on, the samples between in a straight line. The probe's 60 ms
     // one-pole glide, as a tape delay's motor would: echoes already in flight bend in pitch while
     // the time moves, more the further it has to go. The last millionth of a sample snaps, so it
     // lands exactly. In double: in float the step drops under the precision of a time near 22050
-    // samples and the glide stalls ~2.6 samples short of its target, for good.
-    // TODO(EffectForce): pick the behaviour the real delay keeps (see docs/PROBE.md, "Your part").
+    // samples and the glide stalls ~2.6 samples short of its target, for good. (docs/PROBE.md,
+    // "Your part": the choice is Params::glide now; Fade is the other branch in segment().)
     double glideTime(double current, double target) const {
         const double d = target - current;
         return std::fabs(d) < 1e-6 ? target : current + d * glide_;
     }
 
     void segment();
-    void wowNow(float& l, float& r) const;
-    template <bool Moving>
+    void wowNow(double tl, double tr, float& l, float& r) const;
+    template <bool Moving, bool Fading>
     void run(float* L, float* R, int n);
 
     const double glide_;          // glideTime()'s step per segment
@@ -106,6 +115,16 @@ private:
     double teL_ = 1.0, teR_ = 1.0;                           // with the wow, this sample
     double teEndL_ = 1.0, teEndR_ = 1.0, teStepL_ = 0.0, teStepR_ = 0.0;
     int segLeft_ = 0;
+
+    // Fade's second read head, per side: its time (the first head's while there's no fade) and
+    // the two heads' gains (A L, A R, B L, B R); fadeL_ / fadeR_ count the fade's segments, -1
+    // with none running.
+    int glideType_ = TAPE;
+    double tBL_ = 1.0, tBR_ = 1.0, teBL_ = 1.0, teBR_ = 1.0;
+    double teBEndL_ = 1.0, teBEndR_ = 1.0, teBStepL_ = 0.0, teBStepR_ = 0.0;
+    int fadeL_ = -1, fadeR_ = -1;
+    bool fading_ = false;   // either side, this segment
+    float gain_[4] = {1.0f, 1.0f, 0.0f, 0.0f}, gainEnd_[4] = {1.0f, 1.0f, 0.0f, 0.0f}, gainStep_[4] = {};
 
     float lpL_ = 0.0f, lpR_ = 0.0f, hpL_ = 0.0f, hpR_ = 0.0f;   // the cuts' states
     float gainL_ = 1.0f, gainR_ = 1.0f;                         // the limiter's

@@ -951,6 +951,15 @@
    "display": "string"
   },
   {
+   "key": "dly_glide",
+   "name": "Delay Glide",
+   "options": [
+    "Tape",
+    "Fade"
+   ],
+   "default": "Tape"
+  },
+  {
    "key": "rev_on",
    "name": "Reverb On",
    "options": [

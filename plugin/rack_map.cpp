@@ -201,6 +201,7 @@ void setField(RackPatch& p, int id, float v) {
         case P_DLY_DRIVE: p.delay.drive = v; break;
         case P_DLY_DUCK: p.delay.duck = v; break;
         case P_DLY_MIX: p.delay.mix = v; break;
+        case P_DLY_GLIDE: p.delay.glide = opt; break;
 
         case P_REV_MODE: p.reverb.mode = opt; break;
         case P_REV_SIZE: p.reverb.size = v; break;

@@ -121,7 +121,9 @@ for ever).
 repeat a little thinner and darker), **Drive** (each repeat a little dirtier) and **Wow** (tape speed
 wobble). **Delay Duck** keeps the repeats down while you play and lets them bloom in the gaps.
 
-A tempo change glides the time like a tape delay's motor: repeats in flight bend in pitch.
+**Delay Glide** decides what a change of time does (a new tempo, another division, a turn of Delay
+Time, modulation): **Tape** glides the time like a tape delay's motor, so repeats in flight bend in
+pitch; **Fade** crossfades to the new time over about 50 ms, no pitch bend at all.
 
 ### Reverb
 

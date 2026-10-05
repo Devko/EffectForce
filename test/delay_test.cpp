@@ -59,6 +59,23 @@ Buf concat(Buf a, const Buf& b) {
     return a;
 }
 
+// Runs p for the first `at` samples, then q, in chunks of `chunk`.
+void runSplit(Delay& d, const P& p, const P& q, Buf& L, Buf& R, size_t at, ef::Transport t = {}, int chunk = ef::kChunk) {
+    Buf l1(L.begin(), L.begin() + static_cast<std::ptrdiff_t>(at)), r1(R.begin(), R.begin() + static_cast<std::ptrdiff_t>(at));
+    Buf l2(L.begin() + static_cast<std::ptrdiff_t>(at), L.end()), r2(R.begin() + static_cast<std::ptrdiff_t>(at), R.end());
+    run(d, p, l1, r1, t, chunk);
+    run(d, q, l2, r2, t, chunk);
+    L = concat(l1, l2);
+    R = concat(r1, r2);
+}
+
+// A sine through a sine fades in over 10 ms (its own start is no click to measure).
+Buf fadedSine(double hz, int n, float amp, double phase = 0.0) {
+    Buf x = sine(hz, n, amp, phase);
+    for (int i = 0; i < 441; ++i) x[static_cast<size_t>(i)] *= static_cast<float>(i) / 441.0f;
+    return x;
+}
+
 // The cuts (dsp/delay.h): a = 1 - exp(-2 pi fc / rate), low-pass a / (1 - (1 - a) z^-1),
 // high-pass (1 - a)(1 - z^-1) / (1 - (1 - a) z^-1); a high cut of 20 kHz is off.
 double coef(double hz) { return 1.0 - std::exp(-2.0 * kPi * hz / ef::kRate); }
@@ -228,6 +245,15 @@ void mono() {
     Buf A = sum, B = sum;
     run(s, q, A, B);
     CHECK(same(A, L));
+    // Through a Fade too.
+    P f = p;
+    f.glide = Delay::FADE;
+    P g = f;
+    g.timeMs = 170.0f;
+    Delay m;
+    Buf C = inL, D = inR;
+    runSplit(m, f, g, C, D, 10000);
+    CHECK(same(C, D));
 }
 
 void feedbackRatio() {
@@ -338,6 +364,185 @@ Buf driven(const Buf& x, int delay, double drive) {
         y[n] = static_cast<float>(v - s);
     }
     return y;
+}
+
+void fadeLands() {
+    // Fade, 120 -> 60 BPM at 1/8: the old head keeps reading 11025 samples back while the new one
+    // at 22050 fades in over 50 ms; then 22050 exactly, and an impulse comes back on the sample.
+    Delay d;
+    P p = synced(0.5);
+    p.glide = Delay::FADE;
+    Buf L = whiteNoise(kSr, 0.5f, 9), R = L;
+    run(d, p, L, R, tempo(120.0));
+    CHECK(d.timeSamples(0) == 11025.0);
+    Buf A = silence(30 * 32), B = A;
+    run(d, p, A, B, tempo(60.0));
+    CHECK(d.timeSamples(0) == 11025.0 && d.timeSamples(1) == 11025.0);   // no glide: still the old head
+    Buf C = silence(71 * 32), D = C;
+    run(d, p, C, D, tempo(60.0));
+    CHECK(d.timeSamples(0) == 22050.0 && d.timeSamples(1) == 22050.0);   // 50 ms on: the new one
+    Buf S = silence(22050), T = S;   // the noise out of the line
+    run(d, p, S, T, tempo(60.0));
+    const int n = 22050 + 200;
+    Buf E = impulseAt(n, 64), F = E;
+    run(d, p, E, F, tempo(60.0));
+    const Buf e = echoOf(n, 64, 22050.0);
+    double worst = 0.0;
+    for (size_t i = 0; i < E.size(); ++i) worst = std::max(worst, std::fabs(static_cast<double>(E[i]) - e[i]));
+    CHECK(worst < 1e-5 && loudest(E) == 64 + 22050);
+    // A change under half a sample snaps: no fade, the new time at once.
+    P q = plain(100.0f);
+    q.glide = Delay::FADE;
+    d.reset();
+    Buf G = silence(64), H = G;
+    run(d, q, G, H);
+    q.timeMs = 100.01f;   // 4410.44
+    run(d, q, G, H);
+    CHECK(d.timeSamples(0) == static_cast<double>(100.01f) * kSr / 1000.0);
+}
+
+// The frequency of x over [from, from + len): zero crossings, placed between samples, per second.
+double frequency(const Buf& x, size_t from, size_t len) {
+    double first = -1.0, last = -1.0;
+    int count = 0;
+    for (size_t i = from + 1; i < from + len; ++i) {
+        if ((x[i - 1] < 0.0f) != (x[i] < 0.0f)) {
+            const double t = static_cast<double>(i - 1) + x[i - 1] / (static_cast<double>(x[i - 1]) - x[i]);
+            if (first < 0.0) first = t;
+            last = t;
+            ++count;
+        }
+    }
+    return count > 1 ? 0.5 * (count - 1) * kSr / (last - first) : 0.0;
+}
+
+void fadeNoBend() {
+    // A 1 kHz sine, 100% wet, through a tempo change. Tape bends its pitch far; Fade doesn't: with
+    // the heads in phase (120 -> 60 BPM at 1/8: 250 cycles apart) not at all, a third of a cycle
+    // apart (100 -> 90 BPM) only the crossfade's phase walk, under 12 Hz.
+    const double bpms[2][2] = {{120.0, 60.0}, {100.0, 90.0}};
+    for (int c = 0; c < 2; ++c) {
+        for (int glide : {Delay::TAPE, Delay::FADE}) {
+            Delay d;
+            P p = synced(0.5);
+            p.glide = glide;
+            const size_t at = 32 * 1000;   // the change
+            Buf L = sine(1000.0, 3 * kSr, 0.5f), R = L;
+            Buf l1(L.begin(), L.begin() + at), r1(R.begin(), R.begin() + at), l2(L.begin() + at, L.end()), r2(R.begin() + at, R.end());
+            run(d, p, l1, r1, tempo(bpms[c][0]));
+            run(d, p, l2, r2, tempo(bpms[c][1]));
+            const Buf out = concat(l1, l2);
+            double worst = 0.0;
+            for (size_t m = at - 4410; m + 441 <= at + 22050; m += 441) worst = std::max(worst, std::fabs(frequency(out, m, 441) - 1000.0));
+            if (glide == Delay::TAPE) CHECK(worst > 100.0);
+            else CHECK(worst < (c == 0 ? 0.05 : 12.0));
+        }
+    }
+}
+
+void fadeLevel() {
+    // Steady noise, 100% wet, 300 -> 400 ms: the two heads read unrelated noise, and the equal-power
+    // crossfade keeps the level through the 50 ms (a straight one would dip 3 dB halfway).
+    Delay d;
+    P p = plain(300.0f);
+    p.glide = Delay::FADE;
+    P q = p;
+    q.timeMs = 400.0f;
+    const size_t at = 32 * 1000;
+    Buf L = whiteNoise(2 * kSr, 0.5f, 91), R = L;
+    runSplit(d, p, q, L, R, at);
+    const double before = rms(L, at - 13230, at);
+    for (size_t m = at; m < at + 3 * 882; m += 882) CHECK(near(db(rms(L, m, m + 882) / before), 0.0, 1.0));
+}
+
+void fadeClicks() {
+    // Two 200 Hz sines through the delay, fb 0.5, mix 0.5: one time change, the time moved every
+    // chunk (an LFO on it), Tape <-> Fade every chunk under a slower LFO, and switching while
+    // the time jumps and Ping-Pong's spread changes. No step beyond twice what a sine at the
+    // output's peak makes.
+    const int n = 1378 * ef::kChunk;
+    for (int what = 0; what < 4; ++what) {
+        Delay d;
+        Buf L = fadedSine(200.0, n, 0.5f), R = fadedSine(200.0, n, 0.5f, 1.0);
+        for (int pos = 0, c = 0; pos < n; pos += ef::kChunk, ++c) {
+            const double sec = static_cast<double>(pos) / kSr;
+            P p = plain(100.0f);
+            p.feedback = 0.5f;
+            p.mix = 0.5f;
+            p.glide = Delay::FADE;
+            switch (what) {
+                case 0: p.timeMs = pos < n / 2 ? 100.0f : 137.0f; break;
+                case 1: p.timeMs = static_cast<float>(150.0 + 100.0 * std::sin(2.0 * kPi * 2.0 * sec)); break;
+                case 2:
+                    p.timeMs = static_cast<float>(150.0 + 20.0 * std::sin(2.0 * kPi * sec));
+                    p.glide = c % 2 ? Delay::TAPE : Delay::FADE;
+                    break;
+                default:
+                    p.mode = Delay::PING_PONG;
+                    p.timeMs = (c / 37) % 2 ? 180.0f : 100.0f;
+                    p.spread = (c / 23) % 2 ? 0.3f : -0.2f;
+                    p.glide = (c / 50) % 2 ? Delay::TAPE : Delay::FADE;
+                    break;
+            }
+            d.set(p, {});
+            d.process(&L[static_cast<size_t>(pos)], &R[static_cast<size_t>(pos)], ef::kChunk);
+        }
+        const double natural = std::max(peak(L), peak(R)) * 2.0 * kPi * 200.0 / kSr;
+        CHECK(allFinite(L) && allFinite(R));
+        CHECK(std::max(maxStep(L), maxStep(R)) < 2.0 * natural);
+    }
+}
+
+// Tape's output on three busy scenarios, hashed (FNV-1a over the bits of L, then R).
+uint64_t tapeHash(int scenario) {
+    Delay d;
+    const int n = 3 * kSr;
+    Buf L = whiteNoise(n, 0.7f, 81), R = sine(330.0, n, 0.6f);
+    for (size_t pos = 0, c = 0; pos < L.size(); pos += ef::kChunk, ++c) {
+        P p;
+        ef::Transport t;
+        t.bpm = 120.0;
+        p.wow = 0.6f;
+        p.drive = 0.4f;
+        p.duck = 0.5f;
+        p.spread = 0.25f;
+        if (scenario == 1) {
+            p.mode = Delay::PING_PONG;
+            p.feedback = 0.8f;
+            p.wow = 1.0f;
+            p.spread = -0.3f;
+            if (pos > 44100) t.bpm = 87.0;
+        } else if (scenario == 2) {
+            p.mode = static_cast<int>((c / 200) % 3);
+            p.sync = false;
+            p.timeMs = 5.0f + 1495.0f * static_cast<float>((c * 7919) % 100) / 99.0f * ((c / 10) % 2);
+            p.drive = 1.0f;
+            p.duck = 1.0f;
+            p.feedback = 0.95f;
+        }
+        d.set(p, t);
+        d.process(&L[pos], &R[pos], static_cast<int>(std::min<size_t>(ef::kChunk, L.size() - pos)));
+    }
+    uint64_t h = 1469598103934665603ull;
+    for (const Buf* b : {&L, &R})
+        for (float v : *b) {
+            uint32_t bits;
+            std::memcpy(&bits, &v, sizeof bits);
+            for (int k = 0; k < 4; ++k) h = (h ^ ((bits >> (8 * k)) & 0xffu)) * 1099511628211ull;
+        }
+    return h;
+}
+
+void tapeUnchanged() {
+    // Tape is bit for bit what it was before Fade came: the hashes were taken from that code, on
+    // x86 and on the device's build (NEON's reciprocal estimate and GCC's contractions differ; a new
+    // compiler may move the device's, not x86's).
+#if EF_NEON
+    const uint64_t before[3] = {0x690cbedd772c6b55ull, 0x49268bdd94b108f1ull, 0x81639e54566b2b03ull};
+#else
+    const uint64_t before[3] = {0x6b493ad57ae03251ull, 0xead2494d4735b109ull, 0x557c2696329e4b99ull};
+#endif
+    for (int k = 0; k < 3; ++k) CHECK(tapeHash(k) == before[k]);
 }
 
 void drive() {
@@ -607,6 +812,7 @@ void extremes() {
         p.drive = bits & 1024 ? 1.0f : 0.0f;
         p.duck = bits & 2048 ? 1.0f : 0.0f;
         p.mix = bits & 4096 ? 1.0f : 0.0f;
+        p.glide = bits & 16384 ? Delay::FADE : Delay::TAPE;
         return p;
     };
     for (int k = 0; k < 120; ++k) {
@@ -631,6 +837,7 @@ void extremes() {
     for (float w : wild) {
         P p;
         p.mode = w > 0.0f ? 7 : -3;
+        p.glide = w > 0.0f ? 5 : -2;
         p.sync = w > 0.0f;
         p.timeMs = p.feedback = p.spread = p.lowCutHz = p.highCutHz = p.wow = p.drive = p.duck = p.mix = w;
         p.divBeats = w;
@@ -663,6 +870,7 @@ void randomJumps() {
         p.drive = 0.5f + 0.75f * ef::randBipolar(s);
         p.duck = 0.5f + 0.75f * ef::randBipolar(s);
         p.mix = 0.5f + 0.75f * ef::randBipolar(s);
+        p.glide = static_cast<int>(ef::xorshift(s) % 4) - 1;
         if (ef::xorshift(s) % 50 == 0) p.timeMs = std::nanf("");
         if (ef::xorshift(s) % 50 == 0) p.feedback = std::nanf("");
         if (ef::xorshift(s) % 50 == 0) p.spread = INFINITY;
@@ -710,6 +918,21 @@ void nanInput() {
         run(a, p, huge, h2);
         CHECK(allFinite(huge) && allFinite(h2));
         CHECK(peak(huge, 400) < 4.0f && peak(h2, 400) < 4.0f);
+
+        // While a Fade runs (from sample 672 to about 2900) too.
+        Delay e, f;
+        P g = p;
+        g.glide = Delay::FADE;
+        g.mix = 0.6f;
+        P h = g;
+        h.feedback = 0.8f;
+        h.timeMs = 250.0f;
+        Buf cl2 = clean, cr2 = clean, bl2 = bad, br2 = bad;
+        br2[2000] = std::nanf("");
+        runSplit(e, g, h, cl2, cr2, 640);
+        runSplit(f, g, h, bl2, br2, 640);
+        CHECK(allFinite(bl2) && allFinite(br2));
+        CHECK(same(cl2, bl2) && same(cr2, br2));
     }
 }
 
@@ -740,6 +963,23 @@ void blockSizes() {
             d.reset();
             Buf L = inL, R = inR;
             run(d, p, L, R, tempo(133.0), chunk);
+            CHECK(same(L, L32) && same(R, R32));
+        }
+    }
+    // A time change (at a sample all three chunkings share): both glides, wow on, Ping-Pong.
+    for (int glide : {Delay::TAPE, Delay::FADE}) {
+        P p = sets[1], q = sets[1];
+        p.glide = q.glide = glide;
+        q.divBeats = 1.0;
+        q.spread = -0.4f;
+        Delay d;
+        const Buf inL = whiteNoise(40000, 0.8f, 62), inR = sine(220.0, 40000, 0.7f);
+        Buf L32 = inL, R32 = inR;
+        runSplit(d, p, q, L32, R32, 22400, tempo(133.0), 32);
+        for (int chunk : {1, 7}) {
+            d.reset();
+            Buf L = inL, R = inR;
+            runSplit(d, p, q, L, R, 22400, tempo(133.0), chunk);
             CHECK(same(L, L32) && same(R, R32));
         }
     }
@@ -854,6 +1094,11 @@ void delayTests() {
     feedbackRatio();
     cuts();
     glide();
+    fadeLands();
+    fadeNoBend();
+    fadeLevel();
+    fadeClicks();
+    tapeUnchanged();
     drive();
     limiter();
     ducking();

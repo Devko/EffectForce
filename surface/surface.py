@@ -218,6 +218,7 @@ num("dly_wow", "Delay Wow", "lin", 0, 1, 0, "pct")
 num("dly_drive", "Delay Drive", "lin", 0, 1, 0, "pct")
 num("dly_duck", "Delay Duck", "lin", 0, 1, 0, "pct")
 num("dly_mix", "Delay Mix", "lin", 0, 1, 0.3, "pct")
+enum("dly_glide", "Delay Glide", ["Tape", "Fade"], "Tape")   # a time change bends the repeats, or crossfades
 
 enum("rev_on", "Reverb On", ON_OFF, "Off")
 enum("rev_mode", "Reverb Mode", ["Room", "Hall", "Plate", "Space"], "Hall")
@@ -581,7 +582,7 @@ def build_layout():
     dly4 = ("dly_fb", "dly_spread", "dly_duck", "dly_mix")
     fbk4 = ("dly_lc", "dly_hc", "dly_drive", "dly_wow")
     L.page("DELAY", bank(("dly_time", "dly_div") + dly4 + ("dly_sync", "dly_on"))
-           + list(fbk4) + ["dly_mode", "out_gain", "mix"])
+           + list(fbk4) + ["dly_glide", "dly_mode", "out_gain", "mix"])
     L.header()
     L.card(24, R1, 1232, 270, "DELAY")
     on_seg(L, S8[0], R1, "dly_on")
@@ -590,9 +591,10 @@ def build_layout():
     rate_or_div(L, S8[2], R1 + 170, "dly_sync", "dly_time", "dly_div")
     for cx, k in zip(S8[3:], dly4):
         L.knob(cx, R1 + 170, k)
-    L.card(24, R2, 1232, 270, "FEEDBACK")
+    L.card(24, R2, 1232, 270, "REPEATS")
     for cx, k in zip(S8, fbk4):
         L.knob(cx, R2 + 126, k)
+    L.vseg(S8[5], R2 + 160, "dly_glide", sw=124, label="TIME CHANGE")
 
     rev5 = ("rev_size", "rev_decay", "rev_pre", "rev_width", "rev_mix")
     rev3 = ("rev_damp", "rev_lc", "rev_mod")

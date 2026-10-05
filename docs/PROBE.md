@@ -115,6 +115,9 @@ Also learned:
 
 ## Your part
 
+Decided 2026-10-05: both, as the Delay's **Delay Glide** parameter (Tape: the one-pole glide below;
+Fade: a crossfade to the new time). The choice as it was put:
+
 `Delay::glideTime()` in [`dsp/delay.h`](../dsp/delay.h) (the probe's own is `StereoDelay::glideTime()`
 in `probe/dsp/probe_delay.h`) decides what happens to the echoes when the delay time changes (a new
 tempo, another division, automation). Both use a 60 ms one-pole glide as a placeholder. The Delay
