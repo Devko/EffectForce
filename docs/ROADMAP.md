@@ -17,7 +17,7 @@ cloud session's branch carries it on.
 | Review: Grain | ✅ memory and real-time safety held (no stale or unwritten frame read in 50M+ instrumented reads). Fixed: held Stutter silent when Hold came near a grid line; short pitched-up Stutter never repeating; the grid missing loops shorter than a slice (and loops wrapping on a block edge) and firing twice on a mid-block wrap; held slices off the grid; a second release lifting the samples before it; a stalled slice cut dead; a backwards read's margin. 16 new checks |
 | Review: Pulse, Shimmer | ✅ Pulse clean. Shimmer: the shifter's first splice after a restart read silence (+19 dropped out), the path faded in while the shifter was still silent (a dip), the tail length ignored the shifter's delay; a frozen shimmer drains (now documented). 9 new checks |
 | Review: integration | ✅ an order saved by 0.0.1 (eight slots) fell back to the default (now kept), Choppy Pads' gate on 1/8 steps (now 1/16, the patterns' unit), option lists checked against the enums, stale docs |
-| Performance | ✅ everything on: avg -9%, p99 -27% in ARM instructions; the p99 had been the shimmer's splice search ([Performance](PERFORMANCE.md#instruction-counts)) |
+| Performance | ✅ everything on: avg -10%, p99 -27% in ARM instructions; the p99 had been the shimmer's splice search ([Performance](PERFORMANCE.md#instruction-counts)) |
 
 Still to do, in order:
 

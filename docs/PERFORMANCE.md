@@ -58,16 +58,18 @@ flag transfers that stall), which the device's p99 over its average (1.24) shows
 | Everything off (the plugin's own work) | 17.8 / – | 9.8 / – |
 | Pulse alone (Gate) | 25.1 / 25.3 | 17.1 / 17.3 |
 | Grain alone (Cloud, densest, +12, feedback) | 97.2 / 108.1 | 72.1 / 79.8 |
-| Reverb alone (Space, full modulation, shimmer 0.6) | 140.7 / 284.6 | 122.4 / 148.4 |
-| **Everything on, heaviest**, 8 mod slots | **446.5 / 592.7** | **407.4 / 435.1** |
+| Reverb alone (Space, full modulation, shimmer 0.6) | 140.7 / 284.6 | 120.0 / 146.1 |
+| **Everything on, heaviest**, 8 mod slots | **446.5 / 592.7** | **402.5 / 431.3** |
 
 Everything on is about 9-11% of the block on average by that measure. At the hand-off its p99 was
 the shimmer's splice search (a correlation of a few thousand multiply-adds in one sample, every 80 ms:
 one block in 28, a p99 of over 16% before the device's own jitter); now the search sums sixteen lags
 at a time in vector lanes, and Grain, the rack's per-sample overhead and the control paths are
-leaner too (the commits of 2026-10-05 say what and by how much). Every change but two leaves the
-output bit for bit as it was; the shimmer's shifter (a contiguous read) and Grain's read segments
-(aligned to time since reset) move it by float rounding (-130 and -100 dB).
+leaner too (the commits of 2026-10-05 say what and by how much). Most of the changes leave the
+output bit for bit as it was; four move it by float rounding, the compiler fusing multiply-adds
+differently: the shimmer's shifter reads and its path after the network loop (-130 dB), Grain's
+read segments aligned to time since reset (-100 dB) and the modulation of log-curve targets by the
+fast exp2 (1e-7 of the value).
 
 ## What keeps it cheap
 
