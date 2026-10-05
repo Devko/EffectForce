@@ -276,6 +276,7 @@ void Grain::reset() {
     w0_ = -1;
     written_ = 0;
     now_ = 0.0;
+    seg_ = 0;
     tailKey_.mode = -1;
     speedPitch_ = 0.0f;
     speed_ = 1.0;
@@ -880,6 +881,7 @@ void Grain::process(float* L, float* R, int n) {
             if (v.t >= std::min(v.end, v.relEnd) || v.t > kOpen / 2) v.on = false;
         }
     now_ += n;
+    seg_ = (seg_ + n) & (kChunk - 1);
 }
 
 // A level of the buffer from the one above it: `count` frames of that one (L R), the first at
@@ -924,13 +926,14 @@ int Grain::decimate(StereoDecimator& down, float (&early)[2], const float* in, i
 }
 
 // A voice's part of this call: its positions and envelope four samples at a time, then the reads.
-// Positions go by the voice's own 32-sample segments: the segment's first position (in double) as
-// a whole frame `base` and a float offset that stays at least 1 across the segment (so truncation
-// is the floor), base moved into the ring (the guard frames past its end take what runs over). A
-// read's offset depends only on where in its segment it falls, so blocks of any size compute every
-// read alike.
+// Positions go by 32-sample segments of time since reset() (with the rack's chunks, a call is one):
+// the segment's first position (in double) as a whole frame `base` and a float offset that stays
+// at least 1 across the segment (so truncation is the floor), base moved into the ring (the guard
+// frames past its end take what runs over). A read's offset depends only on where in its segment
+// it falls, so blocks of any size compute every read alike.
 void Grain::render(Voice& v, int n) {
     constexpr int kSeg = 32;
+    static_assert(kSeg == kChunk, "seg_ counts in chunks");
     const int t0 = v.t;
     const int k0 = std::max(0, -t0);
     const int k1 = std::min(n, std::min(v.end, v.relEnd) - t0);
@@ -942,8 +945,8 @@ void Grain::render(Voice& v, int n) {
     // The positions. Sample counts as floats are exact (under 2^24), so stepping them by 4 is
     // converting each.
     for (int k = k0; k < k1;) {
-        const int seg = (t0 + k) & ~(kSeg - 1);   // the voice's own time, >= 0 here
-        const int s0 = seg - t0, stop = std::min(k1, s0 + kSeg);
+        const int s0 = k - ((seg_ + k) & (kSeg - 1)), stop = std::min(k1, s0 + kSeg);   // where k's segment starts
+        const int seg = t0 + s0;   // the voice's own time there (before it started, the first time)
         const double p = v.start + static_cast<double>(seg) * v.rate;
         // (Backwards, two frames below: the last read's offset is 1 in exact arithmetic, a hair
         // under it in float, which must not truncate to 0.)

@@ -155,6 +155,7 @@ private:
     int w0_ = -1;          // level 0's newest frame
     int written_ = 0;      // level-0 frames written since reset(), up to what stays readable
     double now_ = 0.0;     // samples since reset() (a whole number: exact in double for millennia)
+    int seg_ = 0;          // and that modulo 32: where a call starts in render()'s segments
     uint32_t rng_ = 1;
 
     // Settings, clamped.
