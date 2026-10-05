@@ -2,6 +2,9 @@
 // The modulation sources that need DSP: the two LFOs and the envelope follower. The matrix that
 // routes them (and the macros) to parameters is plugin/engine.cpp: it works on parameter values.
 #include "common.h"
+#include "simd.h"
+
+#include <cfloat>
 
 namespace ef {
 
@@ -78,14 +81,28 @@ public:
         rel_ = smoothCoef(std::max(releaseS, 1e-3f));
         gain_ = dbToGain(gainDb);
     }
-    // Follows a chunk; returns the level at its end.
+    // Follows a chunk; returns the level at its end. On NEON in a vector's lanes: VFP has no min or
+    // max, and its compares stall on the flags.
     float process(const float* L, const float* R, int n) {
-        float e = env_;
+#if EF_NEON
+        float32x2_t e = vdup_n_f32(env_);
+        const float32x2_t att = vdup_n_f32(att_), rel = vdup_n_f32(rel_), big = vdup_n_f32(FLT_MAX);
+        for (int i = 0; i < n; ++i) {
+            float32x2_t v = vld1_lane_f32(R + i, vld1_dup_f32(L + i), 1);
+            v = vreinterpret_f32_u32(vand_u32(vreinterpret_u32_f32(v), vcale_f32(v, big)));   // sanitize()
+            v = vabs_f32(v);
+            const float32x2_t x = vpmax_f32(v, v);
+            e = vfma_f32(e, vsub_f32(x, e), vbsl_f32(vcgt_f32(x, e), att, rel));   // fused, as GCC builds the VFP version
+        }
+        const float last = vget_lane_f32(e, 0);
+#else
+        float last = env_;
         for (int i = 0; i < n; ++i) {
             const float x = std::max(std::fabs(sanitize(L[i])), std::fabs(sanitize(R[i])));
-            e += (x - e) * (x > e ? att_ : rel_);
+            last += (x - last) * (x > last ? att_ : rel_);
         }
-        env_ = e < 1e-9f ? 0.0f : e;   // no denormals while it decays
+#endif
+        env_ = last < 1e-9f ? 0.0f : last;   // no denormals while it decays
         return std::min(env_ * gain_, 1.0f);
     }
 

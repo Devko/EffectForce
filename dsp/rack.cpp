@@ -1,4 +1,5 @@
 #include "rack.h"
+#include "simd.h"
 
 #include <cstring>
 
@@ -10,6 +11,28 @@ constexpr float kDipStep = 1.0f / (0.003f * kRate);    // a new order: 3 ms out,
 
 // 0 dB is exactly 1: an empty chain at unity passes the input through bit for bit.
 float gainOf(float db) { return db == 0.0f ? 1.0f : dbToGain(db); }
+
+void scale(float* L, float* R, int n, float g) {
+    int i = 0;
+    for (; i + 4 <= n; i += 4) {
+        store4(L + i, load4(L + i) * splat(g));
+        store4(R + i, load4(R + i) * splat(g));
+    }
+    for (; i < n; ++i) {
+        L[i] *= g;
+        R[i] *= g;
+    }
+}
+
+// x = dry + (x o - dry) w, as the per-sample loop has it.
+void blend(float* x, const float* dry, int n, float o, float w) {
+    int i = 0;
+    for (; i + 4 <= n; i += 4) {
+        const f4 d = load4(dry + i);
+        store4(x + i, d + (load4(x + i) * splat(o) - d) * splat(w));
+    }
+    for (; i < n; ++i) x[i] = dry[i] + (x[i] * o - dry[i]) * w;
+}
 }
 
 bool validOrder(const int* order) {
@@ -123,19 +146,30 @@ void Rack::process(const RackPatch& p, const Transport& t, float* L, float* R, i
 
     std::memcpy(dryL_, L, sizeof(float) * static_cast<size_t>(n));
     std::memcpy(dryR_, R, sizeof(float) * static_cast<size_t>(n));
-    for (int i = 0; i < n; ++i) {
-        const float g = in_.next();
-        L[i] *= g;
-        R[i] *= g;
+    // Settled gains (almost always) are constants: the same arithmetic four samples at a time, and
+    // none at all for a unity input.
+    if (in_.moving()) {
+        for (int i = 0; i < n; ++i) {
+            const float g = in_.next();
+            L[i] *= g;
+            R[i] *= g;
+        }
+    } else if (in_.value() != 1.0f) {
+        scale(L, R, n, in_.value());
     }
     running_ = 0;
     for (int k = 0; k < RM_COUNT; ++k) runModule(order_[k], p, t, L, R, n);
 
-    for (int i = 0; i < n; ++i) {
-        if (dipDir_ != 0) dip_ = std::clamp(dip_ + (dipDir_ < 0 ? -kDipStep : kDipStep), 0.0f, 1.0f);
-        const float o = out_.next() * dip_, w = mix_.next();
-        L[i] = dryL_[i] + (L[i] * o - dryL_[i]) * w;
-        R[i] = dryR_[i] + (R[i] * o - dryR_[i]) * w;
+    if (dipDir_ != 0 || out_.moving() || mix_.moving()) {
+        for (int i = 0; i < n; ++i) {
+            if (dipDir_ != 0) dip_ = std::clamp(dip_ + (dipDir_ < 0 ? -kDipStep : kDipStep), 0.0f, 1.0f);
+            const float o = out_.next() * dip_, w = mix_.next();
+            L[i] = dryL_[i] + (L[i] * o - dryL_[i]) * w;
+            R[i] = dryR_[i] + (R[i] * o - dryR_[i]) * w;
+        }
+    } else {
+        blend(L, dryL_, n, out_.value() * dip_, mix_.value());
+        blend(R, dryR_, n, out_.value() * dip_, mix_.value());
     }
     if (dipDir_ < 0 && dip_ == 0.0f) {   // silent: the new order goes in, then fades back
         if (orderOk) std::copy(p.order, p.order + RM_COUNT, order_);

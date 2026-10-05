@@ -85,6 +85,12 @@ EF_INLINE Gp dropTiny(Gp x) {
 // common.h's hermite() on both sides of an interleaved stereo line: q points at x[-1]'s left
 // sample (L-1 R-1 L0 R0 L1 R1 L2 R2), t is the fraction past x0. Laurent de Soras's arrangement
 // (one constant, fewer registers): c1 as there, a = c3, b = -c2.
+template <class V>
+EF_INLINE V cubicOf(V xm1, V x0, V x1, V x2, V tt, V half) {
+    const V c1 = half * (x1 - xm1), v = x0 - x1, w = c1 + v;
+    const V a = w + v + half * (x2 - x0), b = w + a;
+    return ((a * tt - b) * tt + c1) * tt + x0;
+}
 EF_INLINE Gp cubic(const float* q, float t) {
 #if EF_NEON
     const float32x4_t lo = vld1q_f32(q), hi = vld1q_f32(q + 4);
@@ -92,10 +98,68 @@ EF_INLINE Gp cubic(const float* q, float t) {
 #else
     const Gp xm1{q[0], q[1]}, x0{q[2], q[3]}, x1{q[4], q[5]}, x2{q[6], q[7]};
 #endif
-    const Gp half = both(0.5f), tt = both(t);
-    const Gp c1 = half * (x1 - xm1), v = x0 - x1, w = c1 + v;
-    const Gp a = w + v + half * (x2 - x0), b = w + a;
-    return ((a * tt - b) * tt + c1) * tt + x0;
+    return cubicOf(xm1, x0, x1, x2, both(t), both(0.5f));
+}
+// The same for two samples at once, lane by lane the same arithmetic: q and r their windows, t
+// their fractions (t0 t0 t1 t1); the result L R of the first, then of the second.
+EF_INLINE f4 cubic2(const float* q, const float* r, f4 t) {
+#if EF_NEON
+    const float32x4_t a = vld1q_f32(q), b = vld1q_f32(q + 4), c = vld1q_f32(r), d = vld1q_f32(r + 4);
+    const f4 xm1 = vcombine_f32(vget_low_f32(a), vget_low_f32(c)), x0 = vcombine_f32(vget_high_f32(a), vget_high_f32(c));
+    const f4 x1 = vcombine_f32(vget_low_f32(b), vget_low_f32(d)), x2 = vcombine_f32(vget_high_f32(b), vget_high_f32(d));
+#else
+    const f4 xm1{q[0], q[1], r[0], r[1]}, x0{q[2], q[3], r[2], r[3]}, x1{q[4], q[5], r[4], r[5]}, x2{q[6], q[7], r[6], r[7]};
+#endif
+    return cubicOf(xm1, x0, x1, x2, t, splat(0.5f));
+}
+// Each lane twice: (x0 x0 x1 x1) and (x2 x2 x3 x3).
+EF_INLINE void store4Twice(float* p, f4 x) {
+#if EF_NEON
+    const float32x4x2_t z = vzipq_f32(x, x);
+    vst1q_f32(p, z.val[0]);
+    vst1q_f32(p + 4, z.val[1]);
+#else
+    for (int i = 0; i < 4; ++i) p[2 * i] = p[2 * i + 1] = x[i];
+#endif
+}
+EF_INLINE f4 swapPairs(f4 v) {
+#if EF_NEON
+    return vrev64q_f32(v);
+#else
+    return f4{v[1], v[0], v[3], v[2]};
+#endif
+}
+
+// The larger magnitude of the two lanes, in both.
+EF_INLINE Gp peakLr(Gp v) {
+#if EF_NEON
+    const float32x2_t m = vabs_f32(v);
+    return vpmax_f32(m, m);
+#else
+    return both(std::max(std::fabs(v[0]), std::fabs(v[1])));
+#endif
+}
+EF_INLINE Gp minLr(Gp a, Gp b) {
+#if EF_NEON
+    return vmin_f32(a, b);
+#else
+    return Gp{std::min(a[0], b[0]), std::min(a[1], b[1])};
+#endif
+}
+EF_INLINE float lane0(Gp v) {
+#if EF_NEON
+    return vget_lane_f32(v, 0);
+#else
+    return v[0];
+#endif
+}
+// Lane 0 over x, decided in the integer unit.
+EF_INLINE bool above(Gp v, float x) {
+#if EF_NEON
+    return vget_lane_u32(vcgt_f32(v, vdup_n_f32(x)), 0) != 0;
+#else
+    return v[0] > x;
+#endif
 }
 
 // The envelope's gain from its ramp a (0..1): sin^2(pi / 2 a). sin as fastmath.h's sinQuarter, its
@@ -677,17 +741,19 @@ void Grain::process(float* L, float* R, int n) {
     for (Voice& v : voice_)
         if (v.on) render(v, n);
 
-    // The output, and the input with the feedback into the buffer.
+    // The output, and the input with the feedback into level 0; its new frames also into `frames`
+    // for the decimators, which run after it (each in a loop of its own: its state in registers).
     const float inv = 1.0f / static_cast<float>(n);
     const float mixStep = (mixEnd_ - mix_) * inv, fbStep = (fbEnd_ - fb_) * inv;
-    float mix = mix_, fb = fb_, live = live_, rec = rec_, limit = limit_;
+    float mix = mix_, fb = fb_, live = live_, rec = rec_;
+    Gp limit = both(limit_);
+    bool fadeIn = rec < 1.0f;
     const bool liveOn = live > 0.0f || liveFrom_ > 0.0f || liveTo_ > 0.0f;
     const bool recording = !hold_;
     Gp lp = Gp{lpL_, lpR_}, hp = Gp{hpL_, hpR_};
     float* const b0 = buf_[0].data();
-    float* const b1 = buf_[1].data();
-    float* const b2 = buf_[2].data();
-    constexpr int f1 = kFrames >> 1, f2 = kFrames >> 2;
+    alignas(16) float frames[2 * kChunk];
+    const int first = w0_ + 1 == kFrames ? 0 : w0_ + 1;   // level 0's first new frame
     int w = w0_;
     for (int k = 0; k < n; ++k) {
         mix += mixStep;
@@ -706,47 +772,26 @@ void Grain::process(float* L, float* R, int n) {
         lp += both(kLowPass) * (wet - lp);
         hp += both(kHighPass) * (lp - hp);
         Gp v = clampLr(x, kInClamp) + (lp - hp) * both(fb);
-        if (rec < 1.0f) {   // after a hold: the recording fades in
+        if (fadeIn) {   // after a hold: the recording fades in
             rec = std::min(1.0f, rec + 1.0f / kHoldFade);
             v *= both(window1(rec));
+            fadeIn = rec < 1.0f;
         }
-        // The limiter: the gain recovers, then drops at once to what keeps this sample at 1.
-        const float a = std::max(std::fabs(v[0]), std::fabs(v[1]));
-        limit = std::min(limit * kRelease, 1.0f);
-        if (a * limit > 1.0f) limit = 1.0f / a;
-        v = dropTiny(v * both(limit));
+        // The limiter: the gain recovers, then drops at once to what keeps this sample at 1. (In
+        // both lanes of a vector: VFP has no min, and its compares stall on the flags.)
+        const Gp a = peakLr(v);
+        limit = minLr(limit * both(kRelease), both(1.0f));
+        if (above(a * limit, 1.0f)) limit = both(1.0f / lane0(a));
+        v = dropTiny(v * limit);
 
         w = w + 1 == kFrames ? 0 : w + 1;
         storePair(b0 + 2 * w, v);
         if (w < kGuard) storePair(b0 + 2 * (kFrames + w), v);
-        if (!(w & 1)) {
-            storePair(early0_, v);
-            continue;
-        }
-        // A pair done: one frame of level 1, and of every second one, one of level 2.
-        float l1, r1;
-        down1_.process(f4{early0_[0], v[0], early0_[1], v[1]}, l1, r1);
-        const int w1 = w >> 1;
-        b1[2 * w1] = l1;
-        b1[2 * w1 + 1] = r1;
-        if (w1 < kGuard) {
-            b1[2 * (f1 + w1)] = l1;
-            b1[2 * (f1 + w1) + 1] = r1;
-        }
-        if (!(w1 & 1)) {
-            early1_[0] = l1;
-            early1_[1] = r1;
-            continue;
-        }
-        float l2, r2;
-        down2_.process(f4{early1_[0], l1, early1_[1], r1}, l2, r2);
-        const int w2 = w1 >> 1;
-        b2[2 * w2] = l2;
-        b2[2 * w2 + 1] = r2;
-        if (w2 < kGuard) {
-            b2[2 * (f2 + w2)] = l2;
-            b2[2 * (f2 + w2) + 1] = r2;
-        }
+        storePair(frames + 2 * k, v);
+    }
+    if (recording) {   // level 1 from level 0's new frames, level 2 from level 1's (in place)
+        const int made = decimate<1>(down1_, early0_, frames, first, n, frames);
+        decimate<2>(down2_, early1_, frames, first >> 1, made, frames);
     }
     lp = dropTiny(lp);
     hp = dropTiny(hp);
@@ -756,7 +801,7 @@ void Grain::process(float* L, float* R, int n) {
     hpR_ = hp[1];
     live_ = live;
     rec_ = rec;
-    limit_ = limit;
+    limit_ = lane0(limit);
     if (recording) {
         w0_ = w;
         written_ = std::min(written_ + n, kKeep);
@@ -770,6 +815,43 @@ void Grain::process(float* L, float* R, int n) {
     now_ += n;
 }
 
+// A level of the buffer from the one above it: `count` frames of that one (L R), the first at
+// `first` in its ring. Each odd frame completes a pair (its even one may be the last call's,
+// `early`): one frame of this level, into its ring and, packed, into `out` (which may be `in`: it
+// is written behind what is read). Returns how many.
+template <int Level>
+int Grain::decimate(StereoDecimator& down, float (&early)[2], const float* in, int first, int count, float* out) {
+    constexpr int above = kFrames >> (Level - 1), frames = kFrames >> Level;
+    float* const b = buf_[Level].data();
+    StereoDecimator d = down;
+    float el = early[0], er = early[1];
+    int made = 0;
+    for (int i = 0, at = first; i < count; ++i, at = at + 1 == above ? 0 : at + 1) {
+        const float l = in[2 * i], r = in[2 * i + 1];
+        if (!(at & 1)) {
+            el = l;
+            er = r;
+            continue;
+        }
+        float lo, ro;
+        d.process(f4{el, l, er, r}, lo, ro);
+        const int f = at >> 1;
+        b[2 * f] = lo;
+        b[2 * f + 1] = ro;
+        if (f < kGuard) {
+            b[2 * (frames + f)] = lo;
+            b[2 * (frames + f) + 1] = ro;
+        }
+        out[2 * made] = lo;
+        out[2 * made + 1] = ro;
+        ++made;
+    }
+    down = d;
+    early[0] = el;
+    early[1] = er;
+    return made;
+}
+
 // A voice's part of this call: its positions and envelope four samples at a time, then the reads.
 // Positions go by the voice's own 32-sample segments: the segment's first position (in double) as
 // a whole frame `base` and a float offset that stays at least 1 across the segment (so truncation
@@ -778,58 +860,75 @@ void Grain::process(float* L, float* R, int n) {
 // read alike.
 void Grain::render(Voice& v, int n) {
     constexpr int kSeg = 32;
-    const int k0 = std::max(0, -v.t);
-    const int k1 = std::min(n, std::min(v.end, v.relEnd) - v.t);
+    const int t0 = v.t;
+    const int k0 = std::max(0, -t0);
+    const int k1 = std::min(n, std::min(v.end, v.relEnd) - t0);
     if (k1 <= k0) return;
     const int level = v.level;
     const double frames = static_cast<double>(kFrames >> level);
-    const f4 lane = f4{0.0f, 1.0f, 2.0f, 3.0f};
+    const f4 lane = f4{0.0f, 1.0f, 2.0f, 3.0f}, four = splat(4.0f);
     const f4 rv = splat(static_cast<float>(v.rate));
-    const f4 inS = splat(v.inSlope), outS = splat(v.outSlope), relS = splat(v.relSlope);
-    const f4 endF = splat(static_cast<float>(v.end)), relF = splat(static_cast<float>(v.relEnd));
+    // The positions. Sample counts as floats are exact (under 2^24), so stepping them by 4 is
+    // converting each.
     for (int k = k0; k < k1;) {
-        const int seg = (v.t + k) & ~(kSeg - 1);   // the voice's own time, >= 0 here
-        const int s0 = seg - v.t, stop = std::min(k1, s0 + kSeg);
+        const int seg = (t0 + k) & ~(kSeg - 1);   // the voice's own time, >= 0 here
+        const int s0 = seg - t0, stop = std::min(k1, s0 + kSeg);
         const double p = v.start + static_cast<double>(seg) * v.rate;
         const double base = floorFast(v.rate < 0.0 ? p + (kSeg - 1) * v.rate : p) - 1.0;
         const int ib = static_cast<int>(base - floorFast(base / frames) * frames);
         const f4 fv = splat(static_cast<float>(p - base));
         const i4 first = i4{2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1)};
         // Four at a time; a group running past `stop` is written over by the next stretch.
-        for (int j = k; j < stop; j += 4) {
-            const f4 o = fv + (splat(static_cast<float>(j - s0)) + lane) * rv;
+        f4 at = splat(static_cast<float>(k - s0)) + lane;
+        for (int j = k; j < stop; j += 4, at += four) {
+            const f4 o = fv + at * rv;
             const i4 io = __builtin_convertvector(o, i4);
-            store4(frac_ + (j - k0), o - __builtin_convertvector(io, f4));
+            store4Twice(frac_ + 2 * (j - k0), o - __builtin_convertvector(io, f4));
             const i4 ix = first + io + io;
 #if EF_NEON
             vst1q_s32(idx_ + (j - k0), ix);
 #else
             std::memcpy(idx_ + (j - k0), &ix, sizeof ix);
 #endif
-            const f4 tau = splat(static_cast<float>(v.t + j)) + lane;
-            f4 a = min4(tau * inS, (endF - tau) * outS);
-            a = max4(min4(a, min4((relF - tau) * relS, splat(1.0f))), splat(0.0f));
-            store4(env_ + (j - k0), window4(a));
         }
         k = stop;
+    }
+    // The envelope (a loop of its own: together they run out of NEON registers).
+    {
+        const f4 inS = splat(v.inSlope), outS = splat(v.outSlope), relS = splat(v.relSlope);
+        const f4 endF = splat(static_cast<float>(v.end)), relF = splat(static_cast<float>(v.relEnd));
+        f4 tau = splat(static_cast<float>(t0 + k0)) + lane;
+        for (int j = k0; j < k1; j += 4, tau += four) {
+            // (Clamped at 1 by window4 itself.)
+            const f4 a = max4(min4(min4(tau * inS, (endF - tau) * outS), (relF - tau) * relS), splat(0.0f));
+            store4Twice(env_ + 2 * (j - k0), window4(a));
+        }
     }
     const float* const buf = buf_[level].data();
     if (v.gx[0] != 0.0f || v.gx[1] != 0.0f) readVoice<true>(v, buf, k0, k1 - k0);
     else readVoice<false>(v, buf, k0, k1 - k0);
 }
 
+// Two samples a step (a vector holds L R of each); an odd one at the end on its own.
 template <bool Cross>
 void Grain::readVoice(const Voice& v, const float* buf, int k0, int count) {
-    const Gp gd = Gp{v.gd[0], v.gd[1]}, gx = Gp{v.gx[0], v.gx[1]};
+    const f4 gd = f4{v.gd[0], v.gd[1], v.gd[0], v.gd[1]}, gx = f4{v.gx[0], v.gx[1], v.gx[0], v.gx[1]};
     float* const acc = acc_ + 2 * k0;
     const int* const idx = idx_;
     const float* const frac = frac_;
     const float* const env = env_;
-    for (int j = 0; j < count; ++j) {
-        const Gp y = cubic(buf + idx[j], frac[j]);
-        Gp g = gd * y;
-        if (Cross) g += gx * swapLr(y);
-        storePair(acc + 2 * j, loadPair(acc + 2 * j) + g * both(env[j]));
+    int j = 0;
+    for (; j + 2 <= count; j += 2) {
+        const f4 y = cubic2(buf + idx[j], buf + idx[j + 1], load4(frac + 2 * j));
+        f4 g = gd * y;
+        if (Cross) g += gx * swapPairs(y);
+        store4(acc + 2 * j, load4(acc + 2 * j) + g * load4(env + 2 * j));
+    }
+    if (j < count) {
+        const Gp y = cubic(buf + idx[j], frac[2 * j]);
+        Gp g = Gp{v.gd[0], v.gd[1]} * y;
+        if (Cross) g += Gp{v.gx[0], v.gx[1]} * swapLr(y);
+        storePair(acc + 2 * j, loadPair(acc + 2 * j) + g * both(env[2 * j]));
     }
 }
 

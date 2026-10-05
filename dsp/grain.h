@@ -132,12 +132,16 @@ private:
     void render(Voice& v, int n);
     template <bool Cross>
     void readVoice(const Voice& v, const float* buf, int k0, int count);
+    template <int Level>
+    int decimate(StereoDecimator& down, float (&early)[2], const float* in, int first, int count, float* out);
 
     std::vector<float> buf_[kLevels];   // interleaved L R frames, then kGuard frames again
     Voice voice_[kVoices];
     alignas(16) float acc_[2 * kChunk];   // the wet of this call, L R interleaved
+    // A voice's reads, staged: per sample its first float, then its fraction and its envelope, each
+    // twice (L and R lanes), so two samples' worth load as one vector.
     alignas(16) int idx_[kChunk + 4];
-    alignas(16) float frac_[kChunk + 4], env_[kChunk + 4];
+    alignas(16) float frac_[2 * (kChunk + 4)], env_[2 * (kChunk + 4)];
 
     int w0_ = -1;          // level 0's newest frame
     int written_ = 0;      // level-0 frames written since reset(), up to what stays readable

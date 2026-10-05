@@ -80,6 +80,11 @@ public:
     }
     void to(float target, int n) {
         target_ = target;
+        if (cur_ == target) {   // there already: it stays (a ramp of 0 steps gives the same values)
+            step_ = 0.0f;
+            left_ = 0;
+            return;
+        }
         left_ = std::max(n, 1);
         step_ = (target_ - cur_) / static_cast<float>(left_);
     }
@@ -92,6 +97,7 @@ public:
     }
     float value() const { return cur_; }
     float target() const { return target_; }
+    bool moving() const { return left_ > 0; }   // false: next() returns value() throughout
 
 private:
     float cur_ = 0.0f, target_ = 0.0f, step_ = 0.0f;
