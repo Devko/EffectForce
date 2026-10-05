@@ -890,11 +890,89 @@ void shimmerClicks() {
 
 } // namespace
 
+// The shifter after a restart (shimmer switched on, or a new interval): a steady tone through it
+// starts silent (its head reaches back before anything it has heard) and once it sounds it keeps
+// sounding, at every interval: the first splice never jumps past what was written since.
+void shifterOnset() {
+    const float ratios[Reverb::kIntervals] = {2.0f, 1.49830708f, 3.17480210f, 0.5f};
+    std::vector<float> buf(ef::PitchShift::bufferSize(ratios[2], ratios[3], 3528));
+    for (int iv = 0; iv < Reverb::kIntervals; ++iv) {
+        ef::PitchShift ps;
+        ps.attach(buf.data(), static_cast<uint32_t>(buf.size()));
+        ps.setRatio(ratios[iv], 3528);
+        for (int i = 0; i < 20000; ++i) ps.tick(std::sin(0.05f * static_cast<float>(i)));   // stale material first
+        ps.restart();
+        int gaps = 0, heard = 0;
+        bool quiet = true;
+        for (int b = 0; b < 80; ++b) {
+            double e = 0.0;
+            for (int i = 0; i < 221; ++i) {
+                const int n = b * 221 + i;
+                const float y = ps.tick(0.5f * std::sin(2.0f * 3.14159265f * 300.0f * static_cast<float>(n) / ef::kRate));
+                e += static_cast<double>(y) * y;
+            }
+            const bool now = std::sqrt(e / 221.0) < 0.05;
+            gaps += heard && now && !quiet;
+            heard += !now;
+            quiet = now;
+        }
+        CHECK(heard > 60 && gaps == 0);
+        if (!(heard > 60 && gaps == 0)) std::printf("  shifter %d: %d blocks heard, %d dropouts\n", iv, heard, gaps);
+    }
+}
+
+// Shimmer switched on in the middle of a tail takes the pitched path's share from what stays only
+// once the shifter sounds: until then the tail is the one without shimmer, bit for bit, and it
+// never dips. And tailSamples() covers a short shimmering tail (the pitched echoes wait in the
+// shifter, so they ring past Decay): Room, size 0, decay 0.3 s, +19.
+void shimmerWakes() {
+    Reverb r;
+    for (int iv = 0; iv < Reverb::kIntervals; ++iv) {
+        P p = wetOnly(Reverb::HALL, 4.0f);
+        p.shimmerInterval = iv;
+        Buf x = whiteNoise(secs(2.0), 0.3f, 7);
+        std::fill(x.begin() + secs(0.5), x.end(), 0.0f);
+        const Stereo plain = render(r, p, x, x);
+        const size_t on = at(1.0);
+        r.reset();
+        Buf L = x, R = x;
+        for (size_t pos = 0; pos < L.size(); pos += ef::kChunk) {
+            p.shimmer = pos >= on ? 1.0f : 0.0f;
+            r.set(p, {});
+            r.process(&L[pos], &R[pos], static_cast<int>(std::min<size_t>(ef::kChunk, L.size() - pos)));
+        }
+        size_t same = on;
+        while (same < L.size() && L[same] == plain.L[same] && R[same] == plain.R[same]) ++same;
+        const double dip = db(rmsLR({L, R}, on, on + at(0.1)) / rmsLR(plain, on, on + at(0.1)));
+        CHECK(same > on + at(0.02) && dip > -0.03);
+        if (!(same > on + at(0.02) && dip > -0.03))
+            std::printf("  shimmer %d on: the same for %.1f ms, the next 100 ms %+.2f dB\n", iv, (same - on) * 1000.0 / ef::kRate, dip);
+    }
+    P p = wetOnly(Reverb::ROOM, 0.3f);
+    p.size = 0.0f;
+    p.shimmer = 1.0f;
+    p.shimmerInterval = Reverb::UP_TWELFTH;
+    r.reset();
+    r.set(p, {});
+    const int n = r.tailSamples();
+    const Stereo s = impulseResponse(r, p, n + secs(1.0));
+    const size_t win = at(0.02);
+    double top = 0.0;
+    size_t t60 = 0;
+    for (size_t i = 0; i + win <= s.L.size(); i += win) top = std::max(top, rmsLR(s, i, i + win));
+    for (size_t i = 0; i + win <= s.L.size(); i += win)
+        if (rmsLR(s, i, i + win) > top * 1e-3) t60 = i + win;
+    std::printf("  reverb: Room 0.3 s, shimmer +19: tailSamples %.2f s, -60 dB at %.2f s\n", n / ef::kRate, t60 / ef::kRate);
+    CHECK(static_cast<size_t>(n) > t60 && static_cast<size_t>(n) < 3 * t60);
+}
+
 void reverbTests() {
     golden();
     shimmerPitch();
     shimmerBounded();
     shimmerClicks();
+    shifterOnset();
+    shimmerWakes();
     decay();
     damping();
     evenDecay();

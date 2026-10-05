@@ -162,8 +162,10 @@ tail: lusher, never metallic), **Reverb Width** and **Reverb Freeze** (the tail 
 sound stays out). Changing the mode clears the tail, as a hardware reverb's program change does.
 **Shimmer** sends the tail through a pitch shifter as it circulates, so it blooms upward with every
 pass (**Shimmer Pitch**: +12, +7, +19, or -12 for a sub shimmer). The climbing energy leaves the
-audible band in the end, so with a lot of shimmer a tail ends a little sooner than its Decay, and a
-frozen tail with shimmer slowly thins out instead of holding still.
+audible band in the end, so with a lot of shimmer a long tail ends a little sooner than its Decay
+(a very short one rings a little past it: the pitched echoes take a moment to come back). **Freeze
+with shimmer** doesn't hold still: the tail keeps climbing and drains away over tens of seconds
+(faster at +19 and with more shimmer); set Shimmer to 0 for a freeze that holds for good.
 
 ## Modulation
 

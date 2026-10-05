@@ -329,7 +329,32 @@ int Reverb::tailSamples() const {
     if (p_.freeze) return 1 << 30;   // 6.8 hours: for good, as far as a host can tell
     const double pre = predelaySamples(p_.predelayMs);
     const double build = maxBase_ * (0.5 + p_.size) + build_;   // until every line has had its echo
-    const double ring = p_.decayS * kRate * (kTailDb / 60.0f);
+    double ring = p_.decayS * kRate * (kTailDb / 60.0f);
+    // Shimmer: of the eighth of the network's energy row 3 holds, the pitched share s (sin^2 of
+    // its angle) waits in the shifter, D samples on average (its head's delay), before it comes
+    // back. Per mean loop T the network keeps g of its energy, so the slowest decay u a pass
+    // solves u = g (1 - s / 8 + s / 8 u^(-D / T)): longer than Decay, at short ones. (Cached: a
+    // bisection, when the settings change.)
+    if (p_.shimmer > 0.0f) {
+        const float key[5] = {p_.decayS, p_.size, p_.shimmer, static_cast<float>(p_.shimmerInterval), static_cast<float>(p_.mode)};
+        if (!std::equal(key, key + 5, tailKey_)) {
+            std::copy(key, key + 5, tailKey_);
+            const double ratio = kShimRatio[p_.shimmerInterval], speed = std::fabs(ratio - 1.0), jump = speed * kShimGrain;
+            const double delay = (ratio > 1.0 ? PitchShift::kMinDelay + speed * PitchShift::kFade : PitchShift::kMinDelay + PitchShift::kSearch) + 0.5 * jump;
+            const ModeDef& d = kModeDefs[p_.mode];
+            double loop = 0.0;
+            for (int k = 0; k < kLines; ++k) loop += (d.line[k] * (0.5 + p_.size) + d.ap[k]) / kLines;
+            const double g = std::pow(10.0, -6.0 * loop / (kRate * static_cast<double>(p_.decayS))), sn = std::sin(p_.shimmer * 1.5707963);
+            const double share = sn * sn / 8.0, r = delay / loop;
+            double lo = 0.0, hi = 1.0;
+            for (int i = 0; i < 40; ++i) {
+                const double u = 0.5 * (lo + hi);
+                (g * (1.0 - share + share * std::pow(u, -r)) > u ? lo : hi) = u;
+            }
+            tailShim_ = kTailDb / (-10.0 * std::log10(hi)) * loop;
+        }
+        ring = std::max(ring, tailShim_);
+    }
     return static_cast<int>(pre + build + ring) + 1;
 }
 
@@ -469,14 +494,22 @@ void Reverb::chunkSetup(int n) {
 
     // Shimmer: an interval change fades the pitched path out, switches in silence and fades it
     // back in. What stays and what is pitched share the power: cos and sin of shimmer x 90 degrees.
-    // Off and settled, the shifter doesn't run (and starts afresh when it does again).
+    // Off and settled, the shifter doesn't run. Asked for again, it starts afresh; as it starts
+    // silent (its head reaches back before anything it has heard), the pitched path fades in once
+    // it sounds, as after an interval change: taking the tail's share away earlier would dip it.
+    const bool wake = !shimOn_ && p_.shimmer > 0.0f;
+    if (wake) {
+        shimmerAfresh();
+        if (!jump) shimGate_ = 0.0f;
+    }
     if (jump) {
         if (p_.shimmerInterval != shimInterval_) setInterval(p_.shimmerInterval);
     } else if (p_.shimmerInterval != shimInterval_) {
         if (!shimOn_ || shimGate_ == 0.0f) setInterval(p_.shimmerInterval);
         else shimGate_ = std::max(0.0f, shimGate_ - fn * kShimStep);
     }
-    if (p_.shimmerInterval == shimInterval_) shimGate_ = std::min(1.0f, shimGate_ + fn * kShimStep);
+    if (p_.shimmerInterval == shimInterval_ && (!(shimOn_ || wake) || shift_.sounding()))
+        shimGate_ = std::min(1.0f, shimGate_ + fn * kShimStep);
     // The angle glides (90 degrees in 20 ms at most): switching what circulates in one chunk would
     // click in the tail.
     const float want = p_.shimmer * shimGate_ * (kPi / 2.0f);
@@ -494,9 +527,7 @@ void Reverb::chunkSetup(int n) {
         shimSin_.to(sn, n);
         shimCos_.to(cs, n);
     }
-    const bool on = sn != 0.0f || shimSin_.value() != 0.0f;
-    if (on && !shimOn_) shimmerAfresh();
-    shimOn_ = on;
+    shimOn_ = p_.shimmer > 0.0f || sn != 0.0f || shimSin_.value() != 0.0f;
 }
 
 // The read positions' next straight line: the sines a segment on, the size where it is going. The
