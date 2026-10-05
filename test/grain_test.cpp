@@ -433,6 +433,182 @@ void holdFreezes() {
     }
 }
 
+// Hold pressed just after a grid line (the natural gesture: on the beat), synced Stutter at 120 BPM
+// sixteenths: the slice just played can't play through (its end is the newest frame), so the held
+// stutter repeats the one before it, never silence. Free 10 ms slices pitched up +12 and +24 (a
+// repeat would catch up with the input) repeat too, from an earlier slice.
+void stutterAlwaysRepeats() {
+    const double spb = kSr * 60.0 / 120.0;
+    const long line = static_cast<long>(std::ceil(40 * 0.25 * spb));   // the grid line at beat 10
+    for (const float density : {0.0f, 1.0f})
+        for (const int e : {0, 200, 600}) {
+            P p = params(Grain::kStutter);
+            p.sync = true;
+            p.sizeBeats = 0.25;
+            p.density = density;
+            const long holdAt = (line + e + kCh - 1) / kCh * kCh;
+            const int n = kCh * 8000;
+            Buf L = sine(440.0, n, 0.5f), R = L;
+            Grain g;
+            for (int c = 0; c * kCh < n; ++c) {
+                Transport t;
+                t.bpm = 120.0;
+                t.playing = t.valid = true;
+                t.beats = c * kCh / spb;
+                p.hold = c * kCh >= holdAt;
+                g.set(p, t);
+                g.process(&L[static_cast<size_t>(c * kCh)], &R[static_cast<size_t>(c * kCh)], kCh);
+            }
+            const double held = rms(L, static_cast<size_t>(holdAt + kSr / 2));
+            CHECK(held > 0.3);
+            if (!(held > 0.3)) std::printf("  hold %ld samples after a grid line, density %.0f: held level %.3f\n", holdAt - line, density, held);
+        }
+    for (const float pitch : {12.0f, 24.0f}) {
+        P p = params(Grain::kStutter, 10.0f);
+        p.density = 1.0f;
+        p.pitch = pitch;
+        const Buf in = sine(440.0, 3 * kSr, 0.5f);
+        Buf L = in, R = in;
+        render(p, L, R);
+        int differ = 0;
+        for (size_t i = 0; i < in.size(); ++i) differ += std::fabs(L[i] - in[i]) > 1e-4f;
+        CHECK(differ > static_cast<int>(in.size()) / 2);
+        if (!(differ > static_cast<int>(in.size()) / 2)) std::printf("  10 ms, +%.0f: %d of %zu samples repeated\n", pitch, differ, in.size());
+    }
+}
+
+// MPC's transport: 128-frame blocks with the song position at each block's start, Engine::render
+// adding a chunk's worth per chunk. Arp and Mosaic on 1-bar slices while MPC loops 2 beats (a loop
+// shorter than a slice), and Arp on a 1-bar loop a whole number of blocks long (the wrap on a block
+// edge): every wrap starts a slice, so they keep playing. Then Mosaic on sixteenths, a 1-bar loop
+// wrapping mid-block on the grid, on a constant input (the output moves only in the crossfades from
+// boundaries): the wrap is the boundary it already had, not a second one 64 samples later.
+template <class F>
+void runHost(Grain& g, const P& p, Buf& L, Buf& R, double bpm, F hostBeats) {
+    for (size_t pos = 0; pos < L.size(); pos += 128) {
+        Transport t;
+        t.bpm = bpm;
+        t.playing = t.valid = true;
+        t.beats = hostBeats(static_cast<long>(pos));
+        for (size_t c = pos; c < std::min(pos + 128, L.size()); c += kCh) {
+            const int n = static_cast<int>(std::min<size_t>(kCh, L.size() - c));
+            g.set(p, t);
+            g.process(&L[c], &R[c], n);
+            t.beats += n / static_cast<double>(kSr) * bpm / 60.0;
+        }
+    }
+}
+void hostLoops() {
+    struct Case { int mode; double bpm, loopBeats; };
+    const double aligned = 4 * 60 * kSr / (128.0 * 650.0);   // a bar of exactly 650 blocks
+    for (const Case c : {Case{Grain::kArp, 125.0, 2.0}, Case{Grain::kMosaic, 125.0, 2.0}, Case{Grain::kArp, aligned, 4.0}}) {
+        P p = params(c.mode);
+        p.sync = true;
+        p.sizeBeats = 4.0;
+        p.density = 0.5f;
+        const double spb = kSr * 60.0 / c.bpm;
+        const long loop = std::lround(c.loopBeats * spb);
+        Buf L = whiteNoise(15 * kSr, 0.3f, 21), R = L;
+        Grain g;
+        runHost(g, p, L, R, c.bpm, [&](long pos) { return (pos % loop) / spb; });
+        const double wet = rms(L, static_cast<size_t>(8 * kSr));
+        CHECK(wet > 0.05);
+        if (!(wet > 0.05)) std::printf("  %s, %.0f-beat loop at %.2f BPM: level %.3f\n", kName[c.mode], c.loopBeats, c.bpm, wet);
+    }
+    const double bpm = 125.0, spb = kSr * 60.0 / bpm;
+    const long bar = std::lround(4 * spb);   // 661.5 blocks
+    P p = params(Grain::kMosaic);
+    p.sync = true;
+    p.sizeBeats = 0.25;
+    p.spread = 1.0f;
+    Buf L(static_cast<size_t>(5 * bar), 0.5f), R = L;
+    Grain g;
+    runHost(g, p, L, R, bpm, [&](long pos) { return (pos % bar) / spb; });
+    std::vector<char> fade(L.size(), 0);   // inside a crossfade from a grid line
+    for (long b = 0; b < 5; ++b)
+        for (int k = 0; k < 16; ++k) {
+            const long at = b * bar + static_cast<long>(std::ceil(k * 0.25 * spb - 1e-6));
+            for (long i = at; i <= at + 222 && i < static_cast<long>(L.size()); ++i) fade[static_cast<size_t>(i)] = 1;
+        }
+    int stray = 0;
+    for (size_t i = static_cast<size_t>(bar); i < L.size(); ++i) stray += std::fabs(L[i] - L[i - 1]) > 1e-6f && !fade[i - 1];
+    CHECK(stray == 0);
+    if (stray) std::printf("  Mosaic, a loop wrapping mid-block: the output moves %d times outside a boundary's crossfade\n", stray);
+}
+
+// Held, Mosaic's slices stay on the recording's grid: syncContent's clicks (1000 samples after
+// every beat) come out 1000 samples after a grid line, wherever in its slice Hold was pressed.
+void heldOnTheGrid() {
+    const int s = 5292, beat = 4 * s, n = 40 * beat;
+    for (const int e : {0, 1600, 3200}) {
+        P p = params(Grain::kMosaic);
+        p.sync = true;
+        p.sizeBeats = 0.25;
+        p.spread = 1.0f;
+        p.density = 0.0f;
+        Buf L = silence(n);
+        for (int i = 1000; i < n; i += beat) L[static_cast<size_t>(i)] = 1.0f;
+        Buf R = L;
+        const int holdAt = (20 * beat + e) / kCh * kCh;
+        Grain g;
+        for (int c = 0; c * kCh < n; ++c) {
+            Transport t;
+            t.bpm = 125.0;
+            t.playing = t.valid = true;
+            t.beats = c * kCh / (kSr * 60.0 / 125.0);
+            p.hold = c * kCh >= holdAt;
+            g.set(p, t);
+            g.process(&L[static_cast<size_t>(c * kCh)], &R[static_cast<size_t>(c * kCh)], kCh);
+        }
+        int count = 0, off = 0;
+        for (int i = holdAt + beat; i < n; ++i)
+            if (std::fabs(L[static_cast<size_t>(i)]) > 0.25f) {
+                ++count;
+                off += (i - 1000) % s != 0;
+            }
+        CHECK(count > 10 && off == 0);
+        if (!(count > 10 && off == 0)) std::printf("  held %d samples into a slice: %d clicks, %d off the grid\n", holdAt - 20 * beat, count, off);
+    }
+}
+
+// A mode change and Hold in the same chunk: the mode change fades every grain out from the
+// chunk's start; Hold stops the recording, so a Stutter repeat reading 11.5 ms behind it is about
+// to reach the newest frames and guard() fades it faster, from partway into the chunk. Blocks of
+// 32, 7 and 1 play the same: the faster fade changes nothing before it starts.
+void releasesAgree() {
+    int checked = 0;
+    for (const int at : {644, 651, 658, 665, 672, 679})
+        for (const int to : {static_cast<int>(Grain::kCloud), static_cast<int>(Grain::kMosaic)}) {
+            P p = params(Grain::kStutter, 11.5f);
+            p.density = 1.0f;
+            const Buf inL = whiteNoise(kSr, 0.5f, 31), inR = whiteNoise(kSr, 0.5f, 32);
+            Buf out[3][2];
+            const int sizes[3] = {32, 7, 1};
+            for (int b = 0; b < 3; ++b) {
+                Buf L = inL, R = inR;
+                Grain g;
+                for (int pos = 0; pos < kSr;) {
+                    const int n = std::min(sizes[b], kSr - pos);
+                    P q = p;
+                    if (pos >= 7 * kCh * at / 7) {   // chunk `at`, a multiple of 7 samples too
+                        q.mode = to;
+                        q.hold = true;
+                    }
+                    g.set(q, Transport{});
+                    g.process(&L[static_cast<size_t>(pos)], &R[static_cast<size_t>(pos)], n);
+                    pos += n;
+                }
+                out[b][0] = L;
+                out[b][1] = R;
+            }
+            const double d = std::max({maxDiff(out[0][0], out[1][0]), maxDiff(out[0][1], out[1][1]), maxDiff(out[0][0], out[2][0]),
+                                       maxDiff(out[0][1], out[2][1])});
+            checked += d < 1e-6;
+            if (!(d < 1e-6)) std::printf("  Stutter to %s with Hold at chunk %d: blocks differ by %g\n", kName[to], at, d);
+        }
+    CHECK(checked == 12);
+}
+
 // Overlapping grains of noise sum at 1 / sqrt(3/8 overlap): all wet, Cloud's level is the
 // input's to within 3 dB at every density, for a mono and a stereo input; Stretch's too.
 void level() {
@@ -744,7 +920,11 @@ void grainTests() {
     mosaicOctaves();
     stretchCrawls();
     stutterLive();
+    stutterAlwaysRepeats();
+    hostLoops();
+    heldOnTheGrid();
     holdFreezes();
+    releasesAgree();
     level();
     feedbackBounded();
     steadyNoClicks();

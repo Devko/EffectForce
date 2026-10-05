@@ -17,8 +17,11 @@
 //            crossfades at the edges.
 //   Stutter  At each slice boundary, with probability `density`, the slice just played repeats
 //            1..1 + 7 x density times (each repeat at `pitch`, backwards with probability
-//            `reverse`, sides alternating by spread); then the live input comes back. Held, it
-//            repeats for good.
+//            `reverse`, sides alternating by spread; as many as the 8 s reach back: fewer for
+//            slices over a second); then the live input comes back. Held, it repeats for good the
+//            last slice on the grid before the recording stopped. A slice whose end is too young
+//            to play through (Hold pressed within ~16 ms of a grid line, or a short slice pitched
+//            up, which would catch up with the input) gives way to the nearest earlier one.
 //   Arp      A note per slice on the grid: a grain of the step before (up to 1 + spread steps
 //            back) at `pitch` plus a step of an interval pattern density picks (octaves; fifth and
 //            octave; adding the twelfth; a leaping six-step; up and down over two octaves; steps
@@ -28,10 +31,12 @@
 //
 // Sync: Size is a division of MPC's tempo (halved while over 2 s, doubled while under 10 ms, so it
 // stays on the grid). While MPC plays, a slice boundary is where the song position is a whole
-// number of slices; a locate or a loop starts a new slice at once, partway through as the grid has
-// it there, crossfaded like any other, so the slices follow t.beats without a click. Stopped, the
-// grid runs on at the tempo. Cloud and Stretch take their grain length from the tempo but place
-// their grains freely.
+// number of slices; a locate or a loop (the song position more than a host block away from where
+// it should be, even within one slice: a loop shorter than a slice starts one at every wrap)
+// starts a new slice at once, partway through as the grid has it there, crossfaded like any
+// other, so the slices follow t.beats without a click. A jump by whole slices (a loop on the grid)
+// only renumbers the slice under way. Stopped, the grid runs on at the tempo. Cloud and Stretch
+// take their grain length from the tempo but place their grains freely.
 //
 // The buffer holds 8.5 s of stereo three times over: level 0 at the full rate, levels 1 and 2 at
 // a half and a quarter of it, each through the halfband decimator of dsp/halfband.h. A grain
@@ -53,7 +58,7 @@
 //
 // Hold freezes the buffer: nothing is written, the grains play on what is there. Engaging it fades
 // the last 5 ms recorded to silence and releasing it fades the recording back in, so the seam
-// between old and new material is a dip, never a step.
+// between old and new material is a dip, never a step. Held slices stay on the recording's grid.
 //
 // Changes: pitch, size, density, spread and reverse take effect with the next grain or slice, so
 // they never click; a mode change fades every grain out over 20 ms while the new mode's fade in.
@@ -100,7 +105,8 @@ private:
     // A grain, a slice or a note. Its envelope's ramp a(t) = min(t inSlope, (end - t) outSlope,
     // (relEnd - t) relSlope, 1), clamped to 0..1, makes the gain sin^2(pi / 2 a): a Hann window
     // when it rises for half its length and falls for the other half. A release adds the third
-    // term, starting from where the envelope is.
+    // term, starting from where the envelope is; one partway into a call keeps the line it
+    // replaces for that call (the `prior` ones), which is the lower one before it starts.
     struct Voice {
         double start = 0.0;   // its level's ring position at its own time 0 (frames)
         double rate = 0.0;    // its level's frames per sample (< 0: backwards)
@@ -109,6 +115,9 @@ private:
         int end = 0;          // its own time when the natural envelope reaches 0
         int relEnd = 0;       // and when a release does
         float inSlope = 0.0f, outSlope = 0.0f, relSlope = 1.0f;
+        int priors = 0;       // release lines replaced during this call, still in force before theirs
+        int priorEnd[2] = {};
+        float priorSlope[2] = {};
         float gd[2] = {}, gx[2] = {};   // L and R: the gains of its own side and of the other one
         bool on = false;
         bool slice = false;   // a Mosaic slice or a Stutter repeat: released at the next boundary
@@ -159,6 +168,7 @@ private:
 
     // The grid: the last boundary (samples since reset), the slice the song position is in.
     double lastBoundary_ = 0.0, sliceIndex_ = 0.0;
+    double expectBeats_ = 0.0; // locked: where the song position should be at the next call
     bool indexValid_ = false;
     bool enter_ = false;       // a slice mode starts a slice at once (mode change, hold in Stutter)
     bool dropAll_ = false;     // a mode change: every grain fades out
@@ -167,6 +177,7 @@ private:
     double head_ = 0.0;        // Stretch: the play head (level-0 ring position) at sample headTime_
     double headTime_ = 0.0;
     double cap_ = 0.0;         // Stutter: where the repeated slice starts (level-0 ring position)
+    double holdLag_ = 0.0;     // held: how far past the grid line the recording stopped (samples)
     int left_ = 0, repeat_ = 0;
     bool stuttering_ = false;
     int64_t step_ = 0;         // Arp, free: the pattern's step
