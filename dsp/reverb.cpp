@@ -150,16 +150,6 @@ EF_INLINE float lane(f4 v) {
 #endif
 }
 
-// v with x in lane 3.
-EF_INLINE f4 withLane3(f4 v, float x) {
-#if EF_NEON
-    return vsetq_lane_f32(x, v, 3);
-#else
-    v[3] = x;
-    return v;
-#endif
-}
-
 // One line's 8-point read di + (ph + fr) / kPhases samples back from `w` (the index being written
 // now): the window, its coefficients, and their products, still to be summed (sums4()).
 EF_INLINE f4 lagrangeRead(const float* line, uint32_t mask, uint32_t w, int32_t di, int32_t ph, f4 fr) {
@@ -726,11 +716,7 @@ void Reverb::runNetwork(float* L, float* R, int n) {
         const f4 step0 = posStep_[0], step1 = posStep_[1];
         f4 g0 = g_[0], g1 = g_[1], p0 = pole_[0], p1 = pole_[1], lp0 = lp_[0], lp1 = lp_[1];
         const f4 gs0 = gStep_[0], gs1 = gStep_[1], ps0 = poleStep_[0], ps1 = poleStep_[1];
-        PitchShift shift = shift_;
-        ShimmerFilter filter = shimFilter_;
-        Ramp keep = shimCos_, pitched = shimSin_;
-        double pp = shimPP_, cc = shimCC_;
-        const float beta = shimBeta_;
+        float row3[kSegment];   // Shimmer: row 3's component, sample by sample (pitched after the loop)
         for (int i = 0; i < n; ++i) {
             const uint32_t w = w0 + static_cast<uint32_t>(i), t = age0 + static_cast<uint32_t>(i);
 
@@ -785,15 +771,7 @@ void Reverb::runNetwork(float* L, float* R, int n) {
             outL[i] = lane<1>(ha);   // rows + - + - ... and + + - - ...
             outR[i] = lane<2>(ha);
 
-            // Shimmer: row 3's component c, part of it pitched. What the pitched copy holds of c itself
-            // (an octave landing on a frozen chord's own harmonics, in phase) comes out first: with
-            // only the rest, cos^2 + sin^2 can't add power, whatever the material.
-            if (Shimmer) {
-                const float c = lane<3>(ha), q = shift.tick(filter.tick(c));
-                pp += kShimCorr * (static_cast<double>(q) * c - pp);   // in double: no denormals from the quiet
-                cc += kShimCorr * (static_cast<double>(c) * c - cc);
-                ha = withLane3(ha, keep.next() * c + pitched.next() * (q - beta * c));
-            }
+            if (Shimmer) row3[i] = lane<3>(ha);
 
             // Back into the lines, rotated by one (H alone is its own inverse), with the input:
             // L into the even lines, R into the odd.
@@ -817,7 +795,30 @@ void Reverb::runNetwork(float* L, float* R, int n) {
             pole_[0] = p0;
             pole_[1] = p1;
         }
+
+        // Shimmer: row 3's component c, part of it pitched, back into line 4 (the one it feeds, with
+        // L's input). After the loop rather than in it, where its state would crowd the lines' out
+        // of the registers: no line is read sooner than a few hundred samples after it is written,
+        // so nothing in this stretch reads what is rewritten here. What the pitched copy holds of c
+        // itself (an octave landing on a frozen chord's own harmonics, in phase) comes out first:
+        // with only the rest, cos^2 + sin^2 can't add power, whatever the material.
         if (Shimmer) {
+            PitchShift shift = shift_;
+            ShimmerFilter filter = shimFilter_;
+            Ramp keep = shimCos_, pitched = shimSin_;
+            double pp = shimPP_, cc = shimCC_;
+            const float beta = shimBeta_;
+            float* const line = lines[4];
+            const uint32_t mask = masks[4];
+            for (int i = 0; i < n; ++i) {
+                const float c = row3[i], q = shift.tick(filter.tick(c));
+                pp += kShimCorr * (static_cast<double>(q) * c - pp);   // in double: no denormals from the quiet
+                cc += kShimCorr * (static_cast<double>(c) * c - cc);
+                const float v = (keep.next() * c + pitched.next() * (q - beta * c)) + inL[i];
+                const uint32_t j = (w0 + static_cast<uint32_t>(i)) & mask;
+                line[j] = v;
+                if (j < kGuard) line[j + mask + 1] = v;
+            }
             shift_ = shift;
             shimFilter_ = filter;
             shimCos_ = keep;
