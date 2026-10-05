@@ -7,3 +7,4 @@ flt_type=LP 12
 flt_cut=6000
 eq_on=On
 eq_lc=80
+out_gain=1.5

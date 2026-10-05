@@ -14,3 +14,4 @@ m1_amt=0.5
 m2_src=Macro 1
 m2_dst=Delay Mix
 m2_amt=0.3
+out_gain=2.3

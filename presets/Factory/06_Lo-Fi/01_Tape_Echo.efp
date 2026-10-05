@@ -12,3 +12,4 @@ dly_drive=0.4
 dly_hc=3500
 dly_lc=250
 dly_mix=0.3
+out_gain=2.0

@@ -9,3 +9,4 @@ rev_decay=5
 rev_pre=0.03
 rev_mod=0.5
 rev_mix=0.35
+out_gain=2.2

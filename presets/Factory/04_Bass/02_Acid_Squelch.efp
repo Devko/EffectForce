@@ -12,3 +12,4 @@ l1_wave=Triangle
 m1_src=LFO 1
 m1_dst=Filter Cutoff
 m1_amt=0.3
+out_gain=-5.2

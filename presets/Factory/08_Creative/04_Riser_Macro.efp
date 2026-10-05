@@ -19,3 +19,4 @@ m2_amt=0.3
 m3_src=Macro 1
 m3_dst=Delay FB
 m3_amt=0.3
+out_gain=2.2

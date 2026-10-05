@@ -6,3 +6,4 @@ phs_depth=0.9
 phs_fb=0.8
 phs_center=0.4
 phs_mix=0.5
+out_gain=-2.1

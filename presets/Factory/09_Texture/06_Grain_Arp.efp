@@ -8,3 +8,4 @@ dly_on=On
 dly_div=1/8.
 dly_fb=0.35
 dly_mix=0.2
+out_gain=5.8

@@ -10,3 +10,4 @@ rev_mod=0.6
 rev_shim=0.6
 rev_damp=7000
 rev_mix=0.45
+out_gain=-0.9

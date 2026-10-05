@@ -7,3 +7,4 @@ rev_mod=0.8
 rev_damp=4000
 rev_lc=300
 rev_mix=0.5
+out_gain=0.3

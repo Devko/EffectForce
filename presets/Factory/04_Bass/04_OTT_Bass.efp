@@ -4,3 +4,4 @@ cmp_mode=OTT
 ott_depth=0.5
 eq_on=On
 eq_lc=30
+out_gain=3.5

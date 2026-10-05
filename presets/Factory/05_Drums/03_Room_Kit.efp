@@ -11,3 +11,4 @@ cmp_att=0.002
 cmp_rel=0.1
 cmp_makeup=10
 cmp_mix=0.5
+out_gain=5.4

@@ -11,3 +11,4 @@ cmp_ratio=6
 cmp_att=0.005
 cmp_rel=0.08
 cmp_makeup=3
+out_gain=1.7

@@ -15,3 +15,4 @@ dly_mix=0.2
 rev_on=On
 rev_decay=2.5
 rev_mix=0.15
+out_gain=2.5

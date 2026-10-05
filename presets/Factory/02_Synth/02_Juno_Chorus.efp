@@ -8,3 +8,4 @@ rev_mode=Room
 rev_size=0.4
 rev_decay=0.9
 rev_mix=0.12
+out_gain=1.8

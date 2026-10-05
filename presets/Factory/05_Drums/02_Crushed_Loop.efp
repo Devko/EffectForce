@@ -10,3 +10,4 @@ flt_res=0.1
 cmp_on=On
 cmp_thr=-18
 cmp_ratio=4
+out_gain=9.0

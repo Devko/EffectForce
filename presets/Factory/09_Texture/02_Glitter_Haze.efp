@@ -12,3 +12,4 @@ rev_mode=Space
 rev_decay=8
 rev_shim=0.4
 rev_mix=0.4
+out_gain=2.6
