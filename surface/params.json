@@ -1,0 +1,2548 @@
+{
+ "name": "EffectForce",
+ "params": [
+  {
+   "key": "status",
+   "name": "Status",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "in_gain",
+   "name": "Rack Input",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "out_gain",
+   "name": "Rack Output",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "mix",
+   "name": "Rack Mix",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "order_1",
+   "name": "Order 1",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Drive"
+  },
+  {
+   "key": "order_2",
+   "name": "Order 2",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Filter"
+  },
+  {
+   "key": "order_3",
+   "name": "Order 3",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "EQ"
+  },
+  {
+   "key": "order_4",
+   "name": "Order 4",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Comp"
+  },
+  {
+   "key": "order_5",
+   "name": "Order 5",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Chorus"
+  },
+  {
+   "key": "order_6",
+   "name": "Order 6",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Phaser"
+  },
+  {
+   "key": "order_7",
+   "name": "Order 7",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Delay"
+  },
+  {
+   "key": "order_8",
+   "name": "Order 8",
+   "options": [
+    "Drive",
+    "Filter",
+    "EQ",
+    "Comp",
+    "Chorus",
+    "Phaser",
+    "Delay",
+    "Reverb"
+   ],
+   "default": "Reverb"
+  },
+  {
+   "key": "chain_sel",
+   "name": "Selected",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "slot_1",
+   "name": "Slot 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_2",
+   "name": "Slot 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_3",
+   "name": "Slot 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_4",
+   "name": "Slot 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_5",
+   "name": "Slot 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_6",
+   "name": "Slot 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_7",
+   "name": "Slot 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "slot_8",
+   "name": "Slot 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "move_l",
+   "name": "Move Left",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "move_r",
+   "name": "Move Right",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "sel_on",
+   "name": "Slot On/Off",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "mac_1",
+   "name": "Macro 1",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "mac_2",
+   "name": "Macro 2",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "mac_3",
+   "name": "Macro 3",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "mac_4",
+   "name": "Macro 4",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "drv_on",
+   "name": "Drive On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "drv_type",
+   "name": "Drive Type",
+   "options": [
+    "Soft",
+    "Tube",
+    "Hard",
+    "Fold",
+    "Sine",
+    "Crush"
+   ],
+   "default": "Soft"
+  },
+  {
+   "key": "drv_amt",
+   "name": "Drive Amount",
+   "min": 0,
+   "max": 1,
+   "default": 0.333333,
+   "display": "string"
+  },
+  {
+   "key": "drv_tone",
+   "name": "Drive Tone",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "drv_bias",
+   "name": "Drive Bias",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "drv_out",
+   "name": "Drive Out",
+   "min": 0,
+   "max": 1,
+   "default": 0.666667,
+   "display": "string"
+  },
+  {
+   "key": "drv_mix",
+   "name": "Drive Mix",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "flt_on",
+   "name": "Filter On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "flt_type",
+   "name": "Filter Type",
+   "options": [
+    "LP 12",
+    "LP 24",
+    "HP 12",
+    "HP 24",
+    "BP",
+    "Notch"
+   ],
+   "default": "LP 24"
+  },
+  {
+   "key": "flt_cut",
+   "name": "Filter Cutoff",
+   "min": 0,
+   "max": 1,
+   "default": 0.566323,
+   "display": "string"
+  },
+  {
+   "key": "flt_res",
+   "name": "Filter Res",
+   "min": 0,
+   "max": 1,
+   "default": 0.2,
+   "display": "string"
+  },
+  {
+   "key": "flt_drive",
+   "name": "Filter Drive",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "flt_spread",
+   "name": "Filter Spread",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "flt_mix",
+   "name": "Filter Mix",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "eq_on",
+   "name": "EQ On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "eq_lc",
+   "name": "EQ Low Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "eq_lf",
+   "name": "EQ Low Freq",
+   "min": 0,
+   "max": 1,
+   "default": 0.427941,
+   "display": "string"
+  },
+  {
+   "key": "eq_lg",
+   "name": "EQ Low Gain",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "eq_mf",
+   "name": "EQ Mid Freq",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "eq_mg",
+   "name": "EQ Mid Gain",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "eq_mq",
+   "name": "EQ Mid Q",
+   "min": 0,
+   "max": 1,
+   "default": 0.366683,
+   "display": "string"
+  },
+  {
+   "key": "eq_hf",
+   "name": "EQ High Freq",
+   "min": 0,
+   "max": 1,
+   "default": 0.646241,
+   "display": "string"
+  },
+  {
+   "key": "eq_hg",
+   "name": "EQ High Gain",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "eq_hc",
+   "name": "EQ High Cut",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "cmp_on",
+   "name": "Comp On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "cmp_mode",
+   "name": "Comp Mode",
+   "options": [
+    "Comp",
+    "OTT"
+   ],
+   "default": "Comp"
+  },
+  {
+   "key": "cmp_thr",
+   "name": "Comp Thresh",
+   "min": 0,
+   "max": 1,
+   "default": 0.7,
+   "display": "string"
+  },
+  {
+   "key": "cmp_ratio",
+   "name": "Comp Ratio",
+   "min": 0,
+   "max": 1,
+   "default": 0.462756,
+   "display": "string"
+  },
+  {
+   "key": "cmp_att",
+   "name": "Comp Attack",
+   "min": 0,
+   "max": 1,
+   "default": 0.666667,
+   "display": "string"
+  },
+  {
+   "key": "cmp_rel",
+   "name": "Comp Release",
+   "min": 0,
+   "max": 1,
+   "default": 0.511115,
+   "display": "string"
+  },
+  {
+   "key": "cmp_knee",
+   "name": "Comp Knee",
+   "min": 0,
+   "max": 1,
+   "default": 0.25,
+   "display": "string"
+  },
+  {
+   "key": "cmp_sc",
+   "name": "Comp SC Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "cmp_makeup",
+   "name": "Comp Makeup",
+   "min": 0,
+   "max": 1,
+   "default": 0.333333,
+   "display": "string"
+  },
+  {
+   "key": "cmp_mix",
+   "name": "Comp Mix",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "ott_depth",
+   "name": "OTT Depth",
+   "min": 0,
+   "max": 1,
+   "default": 0.6,
+   "display": "string"
+  },
+  {
+   "key": "ott_time",
+   "name": "OTT Time",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "ott_up",
+   "name": "OTT Up",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "ott_down",
+   "name": "OTT Down",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "ott_low",
+   "name": "OTT Low",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "ott_mid",
+   "name": "OTT Mid",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "ott_high",
+   "name": "OTT High",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "chr_on",
+   "name": "Chorus On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "chr_mode",
+   "name": "Chorus Mode",
+   "options": [
+    "Chorus",
+    "Ensemble",
+    "Dimension"
+   ],
+   "default": "Chorus"
+  },
+  {
+   "key": "chr_rate",
+   "name": "Chorus Rate",
+   "min": 0,
+   "max": 1,
+   "default": 0.484307,
+   "display": "string"
+  },
+  {
+   "key": "chr_depth",
+   "name": "Chorus Depth",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "chr_delay",
+   "name": "Chorus Delay",
+   "min": 0,
+   "max": 1,
+   "default": 0.673621,
+   "display": "string"
+  },
+  {
+   "key": "chr_lc",
+   "name": "Chorus Lo Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.458014,
+   "display": "string"
+  },
+  {
+   "key": "chr_width",
+   "name": "Chorus Width",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "chr_mix",
+   "name": "Chorus Mix",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "phs_on",
+   "name": "Phaser On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "phs_mode",
+   "name": "Phaser Mode",
+   "options": [
+    "Phaser 4",
+    "Phaser 8",
+    "Phaser 12",
+    "Flanger"
+   ],
+   "default": "Phaser 4"
+  },
+  {
+   "key": "phs_sync",
+   "name": "Phaser Sync",
+   "options": [
+    "Free",
+    "Sync"
+   ],
+   "default": "Free"
+  },
+  {
+   "key": "phs_rate",
+   "name": "Phaser Rate",
+   "min": 0,
+   "max": 1,
+   "default": 0.447473,
+   "display": "string"
+  },
+  {
+   "key": "phs_div",
+   "name": "Phaser Div",
+   "options": [
+    "1/16",
+    "1/8T",
+    "1/8",
+    "1/4T",
+    "1/8.",
+    "1/4",
+    "1/4.",
+    "1/2",
+    "1/2.",
+    "1 bar",
+    "2 bars",
+    "4 bars",
+    "8 bars",
+    "16 bars"
+   ],
+   "default": "1 bar"
+  },
+  {
+   "key": "phs_div__open",
+   "name": "Phaser Div List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "phs_div",
+   "type": "enum"
+  },
+  {
+   "key": "phs_depth",
+   "name": "Phaser Depth",
+   "min": 0,
+   "max": 1,
+   "default": 0.7,
+   "display": "string"
+  },
+  {
+   "key": "phs_center",
+   "name": "Phaser Center",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "phs_fb",
+   "name": "Phaser FB",
+   "min": 0,
+   "max": 1,
+   "default": 0.763158,
+   "display": "string"
+  },
+  {
+   "key": "phs_stereo",
+   "name": "Phaser Stereo",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "phs_mix",
+   "name": "Phaser Mix",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "dly_on",
+   "name": "Delay On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "dly_mode",
+   "name": "Delay Mode",
+   "options": [
+    "Stereo",
+    "Ping-Pong",
+    "Mono"
+   ],
+   "default": "Stereo"
+  },
+  {
+   "key": "dly_sync",
+   "name": "Delay Sync",
+   "options": [
+    "Free",
+    "Sync"
+   ],
+   "default": "Sync"
+  },
+  {
+   "key": "dly_time",
+   "name": "Delay Time",
+   "min": 0,
+   "max": 1,
+   "default": 0.779766,
+   "display": "string"
+  },
+  {
+   "key": "dly_div",
+   "name": "Delay Div",
+   "options": [
+    "1/64",
+    "1/32T",
+    "1/32",
+    "1/16T",
+    "1/16",
+    "1/8T",
+    "1/16.",
+    "1/8",
+    "1/4T",
+    "1/8.",
+    "1/4",
+    "1/2T",
+    "1/4.",
+    "1/2",
+    "1/2.",
+    "1 bar"
+   ],
+   "default": "1/8."
+  },
+  {
+   "key": "dly_div__open",
+   "name": "Delay Div List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "dly_div",
+   "type": "enum"
+  },
+  {
+   "key": "dly_fb",
+   "name": "Delay FB",
+   "min": 0,
+   "max": 1,
+   "default": 0.4,
+   "display": "string"
+  },
+  {
+   "key": "dly_spread",
+   "name": "Delay Spread",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "dly_lc",
+   "name": "Delay Lo Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.349485,
+   "display": "string"
+  },
+  {
+   "key": "dly_hc",
+   "name": "Delay Hi Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.751607,
+   "display": "string"
+  },
+  {
+   "key": "dly_wow",
+   "name": "Delay Wow",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "dly_drive",
+   "name": "Delay Drive",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "dly_duck",
+   "name": "Delay Duck",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "dly_mix",
+   "name": "Delay Mix",
+   "min": 0,
+   "max": 1,
+   "default": 0.3,
+   "display": "string"
+  },
+  {
+   "key": "rev_on",
+   "name": "Reverb On",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "rev_mode",
+   "name": "Reverb Mode",
+   "options": [
+    "Room",
+    "Hall",
+    "Plate",
+    "Space"
+   ],
+   "default": "Hall"
+  },
+  {
+   "key": "rev_size",
+   "name": "Reverb Size",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "rev_decay",
+   "name": "Reverb Decay",
+   "min": 0,
+   "max": 1,
+   "default": 0.564341,
+   "display": "string"
+  },
+  {
+   "key": "rev_pre",
+   "name": "Reverb Pre",
+   "min": 0,
+   "max": 1,
+   "default": 0.08,
+   "display": "string"
+  },
+  {
+   "key": "rev_damp",
+   "name": "Reverb Damp",
+   "min": 0,
+   "max": 1,
+   "default": 0.598104,
+   "display": "string"
+  },
+  {
+   "key": "rev_lc",
+   "name": "Reverb Lo Cut",
+   "min": 0,
+   "max": 1,
+   "default": 0.515054,
+   "display": "string"
+  },
+  {
+   "key": "rev_mod",
+   "name": "Reverb Mod",
+   "min": 0,
+   "max": 1,
+   "default": 0.3,
+   "display": "string"
+  },
+  {
+   "key": "rev_width",
+   "name": "Reverb Width",
+   "min": 0,
+   "max": 1,
+   "default": 1.0,
+   "display": "string"
+  },
+  {
+   "key": "rev_freeze",
+   "name": "Reverb Freeze",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "rev_mix",
+   "name": "Reverb Mix",
+   "min": 0,
+   "max": 1,
+   "default": 0.3,
+   "display": "string"
+  },
+  {
+   "key": "l1_wave",
+   "name": "LFO 1 Wave",
+   "options": [
+    "Sine",
+    "Triangle",
+    "Saw Up",
+    "Saw Down",
+    "Square",
+    "S&H",
+    "Smooth"
+   ],
+   "default": "Sine"
+  },
+  {
+   "key": "l1_wave__open",
+   "name": "LFO 1 Wave List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "l1_wave",
+   "type": "enum"
+  },
+  {
+   "key": "l1_sync",
+   "name": "LFO 1 Sync",
+   "options": [
+    "Free",
+    "Sync"
+   ],
+   "default": "Free"
+  },
+  {
+   "key": "l1_rate",
+   "name": "LFO 1 Rate",
+   "min": 0,
+   "max": 1,
+   "default": 0.605872,
+   "display": "string"
+  },
+  {
+   "key": "l1_div",
+   "name": "LFO 1 Div",
+   "options": [
+    "1/16",
+    "1/8T",
+    "1/8",
+    "1/4T",
+    "1/8.",
+    "1/4",
+    "1/4.",
+    "1/2",
+    "1/2.",
+    "1 bar",
+    "2 bars",
+    "4 bars",
+    "8 bars",
+    "16 bars"
+   ],
+   "default": "1 bar"
+  },
+  {
+   "key": "l1_div__open",
+   "name": "LFO 1 Div List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "l1_div",
+   "type": "enum"
+  },
+  {
+   "key": "l1_phase",
+   "name": "LFO 1 Phase",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "l2_wave",
+   "name": "LFO 2 Wave",
+   "options": [
+    "Sine",
+    "Triangle",
+    "Saw Up",
+    "Saw Down",
+    "Square",
+    "S&H",
+    "Smooth"
+   ],
+   "default": "Sine"
+  },
+  {
+   "key": "l2_wave__open",
+   "name": "LFO 2 Wave List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "l2_wave",
+   "type": "enum"
+  },
+  {
+   "key": "l2_sync",
+   "name": "LFO 2 Sync",
+   "options": [
+    "Free",
+    "Sync"
+   ],
+   "default": "Free"
+  },
+  {
+   "key": "l2_rate",
+   "name": "LFO 2 Rate",
+   "min": 0,
+   "max": 1,
+   "default": 0.423486,
+   "display": "string"
+  },
+  {
+   "key": "l2_div",
+   "name": "LFO 2 Div",
+   "options": [
+    "1/16",
+    "1/8T",
+    "1/8",
+    "1/4T",
+    "1/8.",
+    "1/4",
+    "1/4.",
+    "1/2",
+    "1/2.",
+    "1 bar",
+    "2 bars",
+    "4 bars",
+    "8 bars",
+    "16 bars"
+   ],
+   "default": "1 bar"
+  },
+  {
+   "key": "l2_div__open",
+   "name": "LFO 2 Div List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "l2_div",
+   "type": "enum"
+  },
+  {
+   "key": "l2_phase",
+   "name": "LFO 2 Phase",
+   "min": 0,
+   "max": 1,
+   "default": 0.0,
+   "display": "string"
+  },
+  {
+   "key": "env_att",
+   "name": "Env Attack",
+   "min": 0,
+   "max": 1,
+   "default": 0.370512,
+   "display": "string"
+  },
+  {
+   "key": "env_rel",
+   "name": "Env Release",
+   "min": 0,
+   "max": 1,
+   "default": 0.525219,
+   "display": "string"
+  },
+  {
+   "key": "env_gain",
+   "name": "Env Gain",
+   "min": 0,
+   "max": 1,
+   "default": 0.333333,
+   "display": "string"
+  },
+  {
+   "key": "m1_src",
+   "name": "Mod 1 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m1_src__open",
+   "name": "Mod 1 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m1_src",
+   "type": "enum"
+  },
+  {
+   "key": "m1_dst",
+   "name": "Mod 1 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m1_dst__open",
+   "name": "Mod 1 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m1_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m1_amt",
+   "name": "Mod 1 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m2_src",
+   "name": "Mod 2 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m2_src__open",
+   "name": "Mod 2 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m2_src",
+   "type": "enum"
+  },
+  {
+   "key": "m2_dst",
+   "name": "Mod 2 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m2_dst__open",
+   "name": "Mod 2 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m2_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m2_amt",
+   "name": "Mod 2 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m3_src",
+   "name": "Mod 3 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m3_src__open",
+   "name": "Mod 3 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m3_src",
+   "type": "enum"
+  },
+  {
+   "key": "m3_dst",
+   "name": "Mod 3 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m3_dst__open",
+   "name": "Mod 3 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m3_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m3_amt",
+   "name": "Mod 3 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m4_src",
+   "name": "Mod 4 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m4_src__open",
+   "name": "Mod 4 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m4_src",
+   "type": "enum"
+  },
+  {
+   "key": "m4_dst",
+   "name": "Mod 4 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m4_dst__open",
+   "name": "Mod 4 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m4_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m4_amt",
+   "name": "Mod 4 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m5_src",
+   "name": "Mod 5 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m5_src__open",
+   "name": "Mod 5 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m5_src",
+   "type": "enum"
+  },
+  {
+   "key": "m5_dst",
+   "name": "Mod 5 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m5_dst__open",
+   "name": "Mod 5 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m5_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m5_amt",
+   "name": "Mod 5 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m6_src",
+   "name": "Mod 6 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m6_src__open",
+   "name": "Mod 6 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m6_src",
+   "type": "enum"
+  },
+  {
+   "key": "m6_dst",
+   "name": "Mod 6 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m6_dst__open",
+   "name": "Mod 6 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m6_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m6_amt",
+   "name": "Mod 6 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m7_src",
+   "name": "Mod 7 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m7_src__open",
+   "name": "Mod 7 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m7_src",
+   "type": "enum"
+  },
+  {
+   "key": "m7_dst",
+   "name": "Mod 7 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m7_dst__open",
+   "name": "Mod 7 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m7_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m7_amt",
+   "name": "Mod 7 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "m8_src",
+   "name": "Mod 8 Source",
+   "options": [
+    "Off",
+    "Macro 1",
+    "Macro 2",
+    "Macro 3",
+    "Macro 4",
+    "LFO 1",
+    "LFO 2",
+    "Envelope"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m8_src__open",
+   "name": "Mod 8 Source List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m8_src",
+   "type": "enum"
+  },
+  {
+   "key": "m8_dst",
+   "name": "Mod 8 Target",
+   "options": [
+    "Off",
+    "Rack Input",
+    "Rack Output",
+    "Rack Mix",
+    "Drive Amount",
+    "Drive Tone",
+    "Drive Bias",
+    "Drive Mix",
+    "Filter Cutoff",
+    "Filter Res",
+    "Filter Drive",
+    "Filter Spread",
+    "Filter Mix",
+    "EQ Low Freq",
+    "EQ Low Gain",
+    "EQ Mid Freq",
+    "EQ Mid Gain",
+    "EQ High Freq",
+    "EQ High Gain",
+    "Comp Thresh",
+    "Comp Makeup",
+    "Comp Mix",
+    "OTT Depth",
+    "OTT Up",
+    "OTT Down",
+    "Chorus Rate",
+    "Chorus Depth",
+    "Chorus Mix",
+    "Phaser Rate",
+    "Phaser Depth",
+    "Phaser Center",
+    "Phaser FB",
+    "Phaser Mix",
+    "Delay Time",
+    "Delay FB",
+    "Delay Spread",
+    "Delay Lo Cut",
+    "Delay Hi Cut",
+    "Delay Wow",
+    "Delay Duck",
+    "Delay Mix",
+    "Reverb Size",
+    "Reverb Decay",
+    "Reverb Damp",
+    "Reverb Mod",
+    "Reverb Width",
+    "Reverb Mix",
+    "LFO 1 Rate",
+    "LFO 2 Rate"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "m8_dst__open",
+   "name": "Mod 8 Target List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "m8_dst",
+   "type": "enum"
+  },
+  {
+   "key": "m8_amt",
+   "name": "Mod 8 Amt",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "preset",
+   "name": "Preset",
+   "min": 0,
+   "max": 1,
+   "display": "string",
+   "type": "stepper"
+  },
+  {
+   "key": "preset_prev",
+   "name": "Preset Prev",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "preset_next",
+   "name": "Preset Next",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "pre_save",
+   "name": "Save Preset",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "pre_init",
+   "name": "Init Preset",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "cat_1",
+   "name": "Category 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_2",
+   "name": "Category 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_3",
+   "name": "Category 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_4",
+   "name": "Category 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_5",
+   "name": "Category 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_6",
+   "name": "Category 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_7",
+   "name": "Category 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_8",
+   "name": "Category 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_9",
+   "name": "Category 9",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_10",
+   "name": "Category 10",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_11",
+   "name": "Category 11",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_12",
+   "name": "Category 12",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_13",
+   "name": "Category 13",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_14",
+   "name": "Category 14",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_15",
+   "name": "Category 15",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_16",
+   "name": "Category 16",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "cat_prev",
+   "name": "Categories Prev",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "cat_next",
+   "name": "Categories Next",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "item_1",
+   "name": "Item 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_2",
+   "name": "Item 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_3",
+   "name": "Item 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_4",
+   "name": "Item 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_5",
+   "name": "Item 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_6",
+   "name": "Item 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_7",
+   "name": "Item 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_8",
+   "name": "Item 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_9",
+   "name": "Item 9",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_10",
+   "name": "Item 10",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_11",
+   "name": "Item 11",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_12",
+   "name": "Item 12",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_13",
+   "name": "Item 13",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_14",
+   "name": "Item 14",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_15",
+   "name": "Item 15",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_16",
+   "name": "Item 16",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_17",
+   "name": "Item 17",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_18",
+   "name": "Item 18",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_19",
+   "name": "Item 19",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_20",
+   "name": "Item 20",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_21",
+   "name": "Item 21",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_22",
+   "name": "Item 22",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_23",
+   "name": "Item 23",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_24",
+   "name": "Item 24",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "item_prev",
+   "name": "Items Prev",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "item_next",
+   "name": "Items Next",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "item_page",
+   "name": "Items Page",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "br_now",
+   "name": "Loaded",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "fav",
+   "name": "Favorite",
+   "options": [
+    "Off",
+    "On"
+   ],
+   "default": "Off"
+  },
+  {
+   "key": "rnd",
+   "name": "Random Pick",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  }
+ ]
+}

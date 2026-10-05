@@ -1,0 +1,18 @@
+effectforce 1
+drv_on=On
+drv_type=Tube
+drv_amt=14
+drv_tone=0.2
+flt_on=On
+flt_type=LP 24
+flt_cut=6000
+flt_res=0.1
+dly_on=On
+dly_div=1/4
+dly_fb=0.3
+dly_duck=0.5
+dly_mix=0.2
+rev_on=On
+rev_decay=2.5
+rev_mix=0.15
+out_gain=2.5

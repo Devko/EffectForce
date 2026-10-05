@@ -1,0 +1,10 @@
+{
+ "name": "EffectForce",
+ "vendor": "Devko",
+ "uid": "EfFc",
+ "version": 1000,
+ "so": "effectforce.so",
+ "params": "params.json",
+ "layout": "layout.conf",
+ "effect": true
+}

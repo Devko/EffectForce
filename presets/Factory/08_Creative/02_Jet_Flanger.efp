@@ -1,0 +1,9 @@
+effectforce 1
+phs_on=On
+phs_mode=Flanger
+phs_rate=0.1
+phs_depth=0.9
+phs_fb=0.8
+phs_center=0.4
+phs_mix=0.5
+out_gain=-2.1

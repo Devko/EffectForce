@@ -1,0 +1,15 @@
+effectforce 1
+drv_on=On
+drv_type=Tube
+drv_amt=6
+drv_tone=-0.3
+dly_on=On
+dly_mode=Mono
+dly_div=1/8.
+dly_fb=0.55
+dly_wow=0.5
+dly_drive=0.4
+dly_hc=3500
+dly_lc=250
+dly_mix=0.3
+out_gain=2.0

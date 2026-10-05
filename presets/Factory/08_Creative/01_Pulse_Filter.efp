@@ -1,0 +1,12 @@
+effectforce 1
+flt_on=On
+flt_type=LP 24
+flt_cut=400
+flt_res=0.4
+l1_wave=Square
+l1_sync=Sync
+l1_div=1/8
+m1_src=LFO 1
+m1_dst=Filter Cutoff
+m1_amt=0.35
+out_gain=0.8

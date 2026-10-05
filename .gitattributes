@@ -1,0 +1,4 @@
+# Keep LF everywhere: the installer scripts run under BusyBox sh on the device.
+* text=auto eol=lf
+*.png binary
+*.ttf binary

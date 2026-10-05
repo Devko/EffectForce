@@ -1,0 +1,22 @@
+effectforce 1
+flt_on=On
+flt_type=HP 12
+flt_cut=20
+flt_res=0.3
+rev_on=On
+rev_decay=4
+rev_mix=0.15
+dly_on=On
+dly_div=1/8
+dly_fb=0.3
+dly_mix=0.15
+m1_src=Macro 1
+m1_dst=Filter Cutoff
+m1_amt=0.8
+m2_src=Macro 1
+m2_dst=Reverb Mix
+m2_amt=0.3
+m3_src=Macro 1
+m3_dst=Delay FB
+m3_amt=0.3
+out_gain=2.2

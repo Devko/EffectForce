@@ -1,0 +1,10 @@
+{
+ "name": "EffectForce Probe",
+ "vendor": "Devko",
+ "uid": "EfPb",
+ "version": 1000,
+ "so": "effectforce_probe.so",
+ "params": "params.json",
+ "layout": "layout.conf",
+ "effect": true
+}

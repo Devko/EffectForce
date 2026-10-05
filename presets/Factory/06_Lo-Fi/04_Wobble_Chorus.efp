@@ -1,0 +1,11 @@
+effectforce 1
+chr_on=On
+chr_rate=0.3
+chr_depth=0.9
+chr_mix=0.6
+dly_on=On
+dly_div=1/4
+dly_fb=0.3
+dly_wow=0.7
+dly_mix=0.2
+out_gain=3.6

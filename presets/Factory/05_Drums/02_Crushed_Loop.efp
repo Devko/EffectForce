@@ -1,0 +1,13 @@
+effectforce 1
+drv_on=On
+drv_type=Crush
+drv_amt=20
+drv_mix=0.6
+flt_on=On
+flt_type=HP 12
+flt_cut=150
+flt_res=0.1
+cmp_on=On
+cmp_thr=-18
+cmp_ratio=4
+out_gain=9.0

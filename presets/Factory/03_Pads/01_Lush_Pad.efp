@@ -1,0 +1,12 @@
+effectforce 1
+chr_on=On
+chr_mode=Ensemble
+chr_depth=0.6
+chr_mix=0.5
+rev_on=On
+rev_size=0.7
+rev_decay=5
+rev_pre=0.03
+rev_mod=0.5
+rev_mix=0.35
+out_gain=2.2

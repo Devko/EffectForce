@@ -1,0 +1,15 @@
+effectforce 1
+dly_on=On
+dly_div=1/4
+dly_fb=0.6
+dly_duck=0.6
+dly_mix=0.4
+rev_on=On
+rev_mode=Space
+rev_decay=6
+rev_mix=0.45
+env_gain=12
+m1_src=Envelope
+m1_dst=Reverb Mix
+m1_amt=-0.4
+out_gain=4.9

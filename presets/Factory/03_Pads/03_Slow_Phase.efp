@@ -1,0 +1,11 @@
+effectforce 1
+phs_on=On
+phs_mode=Phaser 8
+phs_rate=0.15
+phs_depth=0.8
+phs_fb=0.6
+phs_mix=0.5
+rev_on=On
+rev_decay=4
+rev_mix=0.3
+out_gain=4.2

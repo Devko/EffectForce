@@ -1,0 +1,18 @@
+effectforce 1
+flt_on=On
+flt_type=BP
+flt_cut=1500
+flt_res=0.3
+drv_on=On
+drv_type=Hard
+drv_amt=12
+drv_mix=0.8
+order_1=Filter
+order_2=Drive
+order_3=EQ
+order_4=Comp
+order_5=Chorus
+order_6=Phaser
+order_7=Delay
+order_8=Reverb
+out_gain=9.0

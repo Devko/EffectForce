@@ -1,0 +1,77 @@
+{
+ "name": "EffectForce Probe",
+ "params": [
+  {
+   "key": "status",
+   "name": "Status",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "host",
+   "name": "Host",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "timing",
+   "name": "Timing",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "events",
+   "name": "Events",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "gain",
+   "name": "Gain",
+   "min": 0,
+   "max": 1,
+   "default": 0.5,
+   "display": "string"
+  },
+  {
+   "key": "div",
+   "name": "Delay Time",
+   "options": [
+    "1/16",
+    "1/8T",
+    "1/8",
+    "1/8.",
+    "1/4T",
+    "1/4",
+    "1/4.",
+    "1/2",
+    "1 bar"
+   ],
+   "default": "1/8"
+  },
+  {
+   "key": "fb",
+   "name": "Feedback",
+   "min": 0,
+   "max": 1,
+   "default": 0.421053,
+   "display": "string"
+  },
+  {
+   "key": "mix",
+   "name": "Mix",
+   "min": 0,
+   "max": 1,
+   "default": 0.3,
+   "display": "string"
+  }
+ ]
+}

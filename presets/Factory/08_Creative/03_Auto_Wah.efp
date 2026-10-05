@@ -1,0 +1,13 @@
+effectforce 1
+flt_on=On
+flt_type=BP
+flt_cut=300
+flt_res=0.6
+flt_mix=0.8
+env_gain=6
+env_att=0.005
+env_rel=0.15
+m1_src=Envelope
+m1_dst=Filter Cutoff
+m1_amt=0.3
+out_gain=9.0

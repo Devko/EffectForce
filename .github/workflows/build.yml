@@ -1,0 +1,66 @@
+# The release build. The plugin catalog (sd88me/mpc-vst-plugins) lists only plugins that need glibc 2.32 or
+# less, so they load on MPC OS 2.x as well as 3.x: the device build runs in arm32v7/gcc:11-bullseye (GCC 11,
+# glibc 2.31) under QEMU, as the catalog's own ports do, and the test suite runs on ARM there too. The
+# sanitizer suite runs on x86. The zip is checked with the catalog's checker and kept as an artifact; a vX.Y.Z
+# tag also publishes it as a GitHub release. A tag with a suffix (v0.1.0-beta) publishes a prerelease: the
+# catalog's beta channel. The plugin's version is the tag without the suffix (X.Y.Z only), as PolyForce's.
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test suite (x86, ASan/UBSan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make test
+
+  device:
+    name: Device build (armhf, glibc 2.31), package, catalog check
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # the release, on a tag
+    steps:
+      - uses: actions/checkout@v4
+      # What doesn't depend on the CPU is built here, natively: the generated sources and the skin. The ARM
+      # container then needs nothing beyond its own compiler (bullseye's package mirrors are going to the archive).
+      - name: Generated sources and skin
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends python3-pil
+          make surface skin
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Device build and the suite on ARM, in arm32v7/gcc:11-bullseye
+        run: >-
+          docker run --rm --platform linux/arm/v7 -v "$PWD:/w" -w /w arm32v7/gcc:11-bullseye
+          make ARM_PREFIX= ARM_RUN= arm-plugin test-arm
+      - name: Package
+        run: |
+          case "$GITHUB_REF" in refs/tags/v*) v="${GITHUB_REF_NAME#v}"; version="PLUGIN_VERSION=${v%%-*}" ;; *) version= ;; esac
+          make $version plugin-package   # the .so above is up to date; a rebuild here would fail loudly (no ARM compiler)
+      - name: Catalog check
+        run: >-
+          python3 third_party/mpc-vst-plugins/tools/catalog_check.py dist/*-mpc-armv7.zip
+          --catalog --expect-id effectforce --expect-repo Devko/EffectForce
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EffectForce-mpc-armv7
+          path: dist/*-mpc-armv7.zip
+          if-no-files-found: error
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*-mpc-armv7.zip
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true

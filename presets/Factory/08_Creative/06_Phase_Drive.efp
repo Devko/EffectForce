@@ -1,0 +1,16 @@
+effectforce 1
+drv_on=On
+drv_type=Fold
+drv_amt=10
+drv_mix=0.6
+phs_on=On
+phs_mode=Phaser 12
+phs_sync=Sync
+phs_div=1 bar
+phs_depth=0.9
+phs_fb=0.7
+phs_mix=0.5
+rev_on=On
+rev_decay=2
+rev_mix=0.2
+out_gain=4.7

@@ -1,0 +1,16 @@
+effectforce 1
+drv_on=On
+drv_type=Tube
+drv_amt=10
+drv_tone=-0.2
+drv_mix=0.7
+cmp_on=On
+cmp_thr=-20
+cmp_ratio=4
+cmp_att=0.01
+cmp_rel=0.12
+eq_on=On
+eq_lc=30
+eq_lf=80
+eq_lg=2
+out_gain=7.4

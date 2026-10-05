@@ -1,0 +1,9 @@
+effectforce 1
+eq_on=On
+eq_lc=80
+eq_mf=400
+eq_mg=-3
+eq_mq=1
+eq_hf=8000
+eq_hg=2
+out_gain=1.7

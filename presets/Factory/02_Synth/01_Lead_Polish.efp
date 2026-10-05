@@ -1,0 +1,21 @@
+effectforce 1
+eq_on=On
+eq_lc=120
+eq_hf=7000
+eq_hg=3
+cmp_on=On
+cmp_thr=-12
+cmp_ratio=3
+cmp_att=0.01
+cmp_rel=0.15
+dly_on=On
+dly_mode=Ping-Pong
+dly_div=1/8.
+dly_fb=0.35
+dly_hc=6000
+dly_mix=0.2
+rev_on=On
+rev_mode=Plate
+rev_decay=1.6
+rev_mix=0.18
+out_gain=5.9

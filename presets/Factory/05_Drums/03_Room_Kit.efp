@@ -1,0 +1,14 @@
+effectforce 1
+rev_on=On
+rev_mode=Room
+rev_size=0.35
+rev_decay=0.7
+rev_mix=0.18
+cmp_on=On
+cmp_thr=-30
+cmp_ratio=8
+cmp_att=0.002
+cmp_rel=0.1
+cmp_makeup=10
+cmp_mix=0.5
+out_gain=5.4

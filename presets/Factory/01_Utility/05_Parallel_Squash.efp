@@ -1,0 +1,10 @@
+effectforce 1
+cmp_on=On
+cmp_thr=-36
+cmp_ratio=10
+cmp_att=0.002
+cmp_rel=0.08
+cmp_knee=3
+cmp_makeup=12
+cmp_mix=0.35
+out_gain=2.6

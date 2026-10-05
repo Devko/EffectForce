@@ -1,0 +1,15 @@
+effectforce 1
+cmp_on=On
+cmp_thr=-14
+cmp_ratio=4
+cmp_att=0.003
+cmp_rel=0.1
+dly_on=On
+dly_div=1/8.
+dly_fb=0.45
+dly_mix=0.25
+rev_on=On
+rev_mode=Plate
+rev_decay=1.2
+rev_mix=0.2
+out_gain=5.4

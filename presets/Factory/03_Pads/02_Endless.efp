@@ -1,0 +1,11 @@
+effectforce 1
+eq_on=On
+eq_lc=150
+rev_on=On
+rev_mode=Space
+rev_size=0.8
+rev_decay=12
+rev_mod=0.7
+rev_damp=5000
+rev_mix=0.45
+out_gain=-1.1

@@ -1,0 +1,15 @@
+effectforce 1
+drv_on=On
+drv_amt=8
+flt_on=On
+flt_type=LP 24
+flt_cut=600
+flt_res=0.75
+flt_drive=0.4
+l1_sync=Sync
+l1_div=1/8
+l1_wave=Triangle
+m1_src=LFO 1
+m1_dst=Filter Cutoff
+m1_amt=0.3
+out_gain=-5.2
