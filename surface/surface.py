@@ -56,7 +56,7 @@ MODULE_NAMES = [m[1] for m in MODULES]
 # --- parameters ------------------------------------------------------------------------------
 # kind:
 #   synth    a sound parameter: saved in the state, automatable; curve lin|log|int|pow|enum
-#   chain    a module's place in the chain (order_1..8): saved, part of the sound, but only the
+#   chain    a module's place in the chain (order_1..10): saved, part of the sound, but only the
 #            plugin moves it (the CHAIN page's MOVE buttons); not automatable
 #   ui       a value the surface keeps for itself (the selected chain slot): not saved
 #   readout  text the plugin writes (status line, "PAGE 2 / 4"): read only
@@ -1257,7 +1257,7 @@ constexpr const char* kPlugVendor = %s;
 constexpr int32_t kPlugUid = 0x%08x;   // '%s'
 constexpr int32_t kPlugVersion = %d;
 
-// The modules in their default order (surface.py MODULES); OPTS of order_1..8 name them.
+// The modules in their default order (surface.py MODULES); OPTS of order_1..10 name them.
 enum Module : int { %s, kNumModules };
 static constexpr int kModuleOnParam[kNumModules] = {%s};
 

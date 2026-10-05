@@ -71,6 +71,9 @@ struct PitchShift {
         d = up ? splice + static_cast<float>(jump) : low;
     }
 
+    // Whether the head reads what was written since the restart, at full level.
+    bool sounding() const { return age >= static_cast<uint32_t>(d) + static_cast<uint32_t>(kOnset) + 2u; }
+
     EF_INLINE float tick(float x) {
         w = (w + 1) & mask;
         buf[w] = x;
@@ -127,7 +130,10 @@ private:
         const int dNow = static_cast<int>(d);
         int lo = jump - kSearch, hi = jump + kSearch;
         if (!up) hi = std::min(hi, dNow - static_cast<int>(kMinDelay) - 2);
-        if (lo < 1 || hi <= lo || age < static_cast<uint32_t>(dNow + hi + kWindow + 8)) return std::max(1, std::min(jump, hi));
+        // Too little heard yet to search (the first splice after a restart): the nominal jump, but
+        // going up never past what was written since, which would read silence.
+        if (lo < 1 || hi <= lo || age < static_cast<uint32_t>(dNow + hi + kWindow + 8))
+            return std::max(1, std::min(up ? std::min(jump, static_cast<int>(age) - dNow - 3) : jump, hi));
         constexpr int kCoarse = kWindow / 4, kFine = kWindow / 2, kNear = 3;
         constexpr int kLags = (2 * kSearch) / 4 + 1, kGroups = (kLags + 3) / 4 * 4;
         // Coarse: lag lo + 4 i against the old head's window. Its sample j reads the ring at

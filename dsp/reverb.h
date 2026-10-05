@@ -36,12 +36,15 @@
 // shifter, b c the part of P(c) correlated with c (measured over 50 ms) taken out, so the two
 // terms add in power, never more. Every pass an eighth of the tail's energy moves up (or down) by
 // the interval, so the tail blooms. The shifter never adds energy and the rest of the loop is as
-// before, so the network stays as bounded as without it, frozen too (there, what climbs past the
-// shimmer path's low-pass, or under its high-pass, leaves: a frozen sound slowly thins). The path:
+// before, so the network stays as bounded as without it, frozen too. There it doesn't hold: what
+// climbs past the shimmer path's low-pass (or under its high-pass) leaves, and the splices lose a
+// little, so a frozen tail with shimmer drains, the more the higher the interval and the shimmer
+// (the factory shimmer presets: 25 to 55 dB in 30 s); Shimmer 0 freezes for good. The path:
 // a high-pass at 80 Hz and a 24 dB/oct low-pass under rate / 3 / ratio (9 kHz at most), so +19
 // doesn't fold. The angle glides (20 ms); an interval change fades the path out (20 ms), switches
-// and fades it back in. Shimmer 0 (settled) doesn't run the shifter: the reverb is bit for bit the
-// one without it.
+// and fades it back in, once the restarted shifter sounds (as when shimmer comes on: until then the
+// tail keeps its share). Shimmer 0 (settled) doesn't run the shifter: the reverb is bit for bit
+// the one without it.
 #include "common.h"
 #include "pitch.h"
 #include "simd.h"
@@ -137,6 +140,8 @@ private:
     f4 base_[2] = {};               // line lengths at scale 1, samples
     uint32_t apLen_[kLines] = {}, diffLen_[kLines] = {};
     float apG_ = 0.0f, diffG_[2] = {}, maxBase_ = 1.0f, meanBase_ = 1.0f, meanAp_ = 0.0f, build_ = 0.0f;
+    mutable float tailKey_[5] = {-1.0f};   // tailSamples()'s shimmer settings, and its ring for them
+    mutable double tailShim_ = 0.0;
 
     // The read positions: straight lines between points kSegment samples apart (counted from
     // reset), where the sines and the size are evaluated.

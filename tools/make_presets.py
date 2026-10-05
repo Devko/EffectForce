@@ -148,7 +148,7 @@ preset("Rhythm", "Trance Gate", pls_on="On", pls_mode="Gate", pls_div="1/16", pl
        pls_length=0.6, pls_smooth=0.003, dly_on="On", dly_div="1/8.", dly_fb=0.3, dly_mix=0.2)
 preset("Rhythm", "Vintage Trem", pls_on="On", pls_mode="Tremolo", pls_div="1/8", pls_depth=0.6, pls_shape=0.3)
 preset("Rhythm", "Wide Pan", pls_on="On", pls_mode="Auto-Pan", pls_div="1/4", pls_depth=0.8)
-preset("Rhythm", "Choppy Pads", pls_on="On", pls_mode="Gate", pls_div="1/8", pls_pattern="Offbeat",
+preset("Rhythm", "Choppy Pads", pls_on="On", pls_mode="Gate", pls_div="1/16", pls_pattern="Offbeat",
        pls_length=0.7, pls_smooth=0.008, rev_on="On", rev_decay=2.5, rev_mix=0.3)
 preset("Rhythm", "Stereo Trem", pls_on="On", pls_mode="Tremolo", pls_div="1/16", pls_depth=0.8,
        pls_stereo=180, chr_on="On", chr_mode="Dimension", chr_mix=0.3)

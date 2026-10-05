@@ -66,6 +66,18 @@ void saved() {
     Host b;
     CHECK(b.load(s) == 1);
     CHECK(tile(b, 8) == "REVERB" && tile(b, 9) == "DELAY");
+    // An order saved by 0.0.1 (eight modules, Filter before Drive, Reverb before Delay): kept, Pulse
+    // and Grain (off in it) in the slots it didn't have.
+    Host o;
+    CHECK(o.load("effectforce 1\norder_1=Filter\norder_2=Drive\norder_3=EQ\norder_4=Comp\norder_5=Chorus\n"
+                 "order_6=Phaser\norder_7=Reverb\norder_8=Delay\n") == 1);
+    const char* const want[kNumModules] = {"FILTER", "DRIVE", "EQ", "COMP", "CHORUS", "PHASER", "REVERB", "DELAY", "PULSE", "GRAIN"};
+    bool kept = true;
+    for (int k = 0; k < kNumModules; ++k) {
+        const std::string t = tile(o, k);   // the selected one in brackets
+        kept = kept && (t == want[k] || t == std::string("[ ") + want[k] + " ]");
+    }
+    CHECK(kept);
     // Not a permutation (a module twice): the default order.
     Host c;
     CHECK(c.load("effectforce 1\norder_1=Reverb\norder_2=Reverb\n") == 1);

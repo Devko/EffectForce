@@ -25,7 +25,7 @@ matrix across all of them. It is built on the same groundwork as its siblings
 - **The CHAIN page:** the order as tiles; move a module left or right, switch it on or off. Switching
   fades, reordering never clicks, and a module that is off costs no CPU
 - **Modulation:** 4 macros, 2 LFOs (free or locked to MPC's beat), an envelope follower, and an
-  8-slot matrix reaching 48 parameters across the chain
+  8-slot matrix reaching 54 parameters across the chain
 - **A performance mixer, the Octatrack way:** eight scenes of parameter locks, scene A and B at the
   ends of the Force's crossfader; modules a scene switches fade in with the fader and their tails ring
   out when it comes back (dub throws, washes); a looper that grabs the bar just played and plays it on

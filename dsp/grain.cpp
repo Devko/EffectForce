@@ -221,6 +221,7 @@ constexpr int kSafeFade = 441;      // a grain about to leave the readable regio
 constexpr int kHoldFade = 220;      // the recording's seam at a hold: 5 ms
 constexpr double kMinSlice = 0.01 * kSr, kMaxSlice = 2.0 * kSr;
 constexpr double kStretchSpeed = 0.125;
+constexpr double kJump = 128.0;     // samples: a song position further than this (a host block) from where it should be jumped
 constexpr float kDetune = 6.0f;     // Cloud's random detune at spread 1, +- cents
 constexpr float kInClamp = 8.0f;    // +18 dBFS: the most the limiter ever sees of the input
 constexpr uint32_t kSeed = 0x9e3779b9u;
@@ -275,6 +276,8 @@ void Grain::reset() {
     rng_ = kSeed;
     lastBoundary_ = 0.0;
     sliceIndex_ = 0.0;
+    expectBeats_ = 0.0;
+    holdLag_ = 0.0;
     indexValid_ = false;
     enter_ = dropAll_ = false;
     nextSpawn_ = 0.0;
@@ -331,6 +334,7 @@ void Grain::set(const Params& p, const Transport& t) {
     if (fresh_) {
         mode_ = want;
         hold_ = p.hold;
+        holdLag_ = 0.0;
         mixGlide_[0] = mixGlide_[1] = mix;
         fbGlide_[0] = fbGlide_[1] = fb;
         mix_ = mixEnd_ = mix;
@@ -349,6 +353,7 @@ void Grain::set(const Params& p, const Transport& t) {
         if (p.hold != hold_) {
             hold_ = p.hold;
             if (hold_) {
+                holdLag_ = std::max(0.0, static_cast<double>(now_) - lastBoundary_);
                 freeze();
                 if (mode_ == kStutter && !stuttering_) enter_ = true;   // the live input goes, the last slice repeats
             } else {
@@ -460,6 +465,7 @@ bool Grain::spawn(int k, double want, double rate, double span, int length, int 
     v->inSlope = 1.0f / static_cast<float>(std::max(fadeIn, 1));
     v->outSlope = 1.0f / static_cast<float>(std::max(fadeOut, 1));
     v->relSlope = 1.0f;
+    v->priors = 0;
     const float pc = clampf(pan, -1.0f, 1.0f), m = 0.5f * std::fabs(pc);
     float gl = 1.0f, gr = 1.0f;
     if (pc != 0.0f) {
@@ -481,12 +487,15 @@ float Grain::ramp(const Voice& v, int t) const {
     const float tf = static_cast<float>(t);
     float a = std::min(tf * v.inSlope, (static_cast<float>(v.end) - tf) * v.outSlope);
     a = std::min(a, std::min((static_cast<float>(v.relEnd) - tf) * v.relSlope, 1.0f));
+    for (int i = 0; i < v.priors; ++i) a = std::min(a, (static_cast<float>(v.priorEnd[i]) - tf) * v.priorSlope[i]);
     return std::max(a, 0.0f);
 }
 
 // Fades a voice out over `fade` samples from sample k on. The release's term starts at the
 // envelope's value there and only falls faster than any fade under way (a fade-out ending
-// sooner is left alone), so before k nothing changes.
+// sooner is left alone): from k on it is the lowest line, and before k, where it would be the
+// higher, the release it replaces stays in force for the rest of this call. So before k nothing
+// changes.
 void Grain::release(Voice& v, int k, int fade) {
     const int at = v.t + k;
     if (at <= 0) {   // it hadn't started
@@ -494,7 +503,13 @@ void Grain::release(Voice& v, int k, int fade) {
         return;
     }
     if (std::min(v.end, v.relEnd) - at <= fade) return;
-    v.relSlope = ramp(v, at) / static_cast<float>(fade);
+    const float slope = ramp(v, at) / static_cast<float>(fade);
+    if (k > 0 && v.relEnd < kOpen && v.priors < 2) {   // (two at most: guard() and an event, after one at 0)
+        v.priorEnd[v.priors] = v.relEnd;
+        v.priorSlope[v.priors] = v.relSlope;
+        ++v.priors;
+    }
+    v.relSlope = slope;
     v.relEnd = at + fade;
 }
 
@@ -514,6 +529,9 @@ void Grain::guard(int n) {
     const double readable = std::min(written_ + rec, static_cast<double>(kKeep));
     for (Voice& v : voice_) {
         if (!v.on || v.t < 0) continue;
+        // A slice no boundary has ended (the song position stalled) fades out before its own
+        // time runs past what the envelope counts exactly, instead of stopping dead there.
+        if (v.slice && v.t + n + kSafeFade >= kOpen / 2) release(v, 0, kSafeFade);
         const int level = v.level;
         const double scale = static_cast<double>(1 << level);
         const double age = ageAt((v.start + v.t * v.rate) * scale + kOffset[level], 0);
@@ -537,20 +555,37 @@ void Grain::guard(int n) {
 // far into its slice the grid is there: under a sample at a boundary (the grid line falls between
 // samples), more after a locate. In 4096ths of a sample: the song position MPC reports comes out a
 // few 1e-14 beats apart for different block sizes, which must not move a slice's source.
+//
+// Locked, the song position is checked against where the last call left it: a locate or a loop
+// shows as a jump, whether or not it lands in another slice (a loop shorter than a slice, or one
+// whose wrap falls on a call's edge, starts a slice at every wrap). A jump by whole slices (a loop
+// on the grid wrapping mid-call, just after the boundary it had) moves the slice's number only:
+// the slice under way is already the one the grid has there.
 int Grain::boundary(int n, double& phase) {
     phase = 0.0;
     const double now = static_cast<double>(now_);
     const double tol = 1e-6;   // samples: a boundary on a call's edge counts once, whatever the blocks
     const auto at = [&phase](double x) { phase = floorFast(std::max(0.0, x) * 4096.0 + 0.5) * (1.0 / 4096.0); };
     if (locked_) {
-        const double b = beats_ / sliceBeats_;
+        const double b = beats_ / sliceBeats_, expect = expectBeats_ / sliceBeats_;
+        expectBeats_ = beats_ + n * bpm_ / (60.0 * kSr);
         const double m = floorFast(b + tol / slice_);
-        if (!indexValid_ || m != sliceIndex_) {   // a start, a locate, a loop, or a boundary on the last call's edge
+        const auto start = [&](double index) {   // a slice starts here, partway as the grid has it
             indexValid_ = true;
-            sliceIndex_ = m;
-            at(std::min((b - m) * slice_, slice_));
+            sliceIndex_ = index;
+            at(std::min((b - index) * slice_, slice_));
             lastBoundary_ = now - phase;
             return 0;
+        };
+        if (!indexValid_) return start(m);   // a start
+        const bool due = floorFast(expect + tol / slice_) != sliceIndex_;   // a boundary on the last call's edge
+        const double off = b - expect;
+        if (std::fabs(off) * slice_ > kJump) {   // a locate or a loop
+            const double whole = std::nearbyint(off);
+            if (due || std::fabs(off - whole) * slice_ > kJump) return start(m);
+            sliceIndex_ = m;
+        } else if (m != sliceIndex_) {
+            return start(m);
         }
         const double ahead = (m + 1.0 - b) * slice_;
         const int k = std::max(0, static_cast<int>(std::ceil(ahead - tol)));
@@ -642,7 +677,8 @@ void Grain::mosaic(int k, double phase) {
     const double speed = speedOf(fold(semis));
     const bool back = u4 < reverse_;
     const double rate = back ? -speed : speed, life = s - phase + fade + kSafeFade;
-    const double shift = back ? phase * (1.0 + speed) - speed * s : phase * (1.0 - speed);
+    // Held, ages count from the newest frame, which lies holdLag_ - 1 after the grid line.
+    const double shift = (back ? phase * (1.0 + speed) - speed * s : phase * (1.0 - speed)) + (hold_ ? holdLag_ - 1.0 : 0.0);
     double lo, hi;
     if (!room(rate, life, k, lo, hi)) return;
     const int first = std::max(1, static_cast<int>(std::ceil((lo - shift) / s - 1e-9)));
@@ -655,7 +691,8 @@ void Grain::mosaic(int k, double phase) {
 
 // Stutter: on a boundary, maybe start repeating the slice just played (the last max(1, speed)
 // slices' worth, so a pitched repeat never catches up with the input), or play its next repeat, or
-// let the live input back in.
+// let the live input back in. Held, the slice just played is the last one on the grid before the
+// recording stopped.
 void Grain::stutter(int k, double phase) {
     const double s = slice_;
     const int fade = std::min(kFade, static_cast<int>(s / 4.0));
@@ -668,7 +705,8 @@ void Grain::stutter(int k, double phase) {
     } else {
         stuttering_ = false;
         if (hold_ || u1 < density_) {
-            cap_ = wrapTo((hold_ ? w0_ : w0_ + 1.0 + k) - phase - std::max(1.0, speed) * s, kFrames);
+            const double line = hold_ ? w0_ - (holdLag_ - 1.0) : w0_ + 1.0 + k - phase;   // the grid line
+            cap_ = wrapTo(line - std::max(1.0, speed) * s, kFrames);
             left_ = static_cast<int>(u2 * (1.0f + 7.0f * density_));
             repeat_ = 0;
             stuttering_ = repeat = true;
@@ -677,13 +715,24 @@ void Grain::stutter(int k, double phase) {
     releaseAll(k, fade, true);
     if (repeat) {
         const bool back = u3 < reverse_;
+        const double rate = back ? -speed : speed, life = s - phase + fade + kSafeFade;
         const double from = ageAt(cap_, k);
-        const double want = back ? from - speed * s + phase * speed : from - phase * speed;
+        double want = back ? from - speed * s + phase * speed : from - phase * speed;
+        // Forward, exactly a slice on the grid or no repeat; backwards, as near as there is room.
+        // A slice whose end is too young to play through (held just after a grid line, or short
+        // and pitched up: the repeat would catch up with the newest frames) gives way to the
+        // nearest earlier one that can, for the rest of the stutter.
+        double lo, hi;
+        if (!back && room(rate, life, k, lo, hi) && want < lo - 0.5) {
+            const double steps = std::ceil((lo - 0.5 - want) / s);
+            if (want + steps * s <= hi + 0.5) {
+                cap_ = wrapTo(cap_ - steps * s, kFrames);
+                want += steps * s;
+            }
+        }
         const float pan = 0.6f * spread_ * (repeat_ & 1 ? 1.0f : -1.0f);
         ++repeat_;
-        // Forward, exactly the slice (on the grid) or no repeat; backwards, as near as there is room.
-        if (!spawn(k, want, back ? -speed : speed, s - phase + fade + kSafeFade, kOpen, fade, fade, pan, 1.0f, true, !back))
-            stuttering_ = false;
+        if (!spawn(k, want, rate, life, kOpen, fade, fade, pan, 1.0f, true, !back)) stuttering_ = false;
     }
     const float live = stuttering_ || hold_ ? 0.0f : 1.0f;
     if (k == 0) liveFrom_ = live;
@@ -809,6 +858,7 @@ void Grain::process(float* L, float* R, int n) {
 
     for (Voice& v : voice_)
         if (v.on) {
+            v.priors = 0;   // the latest release is the lowest line from here on
             v.t += n;
             if (v.t >= std::min(v.end, v.relEnd) || v.t > kOpen / 2) v.on = false;
         }
@@ -874,7 +924,9 @@ void Grain::render(Voice& v, int n) {
         const int seg = (t0 + k) & ~(kSeg - 1);   // the voice's own time, >= 0 here
         const int s0 = seg - t0, stop = std::min(k1, s0 + kSeg);
         const double p = v.start + static_cast<double>(seg) * v.rate;
-        const double base = floorFast(v.rate < 0.0 ? p + (kSeg - 1) * v.rate : p) - 1.0;
+        // (Backwards, two frames below: the last read's offset is 1 in exact arithmetic, a hair
+        // under it in float, which must not truncate to 0.)
+        const double base = v.rate < 0.0 ? floorFast(p + (kSeg - 1) * v.rate) - 2.0 : floorFast(p) - 1.0;
         const int ib = static_cast<int>(base - floorFast(base / frames) * frames);
         const f4 fv = splat(static_cast<float>(p - base));
         const i4 first = i4{2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1)};
@@ -898,10 +950,21 @@ void Grain::render(Voice& v, int n) {
         const f4 inS = splat(v.inSlope), outS = splat(v.outSlope), relS = splat(v.relSlope);
         const f4 endF = splat(static_cast<float>(v.end)), relF = splat(static_cast<float>(v.relEnd));
         f4 tau = splat(static_cast<float>(t0 + k0)) + lane;
-        for (int j = k0; j < k1; j += 4, tau += four) {
-            // (Clamped at 1 by window4 itself.)
-            const f4 a = max4(min4(min4(tau * inS, (endF - tau) * outS), (relF - tau) * relS), splat(0.0f));
-            store4Twice(env_ + 2 * (j - k0), window4(a));
+        if (v.priors == 0) {
+            for (int j = k0; j < k1; j += 4, tau += four) {
+                // (Clamped at 1 by window4 itself.)
+                const f4 a = max4(min4(min4(tau * inS, (endF - tau) * outS), (relF - tau) * relS), splat(0.0f));
+                store4Twice(env_ + 2 * (j - k0), window4(a));
+            }
+        } else {   // a release partway into this call (rare): the lines it replaced too
+            const bool two = v.priors > 1;
+            const f4 p0S = splat(v.priorSlope[0]), p0F = splat(static_cast<float>(v.priorEnd[0]));
+            const f4 p1S = splat(two ? v.priorSlope[1] : 1.0f), p1F = splat(static_cast<float>(two ? v.priorEnd[1] : kOpen));
+            for (int j = k0; j < k1; j += 4, tau += four) {
+                f4 a = min4(min4(tau * inS, (endF - tau) * outS), (relF - tau) * relS);
+                a = min4(a, min4((p0F - tau) * p0S, (p1F - tau) * p1S));
+                store4Twice(env_ + 2 * (j - k0), window4(max4(a, splat(0.0f))));
+            }
         }
     }
     const float* const buf = buf_[level].data();

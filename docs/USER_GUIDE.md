@@ -120,7 +120,8 @@ Depth**, **Pulse Shape** (sine, triangle, square for tremolo and pan; for the ga
 swells), **Pulse Stereo** (the tremolo's right side ahead of the left). The **GATE** card: **Gate
 Pattern** (1/16, 1/8, 1/4, Offbeat, Off 16ths, Dotted, Tresillo, Gallop, Rev Gallop, three Trance
 patterns, Pump, Stutter, Half Bar, Build), **Gate Length** (how long each step stays open) and **Gate
-Smooth** (its edges, so it never clicks).
+Smooth** (its edges, so it never clicks). The patterns are named for **Pulse Div 1/16**, a bar each
+(Offbeat: the eighths between the beats); at 1/8 a pattern takes two bars and plays twice as slow.
 
 ### Delay
 
@@ -163,8 +164,10 @@ tail: lusher, never metallic), **Reverb Width** and **Reverb Freeze** (the tail 
 sound stays out). Changing the mode clears the tail, as a hardware reverb's program change does.
 **Shimmer** sends the tail through a pitch shifter as it circulates, so it blooms upward with every
 pass (**Shimmer Pitch**: +12, +7, +19, or -12 for a sub shimmer). The climbing energy leaves the
-audible band in the end, so with a lot of shimmer a tail ends a little sooner than its Decay, and a
-frozen tail with shimmer slowly thins out instead of holding still.
+audible band in the end, so with a lot of shimmer a long tail ends a little sooner than its Decay
+(a very short one rings a little past it: the pitched echoes take a moment to come back). **Freeze
+with shimmer** doesn't hold still: the tail keeps climbing and drains away over tens of seconds
+(faster at +19 and with more shimmer); set Shimmer to 0 for a freeze that holds for good.
 
 ## Modulation
 
@@ -179,12 +182,12 @@ frozen tail with shimmer slowly thins out instead of holding still.
 
 ### The matrix
 
-Eight slots of **Source → Target × Amount**. A target is one of 48 knobs: the levels, every
+Eight slots of **Source → Target × Amount**. A target is one of 54 knobs: the levels, every
 module's main controls and both LFO rates. The amount moves the knob's value by up to its whole range
 (±100%), so modulation follows the knob's own curve (a cutoff sweeps evenly through octaves). Slots on
 the same target add up. A delay synced to the tempo has no time of its own: **Delay Time** as a target
-scales the synced time instead. A rate (Phaser Rate, LFO 1 / 2 Rate) moves only while its owner runs
-free.
+scales the synced time instead. A rate (Phaser Rate, Pulse Rate, LFO 1 / 2 Rate) moves only while
+its owner runs free.
 
 Ideas: Macro 1 → Filter Cutoff + Reverb Mix + Delay FB (a build-up on one knob); Envelope → Filter
 Cutoff (an auto wah); Envelope → Reverb Mix with a negative amount (the reverb ducks while you play);
