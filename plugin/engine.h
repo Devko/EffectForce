@@ -36,6 +36,7 @@ private:
     struct Slot {
         int src, param;
         float amount;
+        float logRatio;   // a log-curve target: log2(hi / lo), so its value is lo 2^(n logRatio); else 0
     };
     Slot slots_[kNumModSlots] = {};
     int nSlots_ = 0;
