@@ -129,6 +129,13 @@ private:
     Voice cur_, old_;            // old_: the one fading out
     int fade_ = kFadeSamples;    // samples into the cross-fade (kFadeSamples: none)
     uint64_t inc_ = 0;           // phase per sample
+    // What period_ and inc_ were worked out from.
+    struct PeriodKey {
+        bool sync = false;
+        double div = -1.0, bpm = -1.0;
+        float rate = -1.0f;
+    } periodKey_;
+    double period_ = 1.0, incDen_ = -1.0;
     float logPeriod_ = 0.0f;     // log2 of the period in samples, gliding
 
     // The gate's ramps: the slope per sample, where in a step (2^28 to a step) an open step's gate

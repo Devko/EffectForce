@@ -38,10 +38,10 @@ public:
     const Looper& looper() const { return rack_.looper(); }
 
 private:
-    void modulate();   // patch_ = base_ moved by the matrix
+    void modulate();   // patch_ = base_ moved by the matrix (routes() copies base_, this moves its targets)
     void rebuild();    // norm_, base_ and the scenes' list from raw_
-    void morph();      // the scenes' parameters at x_ into norm_ and base_
-    void routes();     // the matrix's slots and the envelope follower's settings from norm_ / base_
+    void morph();      // the scenes' parameters at x_ into norm_, base_ and patch_
+    void routes();     // the matrix's slots and the envelope follower's settings from norm_ / base_; patch_ = base_
 
     Rack rack_;
     Lfo lfo_[2];
@@ -68,6 +68,7 @@ private:
     struct Slot {
         int src, param;
         float amount;
+        float logRatio;   // a log-curve target: log2(hi / lo), so its value is lo 2^(n logRatio); else 0
     };
     Slot slots_[kNumModSlots] = {};
     int nSlots_ = 0;

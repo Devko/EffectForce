@@ -190,6 +190,9 @@ T clampOr(T x, T lo, T hi, T nan) {
     return x >= lo ? (x <= hi ? x : hi) : (x < lo ? lo : nan);
 }
 
+// std::ceil, which is a libm call on ARMv7.
+double ceilFast(double x) { return -floorFast(-x); }
+
 // x into [0, size).
 double wrapTo(double x, double size) {
     const double r = x - floorFast(x / size) * size;
@@ -272,7 +275,11 @@ void Grain::reset() {
     for (Voice& v : voice_) v.on = false;
     w0_ = -1;
     written_ = 0;
-    now_ = 0;
+    now_ = 0.0;
+    seg_ = 0;
+    tailKey_.mode = -1;
+    speedPitch_ = 0.0f;
+    speed_ = 1.0;
     rng_ = kSeed;
     lastBoundary_ = 0.0;
     sliceIndex_ = 0.0;
@@ -353,7 +360,7 @@ void Grain::set(const Params& p, const Transport& t) {
         if (p.hold != hold_) {
             hold_ = p.hold;
             if (hold_) {
-                holdLag_ = std::max(0.0, static_cast<double>(now_) - lastBoundary_);
+                holdLag_ = std::max(0.0, now_ - lastBoundary_);
                 freeze();
                 if (mode_ == kStutter && !stuttering_) enter_ = true;   // the live input goes, the last slice repeats
             } else {
@@ -374,7 +381,10 @@ void Grain::set(const Params& p, const Transport& t) {
 
     // How long it rings: whatever a grain may still read of the input (how far back it starts,
     // and its length at its speed), then for feedback until the loop has taken it 60 dB down, a
-    // pass at most that long each.
+    // pass at most that long each. (Worked out again only when what it depends on changes.)
+    const TailKey key{mode_, pitch_, spread_, density_, fb, slice_, hold_};
+    if (key == tailKey_) return;
+    tailKey_ = key;
     const double s = slice_;
     float extra = 0.0f;
     if (mode_ == kMosaic) extra = 12.0f;
@@ -541,12 +551,16 @@ void Grain::guard(int n) {
             v.on = false;
             continue;
         }
+        // Far from both ends for this call (the usual case): no divisions. A sample's margin over
+        // the exact test below keeps the decision the same.
+        const double far = n + kSafeFade + 1.0;
+        if ((vel >= 0.0 || young >= far * -vel) && (vel <= grow || old >= far * (vel - grow))) continue;
         double hit = 1e30;
         if (vel < 0.0) hit = young / -vel;
         if (vel > grow) hit = std::min(hit, old / (vel - grow));
         const double from = hit - kSafeFade;
         if (from >= n) continue;
-        const int k = from <= 0.0 ? 0 : static_cast<int>(std::ceil(from));
+        const int k = from <= 0.0 ? 0 : static_cast<int>(ceilFast(from));
         release(v, k, std::max(1, static_cast<int>(std::min<double>(kSafeFade, std::floor(hit - k)))));
     }
 }
@@ -563,7 +577,7 @@ void Grain::guard(int n) {
 // the slice under way is already the one the grid has there.
 int Grain::boundary(int n, double& phase) {
     phase = 0.0;
-    const double now = static_cast<double>(now_);
+    const double now = now_;
     const double tol = 1e-6;   // samples: a boundary on a call's edge counts once, whatever the blocks
     const auto at = [&phase](double x) { phase = floorFast(std::max(0.0, x) * 4096.0 + 0.5) * (1.0 / 4096.0); };
     if (locked_) {
@@ -588,7 +602,7 @@ int Grain::boundary(int n, double& phase) {
             return start(m);
         }
         const double ahead = (m + 1.0 - b) * slice_;
-        const int k = std::max(0, static_cast<int>(std::ceil(ahead - tol)));
+        const int k = std::max(0, static_cast<int>(ceilFast(ahead - tol)));
         if (k >= n) return -1;
         sliceIndex_ = m + 1.0;
         at(k - ahead);
@@ -600,7 +614,7 @@ int Grain::boundary(int n, double& phase) {
         lastBoundary_ = now;
         return 0;
     }
-    const int k = std::max(0, static_cast<int>(std::ceil(ahead - tol)));
+    const int k = std::max(0, static_cast<int>(ceilFast(ahead - tol)));
     if (k >= n) return -1;
     lastBoundary_ += slice_;
     at(k - ahead);
@@ -610,13 +624,17 @@ int Grain::boundary(int n, double& phase) {
 // Cloud and Stretch: Hann grains at intervals of length / overlap, jittered (Cloud +-30%, Stretch
 // +-15%), at the absolute sample the interval puts them on.
 void Grain::grains(int n) {
-    const double now = static_cast<double>(now_);
+    const double now = now_;
     const bool stretch = mode_ == kStretch;
     const int length = std::max(static_cast<int>(slice_ + 0.5), 2);
     const float overlap = stretch ? 2.0f + 6.0f * density_ : 1.0f + 7.0f * density_;
     const float amp = 1.0f / std::sqrt(0.375f * overlap);
     const double interval = length / static_cast<double>(overlap);
-    const double speed = speedOf(pitch_);
+    if (pitch_ != speedPitch_) {
+        speedPitch_ = pitch_;
+        speed_ = speedOf(pitch_);
+    }
+    const double speed = speed_;
     const double rec = hold_ ? 0.0 : 1.0;
     const double fresh = 0.03 * kSr;   // where Stretch's head starts, behind the present
     const double jitter = (0.005 + 0.06 * spread_) * kSr;
@@ -627,7 +645,7 @@ void Grain::grains(int n) {
 
     if (nextSpawn_ < now - interval) nextSpawn_ = now;
     while (nextSpawn_ < now + n) {
-        const int k = nextSpawn_ <= now ? 0 : static_cast<int>(std::ceil(nextSpawn_ - now));
+        const int k = nextSpawn_ <= now ? 0 : static_cast<int>(ceilFast(nextSpawn_ - now));
         if (k >= n) break;
         // Every draw first, the same ones whether or not the grain finds room.
         const float u1 = uniform(), u2 = uniform(), u3 = uniform(), u4 = uniform(), u5 = uniform(), u6 = uniform();
@@ -681,7 +699,7 @@ void Grain::mosaic(int k, double phase) {
     const double shift = (back ? phase * (1.0 + speed) - speed * s : phase * (1.0 - speed)) + (hold_ ? holdLag_ - 1.0 : 0.0);
     double lo, hi;
     if (!room(rate, life, k, lo, hi)) return;
-    const int first = std::max(1, static_cast<int>(std::ceil((lo - shift) / s - 1e-9)));
+    const int first = std::max(1, static_cast<int>(ceilFast((lo - shift) / s - 1e-9)));
     const int last = static_cast<int>(std::floor((hi - shift) / s + 1e-9));
     if (last < first) return;
     const int upto = std::min(last, std::max(first, 1 + static_cast<int>(spread_ * 7.999f)));
@@ -724,7 +742,7 @@ void Grain::stutter(int k, double phase) {
         // nearest earlier one that can, for the rest of the stutter.
         double lo, hi;
         if (!back && room(rate, life, k, lo, hi) && want < lo - 0.5) {
-            const double steps = std::ceil((lo - 0.5 - want) / s);
+            const double steps = std::ceil((lo - 0.5 - want) / s);   // (rare: once a stutter)
             if (want + steps * s <= hi + 0.5) {
                 cap_ = wrapTo(cap_ - steps * s, kFrames);
                 want += steps * s;
@@ -773,7 +791,7 @@ void Grain::process(float* L, float* R, int n) {
 
     // This call's grains, slices and notes. The grid runs in every mode, so a slice mode starts
     // in step.
-    const double entry = static_cast<double>(now_) - lastBoundary_;
+    const double entry = now_ - lastBoundary_;
     double phase = 0.0;
     const int kb = boundary(n, phase);
     liveFrom_ = liveTo_ = mode_ == kStutter && !stuttering_ && !hold_ ? 1.0f : 0.0f;
@@ -863,71 +881,81 @@ void Grain::process(float* L, float* R, int n) {
             if (v.t >= std::min(v.end, v.relEnd) || v.t > kOpen / 2) v.on = false;
         }
     now_ += n;
+    seg_ = (seg_ + n) & (kChunk - 1);
 }
 
 // A level of the buffer from the one above it: `count` frames of that one (L R), the first at
-// `first` in its ring. Each odd frame completes a pair (its even one may be the last call's,
-// `early`): one frame of this level, into its ring and, packed, into `out` (which may be `in`: it
-// is written behind what is read). Returns how many.
+// `first` in its ring. Each pair of frames (even, odd) makes one frame of this level, into its
+// ring and, packed, into `out` (which may be `in`: it is written behind what is read); a pair
+// begun in the last call finishes with its early frame from there (`early`), one this call
+// begins waits there. Returns how many it made.
 template <int Level>
 int Grain::decimate(StereoDecimator& down, float (&early)[2], const float* in, int first, int count, float* out) {
-    constexpr int above = kFrames >> (Level - 1), frames = kFrames >> Level;
+    constexpr int frames = kFrames >> Level;
     float* const b = buf_[Level].data();
     StereoDecimator d = down;
-    float el = early[0], er = early[1];
-    int made = 0;
-    for (int i = 0, at = first; i < count; ++i, at = at + 1 == above ? 0 : at + 1) {
-        const float l = in[2 * i], r = in[2 * i + 1];
-        if (!(at & 1)) {
-            el = l;
-            er = r;
-            continue;
-        }
-        float lo, ro;
-        d.process(f4{el, l, er, r}, lo, ro);
-        const int f = at >> 1;
-        b[2 * f] = lo;
-        b[2 * f + 1] = ro;
-        if (f < kGuard) {
-            b[2 * (frames + f)] = lo;
-            b[2 * (frames + f) + 1] = ro;
-        }
-        out[2 * made] = lo;
-        out[2 * made + 1] = ro;
+    int made = 0, i = 0, f = first >> 1;   // f: the frame a pair makes
+    const auto put = [&](Gp lr) {
+        storePair(b + 2 * f, lr);
+        if (f < kGuard) storePair(b + 2 * (frames + f), lr);
+        storePair(out + 2 * made, lr);
         ++made;
+        f = f + 1 == frames ? 0 : f + 1;
+    };
+    if ((first & 1) && count > 0) {
+        float l, r;
+        d.process(f4{early[0], in[0], early[1], in[1]}, l, r);
+        put(Gp{l, r});
+        i = 1;
+    }
+    for (; i + 2 <= count; i += 2) {
+#if EF_NEON
+        put(d.processPair(vld1q_f32(in + 2 * i)));
+#else
+        float l, r;
+        d.process(f4{in[2 * i], in[2 * i + 2], in[2 * i + 1], in[2 * i + 3]}, l, r);
+        put(Gp{l, r});
+#endif
+    }
+    if (i < count) {
+        early[0] = in[2 * i];
+        early[1] = in[2 * i + 1];
     }
     down = d;
-    early[0] = el;
-    early[1] = er;
     return made;
 }
 
 // A voice's part of this call: its positions and envelope four samples at a time, then the reads.
-// Positions go by the voice's own 32-sample segments: the segment's first position (in double) as
-// a whole frame `base` and a float offset that stays at least 1 across the segment (so truncation
-// is the floor), base moved into the ring (the guard frames past its end take what runs over). A
-// read's offset depends only on where in its segment it falls, so blocks of any size compute every
-// read alike.
+// Positions go by 32-sample segments of time since reset() (with the rack's chunks, a call is one):
+// the segment's first position (in double) as a whole frame `base` and a float offset that stays
+// at least 1 across the segment (so truncation is the floor), base moved into the ring (the guard
+// frames past its end take what runs over). A read's offset depends only on where in its segment
+// it falls, so blocks of any size compute every read alike.
 void Grain::render(Voice& v, int n) {
     constexpr int kSeg = 32;
+    static_assert(kSeg == kChunk, "seg_ counts in chunks");
     const int t0 = v.t;
     const int k0 = std::max(0, -t0);
     const int k1 = std::min(n, std::min(v.end, v.relEnd) - t0);
     if (k1 <= k0) return;
     const int level = v.level;
-    const double frames = static_cast<double>(kFrames >> level);
+    const int frames = kFrames >> level;
     const f4 lane = f4{0.0f, 1.0f, 2.0f, 3.0f}, four = splat(4.0f);
     const f4 rv = splat(static_cast<float>(v.rate));
     // The positions. Sample counts as floats are exact (under 2^24), so stepping them by 4 is
     // converting each.
     for (int k = k0; k < k1;) {
-        const int seg = (t0 + k) & ~(kSeg - 1);   // the voice's own time, >= 0 here
-        const int s0 = seg - t0, stop = std::min(k1, s0 + kSeg);
+        const int s0 = k - ((seg_ + k) & (kSeg - 1)), stop = std::min(k1, s0 + kSeg);   // where k's segment starts
+        const int seg = t0 + s0;   // the voice's own time there (before it started, the first time)
         const double p = v.start + static_cast<double>(seg) * v.rate;
         // (Backwards, two frames below: the last read's offset is 1 in exact arithmetic, a hair
         // under it in float, which must not truncate to 0.)
         const double base = v.rate < 0.0 ? floorFast(p + (kSeg - 1) * v.rate) - 2.0 : floorFast(p) - 1.0;
-        const int ib = static_cast<int>(base - floorFast(base / frames) * frames);
+        int ib = static_cast<int>(base);   // a whole number, into the ring in integers
+        if (ib >= frames || ib < 0) {   // (a voice that has run a while)
+            ib %= frames;
+            if (ib < 0) ib += frames;
+        }
         const f4 fv = splat(static_cast<float>(p - base));
         const i4 first = i4{2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1), 2 * (ib - 1)};
         // Four at a time; a group running past `stop` is written over by the next stretch.

@@ -136,6 +136,19 @@ void engineFollowsTheFader() {
     e.setParams(k.v);
     play(e, 0.05);
     CHECK(std::fabs(e.current().filter.cutoffHz - paramValue(P_FLT_CUT, 0.8f)) < 0.05f);
+    // The fader moving while the matrix is busy elsewhere: what the scene moves still follows it.
+    k.v[P_M1_DST] = optionNorm(P_M1_DST, "Reverb Mix");
+    k.v[P_XFADE] = 0.0f;
+    e.setParams(k.v);
+    play(e, 0.3);
+    CHECK(std::fabs(e.current().filter.cutoffHz - 1000.0f) < 0.5f);
+    k.v[P_XFADE] = 1.0f;
+    e.setParams(k.v);   // the fader alone: no rebuild, the chunks glide
+    play(e, 0.3);
+    CHECK(std::fabs(e.current().filter.cutoffHz - paramValue(P_FLT_CUT, 0.6f)) < 0.01f && e.current().filter.type == 3);
+    k.v[P_M1_DST] = optionNorm(P_M1_DST, "Filter Cutoff");
+    e.setParams(k.v);
+    play(e, 0.05);
     // A scene moving the matrix: B locks the amount to 0.
     sc.lock(1, P_M1_AMT, normOf(P_M1_AMT, 0.0f));
     play(e, 0.05);

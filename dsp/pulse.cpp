@@ -112,6 +112,8 @@ EF_INLINE f4 progress4(int i, f4 lim) {
 Pulse::Pulse() { reset(); }
 
 void Pulse::reset() {
+    periodKey_ = PeriodKey{};
+    incDen_ = -1.0;
     cur_ = Voice{};
     old_ = Voice{};
     fade_ = kFadeSamples;
@@ -177,13 +179,21 @@ void Pulse::set(const Params& p, const Transport& t) {
 
     // A period in samples (the phase turns once in 16 of them). It glides in log2, unless the
     // song position leads or a voice starts.
-    const double period = p.sync ? div * 60.0 / bpm * kRate : kRate / rate;
+    if (p.sync != periodKey_.sync || div != periodKey_.div || bpm != periodKey_.bpm || rate != periodKey_.rate) {
+        periodKey_ = {p.sync, div, bpm, rate};   // (two divisions: only when these change)
+        period_ = p.sync ? div * 60.0 / bpm * kRate : kRate / rate;
+    }
+    const double period = period_;
     const float logPeriod = log2Fast(static_cast<float>(period));
     if (fresh_ || handOver || locking) logPeriod_ = logPeriod;
     else logPeriod_ = glideTo(logPeriod_, logPeriod, kGlideShape, 1e-5f);
     const bool there = logPeriod_ == logPeriod;
     const float steps = there ? static_cast<float>(period) : exp2Fast(logPeriod_);
-    inc_ = static_cast<uint64_t>(kTwo64 / 16.0 / (there ? period : static_cast<double>(steps)));
+    const double den = there ? period : static_cast<double>(steps);
+    if (den != incDen_) {   // (a division and a 64-bit conversion, done in software on ARMv7)
+        incDen_ = den;
+        inc_ = static_cast<uint64_t>(kTwo64 / 16.0 / den);
+    }
 
     // The gate's edges (pulse.h): the slope, and where an open step starts closing so that it is
     // closed at `length` of the step, or halfway through its open part if two edges don't fit.
