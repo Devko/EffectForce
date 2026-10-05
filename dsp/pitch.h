@@ -20,6 +20,7 @@
 // it: a read reaching back before the restart is a zero, and the output fades in (kOnset samples)
 // as the head reaches what was written since, rather than stepping in.
 #include "common.h"
+#include "simd.h"
 
 #include <cstdint>
 
@@ -118,35 +119,58 @@ private:
     // The jump for this splice: the nominal one, moved to where the kWindow samples behind the
     // new head look most like those behind the old (correlation, every 4th lag and sample first,
     // then every lag nearby). Going down the new head must stay kMinDelay behind the writes.
-    int lag() const {
+    // What the windows read is gathered from the ring first, so that four lags' sums run as one
+    // vector, each in the same order as on its own: the same sums, the same choice, far fewer
+    // instructions (the search is one sample's work, every grain). Out of line: the hot loop
+    // calling tick() keeps its registers.
+    __attribute__((noinline)) int lag() const {
         const int dNow = static_cast<int>(d);
         int lo = jump - kSearch, hi = jump + kSearch;
         if (!up) hi = std::min(hi, dNow - static_cast<int>(kMinDelay) - 2);
         if (lo < 1 || hi <= lo || age < static_cast<uint32_t>(dNow + hi + kWindow + 8)) return std::max(1, std::min(jump, hi));
-        auto corr = [&](int l, int stride) {
-            float s = 0.0f;
-            const uint32_t other = static_cast<uint32_t>(up ? dNow + l : dNow - l);
-            for (int k = 0; k < kWindow; k += stride) s += at(static_cast<uint32_t>(dNow + k)) * at(other + static_cast<uint32_t>(k));
-            return s;
-        };
+        constexpr int kCoarse = kWindow / 4, kFine = kWindow / 2, kNear = 3;
+        constexpr int kLags = (2 * kSearch) / 4 + 1, kGroups = (kLags + 3) / 4 * 4;
+        // Coarse: lag lo + 4 i against the old head's window. Its sample j reads the ring at
+        // dNow +- (lo + 4 i) + 4 j: going up b[i + j], going down b[i - j + kCoarse - 1].
+        alignas(16) float a[kCoarse], b[kGroups + kCoarse], sums[kGroups];
+        const int lags = (hi - lo) / 4 + 1;
+        for (int j = 0; j < kCoarse; ++j) a[j] = at(static_cast<uint32_t>(dNow + 4 * j));
+        const int span = (lags + 3) / 4 * 4 + kCoarse - 1;
+        for (int m = 0; m < span; ++m)
+            b[m] = at(static_cast<uint32_t>(up ? dNow + lo + 4 * m : dNow - lo + 4 * (kCoarse - 1) - 4 * m));
+        for (int i = 0; i < lags; i += 4) {
+            f4 sum = splat(0.0f);
+            const float* const q = up ? b + i : b + i + kCoarse - 1;
+            for (int j = 0; j < kCoarse; ++j) sum += splat(a[j]) * load4(up ? q + j : q - j);
+            store4(sums + i, sum);
+        }
         int best = jump;
         float top = -1e30f;
-        for (int l = lo; l <= hi; l += 4) {
-            const float c = corr(l, 4);
-            if (c > top) {
-                top = c;
-                best = l;
+        for (int i = 0; i < lags; ++i)
+            if (sums[i] > top) {
+                top = sums[i];
+                best = lo + 4 * i;
             }
+        // Fine: every lag within kNear of it, every 2nd sample. Lag center - kNear + r, sample j:
+        // going up e[r + 2 j], going down e[r - 2 j + kWindow - 2].
+        const int center = best, from = std::max(lo, center - kNear), to = std::min(hi, center + kNear);
+        alignas(16) float a2[kFine], e[8 + kWindow - 2], near[8];
+        for (int j = 0; j < kFine; ++j) a2[j] = at(static_cast<uint32_t>(dNow + 2 * j));
+        const int base = center - kNear;
+        for (int m = 0; m < 8 + kWindow - 2; ++m)
+            e[m] = at(static_cast<uint32_t>(up ? dNow + base + m : dNow - base + kWindow - 2 - m));
+        for (int r = 0; r < 8; r += 4) {
+            f4 sum = splat(0.0f);
+            const float* const q = up ? e + r : e + r + kWindow - 2;
+            for (int j = 0; j < kFine; ++j) sum += splat(a2[j]) * load4(up ? q + 2 * j : q - 2 * j);
+            store4(near + r, sum);
         }
-        const int center = best;
         top = -1e30f;
-        for (int l = std::max(lo, center - 3); l <= std::min(hi, center + 3); ++l) {
-            const float c = corr(l, 2);
-            if (c > top) {
-                top = c;
+        for (int l = from; l <= to; ++l)
+            if (near[l - base] > top) {
+                top = near[l - base];
                 best = l;
             }
-        }
         return best;
     }
 };
