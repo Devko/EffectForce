@@ -229,7 +229,7 @@ void editThroughThePlugin() {
     std::printf("== scenes: EDIT A / B, the tiles and CLEAR, as the Force sends them\n");
     Host h;
     CHECK(h.display(P_SCA_1) == "1" && h.get(P_SCA_1) > 0.5f && h.get(P_SCB_1 + 1) > 0.5f && h.get(P_SCB_1) < 0.5f);
-    CHECK(h.display(P_SCN_INFO).find("A: SCENE 1, 0 LOCKS") == 0);
+    CHECK(h.display(P_SCN_INFO).find("A: SCENE 1, CLEAN") == 0);
     h.on(P_FLT_ON);
     // EDIT B: the knobs show scene 2 (nothing locked: the knobs); what is set is locked in it.
     h.tap(P_EDIT_B);

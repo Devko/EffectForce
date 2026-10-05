@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Grain Cloud
+grn_on=On
+grn_mode=Cloud
+grn_density=0.8
+grn_spread=0.7
+grn_mix=0.6

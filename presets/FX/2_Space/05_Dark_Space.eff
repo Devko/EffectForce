@@ -1,0 +1,10 @@
+effectforce-fx 1
+name=Dark Space
+rev_on=On
+rev_mode=Space
+rev_decay=12
+rev_damp=2500
+rev_mix=0.6
+flt_on=On
+flt_type=LP 12
+flt_cut=2000

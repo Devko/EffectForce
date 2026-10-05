@@ -1,0 +1,10 @@
+effectforce-fx 1
+name=Reverse Haze
+grn_on=On
+grn_mode=Cloud
+grn_reverse=1
+grn_density=0.6
+grn_mix=0.6
+rev_on=On
+rev_decay=4
+rev_mix=0.35

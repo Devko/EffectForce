@@ -1,0 +1,10 @@
+effectforce-fx 1
+name=Tape Echo
+dly_on=On
+dly_sync=Sync
+dly_div=1/4.
+dly_fb=0.6
+dly_wow=0.6
+dly_drive=0.5
+dly_hc=4000
+dly_mix=0.45

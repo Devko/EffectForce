@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=LP Resonant
+flt_on=On
+flt_type=LP 24
+flt_cut=250
+flt_res=0.75
+flt_drive=0.3

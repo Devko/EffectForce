@@ -1,0 +1,13 @@
+effectforce-fx 1
+name=Acid Squelch
+flt_on=On
+flt_type=LP 24
+flt_cut=700
+flt_res=0.85
+flt_drive=0.6
+l2_sync=Sync
+l2_div=1/8
+l2_wave=Sine
+m8_src=LFO 2
+m8_dst=Filter Cutoff
+m8_amt=0.3

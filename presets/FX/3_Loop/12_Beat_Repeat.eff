@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Beat Repeat
+lp_mix=1
+lp_rep=1/4
+flt_on=On
+flt_type=HP 12
+flt_cut=250

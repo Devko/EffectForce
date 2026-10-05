@@ -108,6 +108,12 @@ struct Plugin {
 
     // CPU meter: the audio thread sums its own CPU time against the real-time budget and publishes
     // twice a second; the status line is formatted on the UI thread.
+    // The looper's line (PERFORM and LOOPER pages): what it does, published by the audio thread, told to
+    // MPC when it changes (whole beats), written out on the UI thread.
+    std::atomic<int>   lpState{0}, lpCapture{0};
+    std::atomic<float> lpLen{0.0f}, lpSlice{0.0f}, lpSpeed{1.0f}, lpCapLen{0.0f}, lpCapAt{0.0f};
+    uint32_t           lpShown = 0xffffffffu;   // audio thread: the last line MPC was told about
+
     double           winUs = 0.0, winBudgetUs = 0.0, winPeak = 0.0;
     std::atomic<int> shownRunning{0}, shownAvg{0}, shownPeak{0};   // modules, percent
     int              lastRunning = -1, lastAvg = -1, lastPeak = -1;
@@ -123,6 +129,56 @@ void copyStr(void* dst, const std::string& s, size_t cap) {
         while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80) --n;   // s[n] continues a character
     std::memcpy(dst, s.data(), n);
     static_cast<char*>(dst)[n] = 0;
+}
+
+// A length in beats as the page names it: "1/16", "1 BAR", "8 BARS".
+std::string beatsText(double beats) {
+    for (const Division& d : kLoopLens)
+        if (std::fabs(d.beats - beats) < 1e-6) {
+            std::string t = d.name;
+            for (char& c : t) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            return t;
+        }
+    char b[24];
+    std::snprintf(b, sizeof b, "%.2g BEATS", beats);
+    return b;
+}
+
+std::string looperText(const Plugin* p) {
+    const int state = p->lpState.load(), capture = p->lpCapture.load();
+    std::string t;
+    switch (state) {
+        case Looper::kOff: return "LOOPER OFF: SWITCH IT ON TO RECORD";
+        case Looper::kListening: t = "LISTENING"; break;
+        case Looper::kKept: t = "LOOP " + beatsText(p->lpLen.load()) + " KEPT"; break;
+        case Looper::kPlaying: {
+            t = "PLAYING " + beatsText(p->lpLen.load());
+            if (p->lpSlice.load() > 0.0f) t += ", ROLL " + beatsText(p->lpSlice.load());
+            const float sp = p->lpSpeed.load();
+            if (std::fabs(sp - 1.0f) > 0.005f) {
+                char b[24];
+                std::snprintf(b, sizeof b, ", %.2fX", static_cast<double>(sp));
+                t += b;
+            }
+            break;
+        }
+        default: break;
+    }
+    if (capture) {
+        const double at = p->lpCapAt.load();
+        char b[64];
+        if (capture == 1) std::snprintf(b, sizeof b, "REC %s IN %d BEATS", beatsText(p->lpCapLen.load()).c_str(),
+                                        static_cast<int>(std::ceil(at)));
+        else std::snprintf(b, sizeof b, "REC %s: %d OF %d BEATS", beatsText(p->lpCapLen.load()).c_str(),
+                           static_cast<int>(at) + 1, static_cast<int>(std::lround(p->lpCapLen.load())));
+        t += "   ";
+        t += b;
+    } else if (state == Looper::kListening) {
+        t += ": REC, OR PUSH LOOP";
+    } else if (state == Looper::kKept) {
+        t += ": PUSH LOOP TO PLAY";
+    }
+    return t;
 }
 
 std::string statusText(const Plugin* p) {
@@ -192,6 +248,27 @@ void guard(float* x, int n) {
     }
 }
 
+void publishLooper(Plugin* p) {
+    const Looper::Status st = p->engine.looper().status();
+    p->lpState.store(st.state, std::memory_order_relaxed);
+    p->lpCapture.store(st.capture, std::memory_order_relaxed);
+    p->lpLen.store(static_cast<float>(st.lengthBeats), std::memory_order_relaxed);
+    p->lpSlice.store(static_cast<float>(st.sliceBeats), std::memory_order_relaxed);
+    p->lpSpeed.store(st.speed, std::memory_order_relaxed);
+    p->lpCapLen.store(static_cast<float>(st.captureBeats), std::memory_order_relaxed);
+    p->lpCapAt.store(static_cast<float>(st.captureAt), std::memory_order_relaxed);
+    // What the line shows, as a number: a change asks MPC to redraw the texts.
+    uint32_t key = 0;
+    for (const long v : {static_cast<long>(st.state), static_cast<long>(st.capture), std::lround(st.lengthBeats * 16.0),
+                         std::lround(st.sliceBeats * 64.0), std::lround(st.speed * 100.0f),
+                         std::lround(std::ceil(st.captureAt)), std::lround(st.captureBeats * 16.0)})
+        key = key * 1000003u ^ static_cast<uint32_t>(v);
+    if (key != p->lpShown) {
+        p->lpShown = key;
+        p->surface.textsChanged();
+    }
+}
+
 void runBlock(Plugin* p, float* L, float* R, int n, const Transport& tr) {
     // The sound only changes when a parameter does: then the engine takes a new snapshot. Looked
     // at only when something was written since the last look.
@@ -208,7 +285,9 @@ void runBlock(Plugin* p, float* L, float* R, int n, const Transport& tr) {
         }
     }
     if (p->clear.exchange(false)) p->engine.reset();
+    p->engine.setLoopRec(p->surface.loopRecs());
     p->engine.render(L, R, n, tr);
+    publishLooper(p);
     p->tail.store(p->engine.tailSamples(), std::memory_order_relaxed);
     guard(L, n);
     guard(R, n);
@@ -323,6 +402,7 @@ intptr_t dispatch(Plugin* p, int32_t op, int32_t idx, intptr_t val, void* ptr) {
         case vst::effGetParamDisplay:
             if (!validIdx) copyStr(ptr, "", kTextCap);
             else if (idx == P_STATUS) copyStr(ptr, statusText(p), kTextCap);
+            else if (idx == P_LP_INFO) copyStr(ptr, looperText(p), kTextCap);
             else copyStr(ptr, p->surface.display(idx), kTextCap);
             return 0;
         case vst::effSetSampleRate:   // MPC OS is fixed at 44.1 kHz; the modules are built for it

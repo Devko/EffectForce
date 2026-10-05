@@ -1,0 +1,11 @@
+effectforce-fx 1
+name=Dub Echo
+dly_on=On
+dly_sync=Sync
+dly_div=1/8.
+dly_fb=0.75
+dly_lc=300
+dly_hc=3000
+dly_wow=0.3
+dly_drive=0.3
+dly_mix=0.5

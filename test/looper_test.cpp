@@ -298,29 +298,31 @@ void seamless() {
 }
 
 void slowTempoHalves() {
-    std::printf("== looper: a Length over 10 s halves until it fits\n");
+    std::printf("== looper: a Length over 20 s halves until it fits\n");
     auto lp = armed();
-    const int n = 1200000, e = 1100000 / kChunk * kChunk;
+    const int n = 1600000, e = 1500000 / kChunk * kChunk;
     Buf L = ramp(n), R = ramp(n);
-    drive(*lp, L, R, playing(60.0), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 16.0); });
-    std::printf("  4 bars at 60 BPM: %d frames (%.1f beats)\n", lp->loopFrames(), lp->loopBeats());
-    CHECK(lp->loopFrames() == 352800 && lp->loopBeats() == 8.0);
-    // 96 BPM: 4 bars is exactly 10 s and stays.
-    auto lp96 = armed();
-    Buf A = ramp(n), B = ramp(n);
-    drive(*lp96, A, B, playing(96.0), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 16.0); });
-    CHECK(lp96->loopFrames() == 441000);
+    drive(*lp, L, R, playing(60.0), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 32.0); });
+    std::printf("  8 bars at 60 BPM: %d frames (%.1f beats)\n", lp->loopFrames(), lp->loopBeats());
+    CHECK(lp->loopFrames() == 705600 && lp->loopBeats() == 16.0);
+    // 96 BPM: 8 bars is exactly 20 s and stays; 120 BPM: 8 bars (16 s) too.
+    for (double bpm : {96.0, 120.0}) {
+        auto l8 = armed();
+        Buf A = ramp(n), B = ramp(n);
+        drive(*l8, A, B, playing(bpm), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 32.0); });
+        CHECK(l8->loopFrames() == static_cast<int>(32.0 * 44100.0 * 60.0 / bpm) && l8->loopBeats() == 32.0);
+    }
 }
 
 void longLoopSurvivesTheRing() {
-    std::printf("== looper: a 10 s loop plays right while the ring wraps underneath\n");
+    std::printf("== looper: a 20 s loop plays right while the ring wraps underneath\n");
     auto lp = armed();
-    // 96 BPM, 4 bars = 441000 frames. Engaged at 30 s, played for 40 s: the ring (1048576 frames)
-    // wraps three times meanwhile.
-    const int n = 70 * 44100, e = 30 * 44100 / kChunk * kChunk;
+    // 96 BPM, 8 bars = 882000 frames. Engaged at 45 s, played for 60 s: the ring (2097152 frames)
+    // wraps more than twice meanwhile.
+    const int n = 105 * 44100, e = 45 * 44100 / kChunk * kChunk;
     Buf L = ramp(n), R = ramp(n);
-    drive(*lp, L, R, playing(96.0), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 16.0); });
-    const double spb = 44100.0 * 60.0 / 96.0, cell = 16.0 * spb;
+    drive(*lp, L, R, playing(96.0), [&](int s) { return params(s >= e ? 1.0f : 0.0f, 32.0); });
+    const double spb = 44100.0 * 60.0 / 96.0, cell = 32.0 * spb;
     const double start = (std::floor(e / cell) - 1.0) * cell;
     double worst = 0.0;
     for (int i = e + 2000; i < n; i += 211) {
@@ -329,7 +331,153 @@ void longLoopSurvivesTheRing() {
         worst = std::max(worst, std::fabs(index(L[static_cast<size_t>(i)]) - (start + into)));
     }
     std::printf("  worst %.3f frames, copy done %d\n", worst, lp->copyDone());
-    CHECK(worst < 1.0 && lp->copyDone());   // the ramp's float resolution at index 1.3e6 is ~0.12
+    CHECK(worst < 1.0 && lp->copyDone());   // the ramp's float resolution at index 1.8e6 is ~0.12
+}
+
+// REC (Octatrack style): the parameters before each chunk from `at`, REC pressed at the samples in
+// `presses` (each bumps the count).
+P recParams(float loop, double length, int capture, uint32_t rec, bool hold = true) {
+    P p = params(loop, length, 0.0, 1.0f, hold);
+    p.capture = capture;
+    p.rec = rec;
+    return p;
+}
+
+void recLast() {
+    std::printf("== looper: REC Last keeps the cell just played; Loop plays it later\n");
+    auto lp = armed();
+    const int n = 500000;
+    const int press = static_cast<int>(9.5 * 22050) / kChunk * kChunk, up = 400000 / kChunk * kChunk;
+    Buf L = ramp(n), R = ramp(n);
+    drive(*lp, L, R, playing(120.0), [&](int s) {
+        return recParams(s >= up ? 1.0f : 0.0f, 4.0, Looper::kLast, s >= press ? 1u : 0u);
+    });
+    // Kept at the press: bar 1 (frames 88200..176400); live until Loop goes up, then that bar on the grid.
+    bool live = true;
+    for (int i = 0; i < up; i += 13) live = live && L[static_cast<size_t>(i)] == static_cast<float>(i * kTag);
+    CHECK(live && lp->hasLoop());
+    double worst = 0.0;
+    for (int i = up + 2000; i < n; i += 53) {
+        const double into = std::fmod(i, 88200.0);
+        if (into < Looper::kFade + 2) continue;
+        worst = std::max(worst, std::fabs(index(L[static_cast<size_t>(i)]) - (88200.0 + into)));
+    }
+    std::printf("  worst %.3f\n", worst);
+    CHECK(worst < 0.5);
+}
+
+void recNext() {
+    std::printf("== looper: REC Next records the coming cell on the grid (a late press takes the one begun)\n");
+    // 1 bar. Pressed at beat 5.5: the next line is beat 8, the cell beats 8..12, ready at 12.
+    // Pressed at beat 8.5 (half a beat late): the cell begun at 8 still.
+    for (double pressBeat : {5.5, 8.5}) {
+        auto lp = armed();
+        const int n = 600000;
+        const int press = static_cast<int>(pressBeat * 22050) / kChunk * kChunk, up = 450000 / kChunk * kChunk;
+        Buf L = ramp(n), R = ramp(n);
+        int waiting = 0, recording = 0, sawReady = -1;
+        for (size_t pos = 0; pos < L.size(); pos += kChunk) {
+            const int s = static_cast<int>(pos);
+            lp->set(recParams(s >= up ? 1.0f : 0.0f, 4.0, Looper::kNext, s >= press ? 1u : 0u), playing(120.0, s / 22050.0));
+            lp->process(&L[pos], &R[pos], kChunk);
+            const Looper::Status st = lp->status();
+            waiting += st.capture == 1;
+            recording += st.capture == 2;
+            if (sawReady < 0 && st.state == Looper::kKept) sawReady = s;
+        }
+        std::printf("  pressed at beat %.1f: waited %d chunks, recorded %d, kept at sample %d\n", pressBeat, waiting,
+                    recording, sawReady);
+        CHECK(sawReady >= 12 * 22050 && sawReady < 12 * 22050 + 2 * kChunk);   // ready as beat 12 ends the cell
+        CHECK(pressBeat < 8.0 ? waiting > 0 : waiting == 0);
+        CHECK(recording > 0);
+        double worst = 0.0;
+        for (int i = up + 2000; i < n; i += 53) {
+            const double into = std::fmod(i, 88200.0);
+            if (into < Looper::kFade + 2) continue;
+            worst = std::max(worst, std::fabs(index(L[static_cast<size_t>(i)]) - (176400.0 + into)));
+        }
+        std::printf("  plays frames 176400.. of the cell: worst %.3f\n", worst);
+        CHECK(worst < 0.5);
+    }
+}
+
+void recCancelAndUnarmed() {
+    std::printf("== looper: REC twice cancels; REC unarmed does nothing\n");
+    auto lp = armed();
+    const int n = 400000, p1 = 120000 / kChunk * kChunk, p2 = 130000 / kChunk * kChunk;
+    Buf L = ramp(n), R = ramp(n);
+    drive(*lp, L, R, playing(120.0), [&](int s) {
+        return recParams(0.0f, 4.0, Looper::kNext, s >= p2 ? 2u : s >= p1 ? 1u : 0u);
+    });
+    CHECK(!lp->hasLoop() && !lp->capturing());
+    auto un = armed();
+    Buf A = ramp(n), B = ramp(n);
+    drive(*un, A, B, playing(120.0), [&](int s) {
+        P p = recParams(0.0f, 4.0, Looper::kLast, s >= p1 ? 1u : 0u);
+        p.on = false;
+        return p;
+    });
+    CHECK(!un->hasLoop());
+}
+
+void recReplacesWhilePlaying() {
+    std::printf("== looper: a capture while a loop plays replaces it, crossfaded, on the grid\n");
+    auto lp = armed();
+    // A 1-bar loop grabbed at beat 5.5 (bar 0), playing; REC Next pressed at beat 9.5 (past the beat
+    // a late press may be: the cell 12..16), ready at beat 16: from there the loop is bar 3 (frames
+    // 264600..352800).
+    const int n = 520000, up = static_cast<int>(5.5 * 22050) / kChunk * kChunk;
+    const int press = static_cast<int>(9.5 * 22050) / kChunk * kChunk;
+    Buf L = sine(441.0, n, 0.5f), R = L;
+    Buf T = ramp(n), U = ramp(n);
+    auto at = [&](int s) { return recParams(s >= up ? 1.0f : 0.0f, 4.0, Looper::kNext, s >= press ? 1u : 0u, false); };
+    drive(*lp, T, U, playing(120.0), at);
+    double worst = 0.0;
+    for (int i = 16 * 22050 + 2000; i < n; i += 37) {
+        const double into = std::fmod(i, 88200.0);
+        if (into < Looper::kFade + 2) continue;
+        worst = std::max(worst, std::fabs(index(T[static_cast<size_t>(i)]) - (264600.0 + into)));
+    }
+    std::printf("  after the switch: worst %.3f\n", worst);
+    CHECK(worst < 0.5);
+    // A sine of whole cycles per bar: the switch is seamless, no click.
+    auto ls = armed();
+    drive(*ls, L, R, playing(120.0), at);
+    CHECK(maxStep(L, static_cast<size_t>(up + 2000)) < 0.0315f * 1.05f);
+}
+
+void layerKeepsLive() {
+    std::printf("== looper: Layer keeps the live input under the loop\n");
+    auto lp = armed();
+    const int n = 300000, e = 110016;
+    Buf L = ramp(n), R = ramp(n);
+    drive(*lp, L, R, playing(120.0), [&](int s) {
+        P p = params(s >= e ? 1.0f : 0.0f);
+        p.layer = true;
+        return p;
+    });
+    double worst = 0.0;
+    for (int i = e + 2000; i < n; i += 61) {
+        if (std::fmod(i, 88200.0) < Looper::kFade + 2) continue;
+        worst = std::max(worst, std::fabs(index(L[static_cast<size_t>(i)]) - (i + std::fmod(i, 88200.0))));
+    }
+    std::printf("  live + loop: worst %.3f\n", worst);
+    CHECK(worst < 0.5);
+}
+
+void recSurvivesASequenceLoop() {
+    std::printf("== looper: a sequence looping back while REC waits doesn't lose the capture\n");
+    auto lp = armed();
+    // The sequence is 2 bars (8 beats) long and loops; REC Next for 1 bar pressed at beat 6.5: the
+    // next line is beat 8, which the sequence reaches as beat 0 again. The capture counts samples.
+    const int n = 400000, press = static_cast<int>(6.5 * 22050) / kChunk * kChunk;
+    Buf L = ramp(n), R = ramp(n);
+    for (size_t pos = 0; pos < L.size(); pos += kChunk) {
+        const int s = static_cast<int>(pos);
+        lp->set(recParams(0.0f, 4.0, Looper::kNext, s >= press ? 1u : 0u), playing(120.0, std::fmod(s / 22050.0, 8.0)));
+        lp->process(&L[pos], &R[pos], kChunk);
+    }
+    CHECK(lp->hasLoop() && lp->loopFrames() == 88200);
 }
 
 void locateBackOnTheGrid() {
@@ -449,6 +597,12 @@ void looperTests() {
     seamless();
     slowTempoHalves();
     longLoopSurvivesTheRing();
+    recLast();
+    recNext();
+    recCancelAndUnarmed();
+    recReplacesWhilePlaying();
+    layerKeepsLive();
+    recSurvivesASequenceLoop();
     locateBackOnTheGrid();
     stoppedRunsOn();
     nanAndExtremes();

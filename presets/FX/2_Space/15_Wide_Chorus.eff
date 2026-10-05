@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Wide Chorus
+chr_on=On
+chr_mode=Dimension
+chr_depth=0.7
+chr_width=1
+chr_mix=0.5

@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Plate Splash
+rev_on=On
+rev_mode=Plate
+rev_decay=2.5
+rev_pre=0.03
+rev_mix=0.5

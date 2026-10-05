@@ -328,7 +328,7 @@ button("rnd", "Random Pick")
 # looper"). Appended after everything else, so every index before stays where it was. ---
 SCENES = 8
 SCENE_NAMES = [str(k) for k in range(1, SCENES + 1)]
-LOOP_LENGTHS = ["1/16", "1/8", "1/4", "1/2", "1 bar", "2 bars", "4 bars"]   # dsp/looper.h kLoopLens
+LOOP_LENGTHS = ["1/16", "1/8", "1/4", "1/2", "1 bar", "2 bars", "4 bars", "8 bars"]   # dsp/looper.h kLoopLens
 LOOP_REPEATS = ["Off", "1/2", "1/4", "1/8", "1/16", "1/32"]                 # dsp/looper.h kLoopReps
 num("xfade", "Crossfader", "lin", 0, 1, 0, "pct")   # 0 = scene A, 1 = scene B: learn it to the Force's fader
 enum("scene_a", "Scene A", SCENE_NAMES, "1")
@@ -351,6 +351,17 @@ enum("lp_rep", "Loop Repeat", LOOP_REPEATS, "Off")
 popup_flag("lp_rep")
 num("lp_speed", "Loop Speed", "lin", -1, 2, 1, "mult")
 enum("lp_hold", "Loop Hold", ON_OFF, "Off")
+enum("lp_capture", "Loop Capture", ["Last", "Next"], "Next")   # REC takes the cell just played, or the coming one
+button("lp_rec", "Loop Rec")
+enum("lp_blend", "Loop Blend", ["Swap", "Layer"], "Swap")    # Loop crossfades live and loop, or lays the loop on top
+readout("lp_info", "Looper Info")
+# The FX library (presets/FX, tools/make_fx.py): a bank of effects as tiles; a tap puts one in scene B.
+FX_TILES = 16
+for k in range(1, FX_TILES + 1):
+    tile("fx_%d" % k, "FX %d" % k)
+button("fx_prev", "FX Bank Prev")
+button("fx_next", "FX Bank Next")
+readout("fx_bank", "FX Bank")
 
 # How a scene's lock moves with the fader (plugin/scenes.h SceneMorph): never locked; a straight line in
 # the knob's 0..1 space (continuous knobs, and ordered steps: an enum's value is its index / (options - 1),
@@ -439,7 +450,7 @@ KNOB_SIZES = {"big": 30, "small": 22}
 KNOB_STYLES = {r - b: {"bipolar": bool(b), "track": 4 if r - b >= 28 else 3, "pointer": 3.0 if r - b >= 28 else 2.5}
                for r in KNOB_SIZES.values() for b in (0, 1)}
 BIPOLAR_EXTRA = ()                                # every bipolar knob here has a symmetric range
-PRIMARY_BUTTONS = ("pre_save",)                   # drawn in the accent colour by skin_polish.py
+PRIMARY_BUTTONS = ("pre_save", "lp_rec")                   # drawn in the accent colour by skin_polish.py
 FRAMES = 128                                      # shadow_skin: every filmstrip has 128 frames
 PARAMS = {p["key"]: p for p in P}
 
@@ -583,10 +594,11 @@ def build_layout():
         L.knob(cx, R2 + 126, k)
 
     # PERFORM (docs/DESIGN.md "Performance: scenes and the looper"): the scene at each end of the
-    # crossfader, EDIT A / B and CLEAR, the fader (its knob, its bar); the looper. The first Q-Link is the
-    # fader; the Force's own crossfader can be learned to it (ASSIGN A / B).
-    L.page("PERFORM", bank(("xfade", "scene_a", "scene_b"), pad=("mac_1", "mac_2", "mac_3", "mac_4", "mix"))
-           + ["lp_mix", "lp_speed", "lp_len", "lp_rep", "lp_hold", "lp_pos", "lp_on"])
+    # crossfader, EDIT A / B and CLEAR, the fader (its knob, its bar); the FX library, a bank of effects as
+    # tiles: a tap puts one in scene B. The first Q-Link is the fader; the Force's own crossfader can be
+    # learned to it (ASSIGN A / B).
+    L.page("PERFORM", ["xfade", "scene_a", "scene_b", "lp_mix", "lp_len", "lp_rep", "lp_speed", "mix",
+                       "mac_1", "mac_2", "mac_3", "mac_4", "in_gain", "out_gain"])
     L.header(status_w=700)
     L.stepper(998, 121, 516, "preset")
     L.card(24, R1, 1232, 270, "SCENES")
@@ -599,15 +611,36 @@ def build_layout():
     L.button(880, 392, "CLEAR", "scn_clear")
     L.knob(1090, 262, "xfade")
     L.readout(1100, 392, 280, "xf_bar", h=36)
-    L.card(24, R2, 1232, 270, "LOOPER")
-    on_seg(L, S8[0], R2, "lp_on")
-    L.vseg(S8[1], R2 + 160, "lp_pos", sw=110, label="PLACE")
-    L.knob(S8[2], R2 + 126, "lp_mix")
-    L.knob(S8[3], R2 + 126, "lp_speed")
-    for cx, label, key in ((S8[4], "LENGTH", "lp_len"), (S8[5], "REPEAT", "lp_rep")):
-        L.text(cx, R2 + 82, label)
-        L.popup(cx, R2 + 126, 140, key)
-    L.vseg(S8[6], R2 + 160, "lp_hold", sw=110, label="HOLD")
+    L.card(24, R2, 1232, 270, "FX")
+    L.tiles(44, 490, 1192, 8, 2, 48, 8, "fx")
+    L.button(124, 650, "< BANK", "fx_prev")
+    L.readout(640, 650, 820, "fx_bank", h=36)
+    L.button(1156, 650, "BANK >", "fx_next")
+
+    # LOOPER: the Octatrack's recorder. REC takes the coming cell of Length on the grid (or, Capture Last,
+    # the one just played) and keeps it; Loop plays it, Swap crossfading the live input, Layer on top of
+    # it; Repeat rolls it, Speed slows, stops or reverses it.
+    L.page("LOOPER", ["lp_len", "lp_capture", "lp_hold", "lp_pos", "lp_on", "scene_b", "mix", "out_gain",
+                      "lp_mix", "lp_blend", "lp_rep", "lp_speed", "xfade"])
+    L.header(status_w=700)
+    L.stepper(998, 121, 516, "preset")
+    L.card(24, R1, 1232, 270, "LOOPER")
+    on_seg(L, S8[0], R1, "lp_on")
+    L.vseg(S8[1], R1 + 160, "lp_pos", sw=110, label="PLACE")
+    L.text(S8[2] + 76, R1 + 82, "LENGTH")
+    L.popup(S8[2] + 76, R1 + 126, 140, "lp_len")
+    L.vseg(S8[4], R1 + 160, "lp_capture", sw=110, label="CAPTURE")
+    L.button(S8[5] + 60, R1 + 126, "REC", "lp_rec")
+    L.vseg(S8[7], R1 + 160, "lp_hold", sw=110, label="HOLD")
+    L.readout(640, R1 + 226, 1192, "lp_info", h=36)
+    L.card(24, R2, 1232, 270, "PLAY")
+    L.knob(S8[0], R2 + 126, "lp_mix")
+    L.vseg(S8[1], R2 + 160, "lp_blend", sw=110, label="BLEND")
+    L.text(S8[2] + 20, R2 + 82, "REPEAT")
+    L.popup(S8[2] + 20, R2 + 126, 140, "lp_rep")
+    L.knob(S8[3] + 40, R2 + 126, "lp_speed")
+    L.knob(S8[5], R2 + 126, "xfade")
+    L.readout(S8[6] + 76, R2 + 126, 280, "xf_bar", h=36)
 
     # The browser has no knobs of its own: the Q-Links keep the preset stepper, the macros and the levels.
     L.page("PRESETS",["preset", "mac_1", "mac_2", "mac_3", "mac_4", "in_gain", "out_gain", "mix"])
@@ -1300,6 +1333,8 @@ def check_preset_line(params, key, val):
     if scene:
         if not 1 <= int(scene.group(1)) <= SCENES:
             return "%r: scenes are 1..%d" % (key, SCENES)
+        if scene.group(2) == "name":   # what the scene was made from (an effect of the FX library)
+            return None if 0 < len(val) <= FX_NAME_MAX else "%r: a scene's name of 1..%d characters" % (key, FX_NAME_MAX)
         if scene.group(2) not in params or scene_morph(params[scene.group(2)]) == "None":
             return "%r: a scene can't lock %s" % (key, scene.group(2))
         key = scene.group(2)
@@ -1402,6 +1437,67 @@ constexpr int kNumFactoryPresets = %d;
 """ % (rows, len(presets))
 
 
+# --- the FX library: presets/FX/<N_Bank>/<NN_Name>.eff, embedded in the .so --------------------------
+FX_DIR = os.path.join(HERE, "..", "presets", "FX")
+FX_NAME_MAX = 14   # an FX tile (1192 px / 8 columns)
+
+
+def fx_library():
+    """[(bank, name, text)]: a folder per bank (at most FX_TILES each), in file order. A file is
+    "effectforce-fx 1", "name=<name>" and lines a scene can lock (checked like a preset's); names unique and
+    short enough for a tile."""
+    params = {p["key"]: p for p in P}
+    out, errors, names = [], [], set()
+    for d in sorted(os.listdir(FX_DIR)) if os.path.isdir(FX_DIR) else []:
+        folder = os.path.join(FX_DIR, d)
+        if not os.path.isdir(folder):
+            continue
+        bank_name = _shown(d)
+        files = [f for f in sorted(os.listdir(folder)) if f.endswith(".eff")]
+        if len(files) > FX_TILES:
+            errors.append("%s: %d effects, a bank holds %d" % (d, len(files), FX_TILES))
+        for f in files:
+            where = "%s/%s" % (d, f)
+            text = open(os.path.join(folder, f), encoding="utf-8").read().replace("\r\n", "\n")
+            lines = [l for l in text.split("\n") if l.strip()]
+            if not lines or lines[0] != "effectforce-fx 1":
+                errors.append("%s: no 'effectforce-fx 1' header" % where)
+                continue
+            name = lines[1].partition("=")[2] if len(lines) > 1 and lines[1].startswith("name=") else ""
+            if not 0 < len(name) <= FX_NAME_MAX or name in names:
+                errors.append("%s: needs a unique name= of 1..%d characters" % (where, FX_NAME_MAX))
+            names.add(name)
+            for n, line in enumerate(lines[2:], 3):
+                key, _, val = line.partition("=")
+                bad = check_preset_line(params, key, val)
+                if not bad and scene_morph(params[key]) == "None":
+                    bad = "%s can't be locked in a scene" % key
+                if bad:
+                    errors.append("%s:%d: %s" % (where, n, bad))
+            out.append((bank_name, name, text))
+    if errors:
+        raise SystemExit("FX library:\n  " + "\n  ".join(errors))
+    return out
+
+
+def fx_header(fx):
+    rows = ",\n".join("    {%s, %s, %s}" % (c_str(b), c_str(n), c_str(t).replace("\n", "\\n")) for b, n, t in fx)
+    return """// generated by surface/surface.py from presets/FX/*/*.eff: do not edit
+#pragma once
+
+namespace ef {
+
+struct FxEffect { const char* bank; const char* name; const char* text; };
+static const FxEffect kFxLibrary[] = {
+%s
+};
+constexpr int kNumFx = %d;
+constexpr int kFxPerBank = %d;
+
+} // namespace ef
+""" % (rows, len(fx), FX_TILES)
+
+
 def perform_header():
     """The performance layer's part of param_ids.h: how each parameter's scene lock moves with the fader."""
     morph = ", ".join("SceneMorph::%s" % scene_morph(p) for p in P)
@@ -1430,12 +1526,14 @@ def main():
     layout = pages()
     check_layout(layout, build_layout().groups)
     presets = factory_presets()   # everything checked before anything is written
+    fx = fx_library()
     outputs = [
         ("params.json", json.dumps(params_json(), indent=1)),
         ("layout.conf", layout),
         ("vst.json", json.dumps(VST, indent=1)),
         (os.path.join("build", "skin_style.json"), json.dumps(skin_style(), indent=1)),
         (os.path.join("build", "factory_presets.h"), presets_header(presets)),
+        (os.path.join("build", "fx_library.h"), fx_header(fx)),
         (os.path.join("build", "param_ids.h"), header() + perform_header()),   # last: make's target, newer than the rest
     ]
     os.makedirs(os.path.join(HERE, "build"), exist_ok=True)
@@ -1444,7 +1542,7 @@ def main():
         with open(path + ".tmp", "w", newline="\n") as f:
             f.write(text)
         os.replace(path + ".tmp", path)
-    print("surface: %d parameters, layout ok, %d factory presets" % (len(P), len(presets)))
+    print("surface: %d parameters, layout ok, %d factory presets, %d effects" % (len(P), len(presets), len(fx)))
 
 
 if __name__ == "__main__":

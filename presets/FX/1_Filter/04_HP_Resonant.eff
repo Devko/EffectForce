@@ -1,0 +1,6 @@
+effectforce-fx 1
+name=HP Resonant
+flt_on=On
+flt_type=HP 24
+flt_cut=2500
+flt_res=0.7

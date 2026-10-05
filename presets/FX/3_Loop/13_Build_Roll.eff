@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Build Roll
+lp_mix=1
+lp_rep=1/32
+flt_on=On
+flt_type=HP 24
+flt_cut=2500
+rev_on=On
+rev_mix=0.4

@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Crush Filter
+drv_on=On
+drv_type=Crush
+drv_amt=20
+flt_on=On
+flt_type=LP 24
+flt_cut=800
+flt_res=0.5

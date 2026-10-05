@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Jet Flanger
+phs_on=On
+phs_mode=Flanger
+phs_sync=Free
+phs_rate=0.2
+phs_depth=0.9
+phs_fb=0.85
+phs_mix=0.6

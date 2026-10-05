@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Echo Throw
+dly_on=On
+dly_sync=Sync
+dly_div=1/8
+dly_fb=0.65
+dly_mix=0.5

@@ -3245,7 +3245,8 @@
     "1/2",
     "1 bar",
     "2 bars",
-    "4 bars"
+    "4 bars",
+    "8 bars"
    ],
    "default": "1 bar"
   },
@@ -3300,6 +3301,224 @@
     "On"
    ],
    "default": "Off"
+  },
+  {
+   "key": "lp_capture",
+   "name": "Loop Capture",
+   "options": [
+    "Last",
+    "Next"
+   ],
+   "default": "Next"
+  },
+  {
+   "key": "lp_rec",
+   "name": "Loop Rec",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "lp_blend",
+   "name": "Loop Blend",
+   "options": [
+    "Swap",
+    "Layer"
+   ],
+   "default": "Swap"
+  },
+  {
+   "key": "lp_info",
+   "name": "Looper Info",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
+  },
+  {
+   "key": "fx_1",
+   "name": "FX 1",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_2",
+   "name": "FX 2",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_3",
+   "name": "FX 3",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_4",
+   "name": "FX 4",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_5",
+   "name": "FX 5",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_6",
+   "name": "FX 6",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_7",
+   "name": "FX 7",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_8",
+   "name": "FX 8",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_9",
+   "name": "FX 9",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_10",
+   "name": "FX 10",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_11",
+   "name": "FX 11",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_12",
+   "name": "FX 12",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_13",
+   "name": "FX 13",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_14",
+   "name": "FX 14",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_15",
+   "name": "FX 15",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_16",
+   "name": "FX 16",
+   "options": [
+    "-",
+    "On"
+   ],
+   "default": "-",
+   "display": "string"
+  },
+  {
+   "key": "fx_prev",
+   "name": "FX Bank Prev",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "fx_next",
+   "name": "FX Bank Next",
+   "min": 0,
+   "max": 1,
+   "momentary": true,
+   "type": "trigger"
+  },
+  {
+   "key": "fx_bank",
+   "name": "FX Bank",
+   "min": 0,
+   "max": 0,
+   "display": "string",
+   "type": "readout"
   }
  ]
 }

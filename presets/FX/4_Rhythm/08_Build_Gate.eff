@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Build Gate
+pls_on=On
+pls_mode=Gate
+pls_div=1/16
+pls_pattern=Build
+pls_length=0.6

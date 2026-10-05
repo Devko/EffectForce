@@ -1,0 +1,12 @@
+effectforce-fx 1
+name=Wobble 1/8
+flt_on=On
+flt_type=LP 24
+flt_cut=500
+flt_res=0.5
+l2_sync=Sync
+l2_div=1/8
+l2_wave=Triangle
+m8_src=LFO 2
+m8_dst=Filter Cutoff
+m8_amt=0.45

@@ -1,0 +1,8 @@
+effectforce-fx 1
+name=Comb Riser
+phs_on=On
+phs_mode=Flanger
+phs_depth=0
+phs_center=0.95
+phs_fb=0.95
+phs_mix=0.7

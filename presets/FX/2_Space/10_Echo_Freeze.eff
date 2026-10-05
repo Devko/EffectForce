@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Echo Freeze
+dly_on=On
+dly_sync=Sync
+dly_div=1/16
+dly_fb=1
+dly_mix=0.6

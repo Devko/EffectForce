@@ -81,6 +81,15 @@ public:
     // What the state saves for a parameter: while a scene is edited, the knob, not the scene.
     float       stateValue(int i) const;
 
+    // Each scene's name: the effect of the FX library it was made from, "*" added once it is edited.
+    const std::string& sceneName(int scene) const;
+    void        setSceneName(int scene, const std::string& name);
+
+    // The looper's REC presses so far (the engine captures on a change); any thread.
+    uint32_t    loopRecs() const { return loopRecs_.load(std::memory_order_acquire); }
+    // The texts changed underneath (the looper's line, from the audio thread): MPC redraws them.
+    void        textsChanged() { textGen_.fetch_add(1, std::memory_order_release); }
+
     static int  kFine;   // ranges with this many steps or more follow MPC's value
     // Milliseconds for telling gestures apart (null: the steady clock). Tests set one that only
     // moves when they say, so stepping doesn't depend on how fast the machine is.
@@ -98,6 +107,7 @@ private:
     void browserAction(int i);
     void chainAction(int i);   // a slot tile, MOVE < / >, ON / OFF
     void sceneAction(int i);   // EDIT A / B, a scene tile, CLEAR
+    void fxAction(int i);      // an FX tile (into scene B, or the scene being edited), the bank arrows
     void startEdit(int side);
     void loadEdited();         // the edited scene's locks onto the knobs (the knobs hold the base)
     int  sceneOf(int side) const;
@@ -143,6 +153,9 @@ private:
     float                    editBase_[P_COUNT] = {};
     static constexpr int     kFaderBarWidth = 24;   // the fader's bar: this many steps from A to B
     int                      shownBar_ = 0;         // where it was when MPC last redrew it
+    std::atomic<uint32_t>    loopRecs_{0};
+    std::string              sceneName_[kNumScenes];
+    int                      fxBank_ = 0;           // the FX library's bank on the tiles
 
     // Every write of a value MPC should see goes through here.
     void put(int i, float v) {

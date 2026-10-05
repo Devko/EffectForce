@@ -1,0 +1,11 @@
+effectforce-fx 1
+name=Destroy
+drv_on=On
+drv_type=Hard
+drv_amt=36
+flt_on=On
+flt_type=HP 12
+flt_cut=200
+cmp_on=On
+cmp_mode=OTT
+ott_depth=0.8

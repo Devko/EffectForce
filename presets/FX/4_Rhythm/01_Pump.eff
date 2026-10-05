@@ -1,0 +1,8 @@
+effectforce-fx 1
+name=Pump
+pls_on=On
+pls_mode=Gate
+pls_div=1/4
+pls_pattern=Pump
+pls_length=0.7
+pls_smooth=0.02

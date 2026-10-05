@@ -19,4 +19,10 @@ bool isStateText(const std::string& text);   // "effectforce <version >= 1>" (a 
 // only overrides what it lists. False if it isn't EffectForce state.
 bool loadState(Surface& s, const std::string& text, bool asPreset);
 
+// An effect of the FX library (or any scene's key=value lines) into one scene: it locks what the text
+// names and nothing else (what the scene locked before and the text doesn't name is unlocked, after
+// the new locks are in, so the engine never plays the scene half empty). Returns the text's name=
+// ("" if none); `looper` says whether it uses the looper (lp_ keys).
+std::string loadSceneText(Scenes& sc, int scene, const std::string& text, bool* looper = nullptr);
+
 } // namespace ef

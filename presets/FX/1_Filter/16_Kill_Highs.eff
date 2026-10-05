@@ -1,0 +1,4 @@
+effectforce-fx 1
+name=Kill Highs
+eq_on=On
+eq_hc=1500

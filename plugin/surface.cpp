@@ -1,5 +1,6 @@
 #include "surface.h"
 
+#include "fx_library.h"
 #include "rack_map.h"
 #include "presets.h"
 #include "state.h"
@@ -8,6 +9,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 
 namespace ef {
@@ -134,6 +136,8 @@ void Surface::set(int i, float n) {
     bool texts = k != Kind::Synth || isModuleOn(i);
     if (editSide_ >= 0 && Scenes::lockable(i)) {   // editing a scene: what MPC sets is locked in it
         scenes_.lock(editScene_, i, want_[i].load());
+        std::string& name = sceneName_[editScene_];
+        if (!name.empty() && name.back() != '*') name += '*';   // no longer the effect as it came
         texts = true;
     }
     if (i == P_SCENE_A || i == P_SCENE_B) {   // another scene at an end (a Q-Link): the edit follows it
@@ -221,6 +225,11 @@ void Surface::apply(int i, float n) {
             if (i == P_CAT_PREV || i == P_CAT_NEXT || i == P_ITEM_PREV || i == P_ITEM_NEXT || i == P_RND) browserAction(i);
             if (i == P_MOVE_L || i == P_MOVE_R || i == P_SEL_ON) chainAction(i);
             if (i == P_SCN_CLEAR) sceneAction(i);
+            if (i == P_FX_PREV || i == P_FX_NEXT) fxAction(i);
+            if (i == P_LP_REC) {   // a loop to keep: Hold on, and the engine captures on the count's change
+                put(P_LP_HOLD, 1.0f);
+                loopRecs_.fetch_add(1, std::memory_order_acq_rel);
+            }
             break;
         case Kind::Tile:
         case Kind::Toggle: {
@@ -231,6 +240,7 @@ void Surface::apply(int i, float n) {
             else if (i == P_EDIT_A || i == P_EDIT_B || (i >= P_SCA_1 && i < P_SCA_1 + kNumScenes) ||
                      (i >= P_SCB_1 && i < P_SCB_1 + kNumScenes))
                 sceneAction(i);
+            else if (i >= P_FX_1 && i < P_FX_1 + kFxPerBank) fxAction(i);
             else browserAction(i);
             break;
         }
@@ -466,18 +476,75 @@ void Surface::sceneAction(int i) {
         for (int p = 0; p < P_COUNT; ++p)
             if (scenes_.locked(editScene_, p)) put(p, editBase_[p]);
         scenes_.clear(editScene_);
+        sceneName_[editScene_].clear();
     }
+}
+
+const std::string& Surface::sceneName(int scene) const {
+    static const std::string none;
+    return scene >= 0 && scene < kNumScenes ? sceneName_[scene] : none;
+}
+
+void Surface::setSceneName(int scene, const std::string& name) {
+    if (scene >= 0 && scene < kNumScenes) sceneName_[scene] = name.substr(0, 32);
+}
+
+static_assert(P_FX_16 - P_FX_1 == kFxPerBank - 1, "the FX tiles must be in order, one per effect of a bank");
+
+namespace {
+int fxBanks() {
+    int banks = 0;
+    for (int k = 0; k < kNumFx; ++k)
+        if (k == 0 || std::strcmp(kFxLibrary[k].bank, kFxLibrary[k - 1].bank) != 0) ++banks;
+    return banks;
+}
+// The library's effect at tile `tile` of bank `bank`, or -1.
+int fxAt(int bank, int tile) {
+    int b = -1, t = 0;
+    for (int k = 0; k < kNumFx; ++k) {
+        if (k == 0 || std::strcmp(kFxLibrary[k].bank, kFxLibrary[k - 1].bank) != 0) {
+            ++b;
+            t = 0;
+        }
+        if (b == bank && t == tile) return k;
+        ++t;
+    }
+    return -1;
+}
+}
+
+void Surface::fxAction(int i) {
+    const int banks = fxBanks();
+    if (i == P_FX_PREV || i == P_FX_NEXT) {   // the banks go round
+        if (banks > 0) fxBank_ = (fxBank_ + (i == P_FX_NEXT ? 1 : banks - 1)) % banks;
+        return;
+    }
+    const int k = fxAt(fxBank_, i - P_FX_1);
+    if (k < 0) return;
+    // Into the scene being edited, or else the one at the fader's B end.
+    const int target = editSide_ >= 0 ? editScene_ : sceneOf(1);
+    bool looper = false;
+    sceneName_[target] = loadSceneText(scenes_, target, kFxLibrary[k].text, &looper);
+    if (looper) put(P_LP_ON, 1.0f);   // an effect of the looper arms it (the plugin makes its buffers)
+    if (editSide_ >= 0) loadEdited();   // the knobs show the scene as it is now
 }
 
 std::string Surface::sceneInfo() const {
     char b[96];
     if (editSide_ >= 0) {
-        std::snprintf(b, sizeof b, "EDIT %c: SCENE %d, %d LOCKS. WHAT YOU MOVE IS LOCKED", 'A' + editSide_, editScene_ + 1,
-                      scenes_.count(editScene_));
+        const std::string name = sceneName_[editScene_].empty() ? "" : " " + upper(sceneName_[editScene_]);
+        std::snprintf(b, sizeof b, "EDIT %c: SCENE %d%s, %d LOCKS. WHAT YOU MOVE IS LOCKED", 'A' + editSide_,
+                      editScene_ + 1, name.c_str(), scenes_.count(editScene_));
     } else {
         const int a = sceneOf(0), c = sceneOf(1);
-        std::snprintf(b, sizeof b, "A: SCENE %d, %d LOCKS     B: SCENE %d, %d LOCKS", a + 1, scenes_.count(a), c + 1,
-                      scenes_.count(c));
+        // A scene by its name (the effect it came from), or by how many settings it locks.
+        const auto said = [this](int sc) {
+            std::string t = "SCENE " + std::to_string(sc + 1);
+            if (!sceneName_[sc].empty()) return t + " " + upper(sceneName_[sc]);
+            const int n = scenes_.count(sc);
+            return n ? t + ", " + std::to_string(n) + " LOCKS" : t + ", CLEAN";
+        };
+        return "A: " + said(a) + "     B: " + said(c);
     }
     return b;
 }
@@ -635,6 +702,20 @@ void Surface::refresh() {
     put(P_EDIT_B, editSide_ == 1 ? 1.0f : 0.0f);
     t[P_SCN_INFO] = sceneInfo();
     t[P_XF_BAR] = faderBar();
+    // The FX tiles: the bank's effects, lit = the one in scene B as it came.
+    const int banks = fxBanks();
+    fxBank_ = banks > 0 ? clampi(fxBank_, 0, banks - 1) : 0;
+    const std::string& inB = sceneName_[sceneOf(1)];
+    for (int k = 0; k < kFxPerBank; ++k) {
+        const int fx = fxAt(fxBank_, k);
+        put(P_FX_1 + k, fx >= 0 && inB == kFxLibrary[fx].name ? 1.0f : 0.0f);
+        t[static_cast<size_t>(P_FX_1 + k)] = fx >= 0 ? upper(kFxLibrary[fx].name) : "";
+    }
+    const int first = fxAt(fxBank_, 0);
+    const int into = editSide_ >= 0 ? editScene_ : sceneOf(1);
+    t[P_FX_BANK] = first >= 0 ? "BANK " + std::to_string(fxBank_ + 1) + " / " + std::to_string(banks) + ": " +
+                                    upper(kFxLibrary[first].bank) + "   A TAP PUTS IT IN SCENE " + std::to_string(into + 1)
+                              : "";
 
     char b[64];
     std::snprintf(b, sizeof b, "PAGE %d / %d", itemPage_ + 1, itemPages);

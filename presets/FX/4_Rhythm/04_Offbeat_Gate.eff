@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Offbeat Gate
+pls_on=On
+pls_mode=Gate
+pls_div=1/8
+pls_pattern=Offbeat
+pls_length=0.7

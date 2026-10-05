@@ -22,6 +22,7 @@ public:
     void setParams(const float* norm);   // a new snapshot of every parameter (0..1)
     void attachScenes(const Scenes* s);  // the scenes' locks (null: none); before the first render
     bool armLooper();                    // UI thread: the looper's buffers, once (Looper::allocate)
+    void setLoopRec(uint32_t presses);   // REC presses so far (the surface counts them); a change captures
     void reset();                        // clears every tail and modulation source
     void seed(uint32_t s);               // the LFOs' random values (S&H, Smooth)
     // In place, any n: chunks of kChunk with the transport advanced for each.
@@ -62,6 +63,7 @@ private:
     int nLocks_ = 0;
     float x_ = 0.0f, xTarget_ = 0.0f;
     bool xFresh_ = true;
+    uint32_t loopRec_ = 0;
     float src_[MS_COUNT] = {};   // each source's value from the chunk before
     struct Slot {
         int src, param;

@@ -255,6 +255,8 @@ void setField(RackPatch& p, int id, float v) {
         case P_LP_REP: p.looper.repeatBeats = kLoopReps[std::clamp(opt, 0, kNumLoopReps - 1)].beats; break;
         case P_LP_SPEED: p.looper.speed = v; break;
         case P_LP_HOLD: p.looper.hold = on; break;
+        case P_LP_CAPTURE: p.looper.capture = opt == 1 ? Looper::kNext : Looper::kLast; break;
+        case P_LP_BLEND: p.looper.layer = opt == 1; break;
 
         case P_ENV_ATT: p.envAttackS = v; break;
         case P_ENV_REL: p.envReleaseS = v; break;

@@ -153,6 +153,7 @@ void rackTests();
 void modTests();
 void chainTests();
 void scenesTests();
+void fxTests();
 void presetTests();
 
 } // namespace eft

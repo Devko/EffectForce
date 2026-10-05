@@ -48,6 +48,11 @@ void Engine::attachScenes(const Scenes* s) {
 
 bool Engine::armLooper() { return rack_.looper().allocate(); }
 
+void Engine::setLoopRec(uint32_t presses) {
+    loopRec_ = presses;
+    base_.looper.rec = presses;   // patch_ is base_ moved by the matrix: it follows each chunk
+}
+
 void Engine::setParams(const float* norm) {
     // The crossfader alone moved (the common case while it is played): no rebuild, the next chunks
     // glide to it.
@@ -87,6 +92,7 @@ void Engine::rebuild() {
     for (int k = 0; k < nLocks_; ++k)
         if (locks_[k].kind != SceneMorph::Send) norm_[locks_[k].param] = Scenes::morph(locks_[k].param, locks_[k].a, locks_[k].b, x_);
     base_ = patchFromParams(norm_);
+    base_.looper.rec = loopRec_;
     for (int k = 0; k < nLocks_; ++k)
         if (locks_[k].kind == SceneMorph::Send && locks_[k].module >= 0)
             base_.send[static_cast<size_t>(locks_[k].module)] = Scenes::send(locks_[k].a, locks_[k].b, x_);

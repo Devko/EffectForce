@@ -1,0 +1,6 @@
+effectforce-fx 1
+name=Bit Crush
+drv_on=On
+drv_type=Crush
+drv_amt=24
+drv_mix=1

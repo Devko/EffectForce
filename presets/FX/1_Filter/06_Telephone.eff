@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Telephone
+flt_on=On
+flt_type=BP
+flt_cut=1800
+flt_res=0.45
+drv_on=On
+drv_type=Soft
+drv_amt=14

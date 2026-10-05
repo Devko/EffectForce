@@ -1,0 +1,4 @@
+effectforce-fx 1
+name=Kill Lows
+eq_on=On
+eq_lc=300

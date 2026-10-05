@@ -1,0 +1,10 @@
+effectforce-fx 1
+name=Underwater
+flt_on=On
+flt_type=LP 12
+flt_cut=350
+flt_res=0.4
+chr_on=On
+chr_mode=Ensemble
+chr_depth=0.7
+chr_mix=0.5

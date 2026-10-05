@@ -35,7 +35,7 @@ MV       := third_party/mpc-vst-plugins
 SURF     := surface
 SURF_OUT := $(SURF)/build
 SKIN_DIR := $(SURF_OUT)/skin/Devko - VST - EffectForce
-GEN      := $(SURF_OUT)/param_ids.h $(SURF_OUT)/factory_presets.h
+GEN      := $(SURF_OUT)/param_ids.h $(SURF_OUT)/factory_presets.h $(SURF_OUT)/fx_library.h
 SKIN     := $(SURF_OUT)/skin.stamp
 
 SRC      := $(wildcard dsp/*.cpp) $(wildcard plugin/*.cpp)
@@ -65,6 +65,7 @@ surface: $(GEN)
 # The preset folders themselves too: their times change when a preset is deleted.
 # The fonts too: the layout check measures labels with them.
 $(GEN) &: $(SURF)/surface.py presets/Factory $(wildcard presets/Factory/*) $(wildcard presets/Factory/*/*.efp) \
+          presets/FX $(wildcard presets/FX/*) $(wildcard presets/FX/*/*.eff) \
           $(wildcard $(SURF)/fonts/*.ttf)   # one run writes both
 	python3 $(SURF)/surface.py
 

@@ -64,8 +64,8 @@ int savedParam(const std::string& key) {
     return -1;
 }
 
-// "scene3.flt_cut" -> scene 2 (0-based) and the parameter; false if the key isn't a scene's lock.
-bool sceneKey(const std::string& key, int& scene, int& param) {
+// "scene3.flt_cut" -> scene 2 (0-based) and what follows the dot; false if it isn't sceneN.something.
+bool sceneOf(const std::string& key, int& scene, std::string& rest) {
     if (key.compare(0, 5, "scene") != 0) return false;
     const size_t dot = key.find('.');
     if (dot == std::string::npos || dot == 5) return false;
@@ -73,8 +73,21 @@ bool sceneKey(const std::string& key, int& scene, int& param) {
     const auto r = std::from_chars(key.data() + 5, key.data() + dot, n);
     if (r.ec != std::errc() || r.ptr != key.data() + dot || n < 1 || n > kNumScenes) return false;
     scene = n - 1;
-    param = savedParam(key.substr(dot + 1));
+    rest = key.substr(dot + 1);
+    return true;
+}
+
+// A scene's lock: the scene and the parameter; false if the key isn't one.
+bool sceneKey(const std::string& key, int& scene, int& param) {
+    std::string rest;
+    if (!sceneOf(key, scene, rest)) return false;
+    param = savedParam(rest);
     return param >= 0 && Scenes::lockable(param);
+}
+
+bool sceneNameKey(const std::string& key, int& scene) {
+    std::string rest;
+    return sceneOf(key, scene, rest) && rest == "name";
 }
 } // namespace
 
@@ -96,13 +109,15 @@ std::string saveState(const Surface& s, bool asPreset) {
         out += valueText(i, s.stateValue(i));   // while a scene is edited: the knobs, not the scene
         out += '\n';
     }
-    // The scenes' locks: sceneN.key=value.
-    for (int sc = 0; sc < kNumScenes; ++sc)
+    // The scenes: each one's name (the effect it was made from), then its locks, sceneN.key=value.
+    for (int sc = 0; sc < kNumScenes; ++sc) {
+        if (!s.sceneName(sc).empty()) out += "scene" + std::to_string(sc + 1) + ".name=" + s.sceneName(sc) + "\n";
         for (int i = 0; i < P_COUNT; ++i) {
             const float n = s.scenes().value(sc, i);
             if (n < 0.0f) continue;
             out += "scene" + std::to_string(sc + 1) + "." + PARAM_INFO[i].key + "=" + valueText(i, n) + "\n";
         }
+    }
     if (!asPreset && !s.presetKey().empty()) out += "preset=" + s.presetKey() + "\n";
     return out;
 }
@@ -112,6 +127,7 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
     const std::string text = textIn.compare(0, 3, "\xEF\xBB\xBF") == 0 ? textIn.substr(3) : textIn;
     s.endEdit();               // a scene being edited: its knobs go back first
     s.scenes().clearAll();     // the state's scenes replace the ones there were (none listed: none)
+    for (int sc = 0; sc < kNumScenes; ++sc) s.setSceneName(sc, "");
     Surface::Batch batch(s);   // the audio thread never plays a half-loaded sound
     if (asPreset)
         for (int i = 0; i < P_COUNT; ++i)
@@ -133,6 +149,10 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
             continue;
         }
         int scene = 0, param = -1;
+        if (sceneNameKey(key, scene)) {
+            s.setSceneName(scene, val);
+            continue;
+        }
         if (sceneKey(key, scene, param)) {
             const float n = normOf(param, val);
             if (n >= 0.0f) s.scenes().lock(scene, param, n);
@@ -176,6 +196,37 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
     if (!asPreset) s.setPresetKey(preset);   // a project without one came from no preset
     s.refresh();
     return true;
+}
+
+std::string loadSceneText(Scenes& sc, int scene, const std::string& text, bool* looper) {
+    bool named[P_COUNT] = {};
+    std::string name;
+    if (looper) *looper = false;
+    size_t at = 0;
+    while (at < text.size()) {
+        size_t end = text.find('\n', at);
+        if (end == std::string::npos) end = text.size();
+        std::string line = text.substr(at, end - at);
+        at = end + 1;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string key = line.substr(0, eq), val = line.substr(eq + 1);
+        if (key == "name") {
+            name = val;
+            continue;
+        }
+        const int i = savedParam(key);
+        if (i < 0 || !Scenes::lockable(i)) continue;
+        const float n = normOf(i, val);
+        if (n < 0.0f) continue;
+        sc.lock(scene, i, n);
+        named[i] = true;
+        if (looper && key.compare(0, 3, "lp_") == 0) *looper = true;
+    }
+    for (int i = 0; i < P_COUNT; ++i)
+        if (!named[i] && sc.locked(scene, i)) sc.unlock(scene, i);
+    return name;
 }
 
 } // namespace ef

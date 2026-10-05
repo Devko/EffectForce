@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Lo-Fi Radio
+drv_on=On
+drv_type=Crush
+drv_amt=14
+flt_on=On
+flt_type=BP
+flt_cut=1500
+flt_res=0.35

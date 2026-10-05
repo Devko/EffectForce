@@ -1,0 +1,6 @@
+effectforce-fx 1
+name=Fold
+drv_on=On
+drv_type=Fold
+drv_amt=20
+drv_mix=0.7

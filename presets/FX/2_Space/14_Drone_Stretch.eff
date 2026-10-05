@@ -1,0 +1,8 @@
+effectforce-fx 1
+name=Drone Stretch
+grn_on=On
+grn_mode=Stretch
+grn_density=0.7
+grn_mix=0.7
+rev_on=On
+rev_mix=0.3

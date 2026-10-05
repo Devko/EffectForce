@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Punch Comp
+cmp_on=On
+cmp_mode=Comp
+cmp_thr=-30
+cmp_ratio=8
+cmp_att=0.003
+cmp_rel=0.08
+cmp_makeup=10

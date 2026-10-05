@@ -1,0 +1,8 @@
+effectforce-fx 1
+name=Ping-Pong 1/4
+dly_on=On
+dly_mode=Ping-Pong
+dly_sync=Sync
+dly_div=1/4
+dly_fb=0.6
+dly_mix=0.45

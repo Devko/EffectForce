@@ -1,0 +1,9 @@
+effectforce-fx 1
+name=Auto Wah
+flt_on=On
+flt_type=BP
+flt_cut=400
+flt_res=0.6
+m8_src=Envelope
+m8_dst=Filter Cutoff
+m8_amt=0.6

@@ -256,6 +256,7 @@ int main() {
     testLists();
     chainTests();
     scenesTests();
+    fxTests();
     presetTests();
     testStress();
 

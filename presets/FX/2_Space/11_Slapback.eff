@@ -1,0 +1,7 @@
+effectforce-fx 1
+name=Slapback
+dly_on=On
+dly_sync=Free
+dly_time=0.09
+dly_fb=0.1
+dly_mix=0.4

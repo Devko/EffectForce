@@ -1,0 +1,6 @@
+effectforce-fx 1
+name=HP Sweep
+flt_on=On
+flt_type=HP 24
+flt_cut=1500
+flt_res=0.25

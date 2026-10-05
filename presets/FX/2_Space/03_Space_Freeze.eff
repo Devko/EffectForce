@@ -1,0 +1,8 @@
+effectforce-fx 1
+name=Space Freeze
+rev_on=On
+rev_mode=Space
+rev_size=0.9
+rev_decay=12
+rev_freeze=On
+rev_mix=0.8
