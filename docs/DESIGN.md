@@ -7,6 +7,7 @@ disagree, fix one of them.
 - [The rack](#the-rack)
 - [Modules](#modules)
 - [Modulation](#modulation)
+- [Performance: scenes and the looper](#performance-scenes-and-the-looper)
 - [Pages](#pages)
 - [Presets](#presets)
 - [Budget](#budget)
@@ -98,6 +99,100 @@ LFOs `1/16 … 16 bars` (14 values), each with triplets and dotted values where 
   phaser runs free). Modulation adds
   `amount × source` to the target's 0..1 value, clamped, so it follows the knob's own curve
   (log for frequencies, and so on). Computed per 32-sample chunk; modules smooth from there.
+
+## Performance: scenes and the looper
+
+The Octatrack's performance-mixer setup, in one insert (on the master, or any track): the rack's
+modules as the effects, two **scenes** at the ends of a **crossfader**, and a **looper** that grabs
+what just played and plays it on the beat. The Force's own crossfader drives it: MPC can learn any
+automatable parameter to it (hold ASSIGN A or B and move the parameter), so `xfade` is an ordinary
+parameter, also on a Q-Link and on the PERFORM page.
+
+### Scenes
+
+- **Eight scenes**, each a set of **locks**: a parameter and the value it takes in that scene.
+  `scene_a` and `scene_b` pick the scene at each end of the fader; `xfade` 0 is A, 1 is B. Changing
+  the scene at the end the fader is away from is silent (the DJ's way to line up the next move).
+- **What a parameter plays** at fader position x: `a` = its lock in scene A, or the knob if A
+  doesn't lock it; `b` the same for B; then by kind:
+
+  | Kind | Morph |
+  |---|---|
+  | Continuous (lin, log, pow, int) | `a + (b - a) x` in the knob's 0..1 space, so it follows the knob's curve |
+  | Ordered steps (sync divisions, loop length, repeat) | the index walks from a to b step by step (a roll speeds up as the fader moves) |
+  | Other options and switches (types, modes, sync, freeze, hold, matrix routing) | `a` below the middle, `b` from it |
+  | A module's On | a **send**, below |
+
+- **A module switched by the fader** (On in one scene, Off in the other, or locked On against a
+  knob that is Off) runs while either end has it on, and the fader moves its input level s from
+  0 (the Off end) to 1 (the On end): out = in (1 - s) + module(in s). At the On end that is exactly
+  the module; at the Off end the input passes and the module's **tail rings out** (a delay throw,
+  a reverb wash). Once s has been 0 for the module's tail time it stops (no CPU) until s rises.
+  A module that no scene switches keeps send 1: today's rack, bit for bit.
+- **Not lockable:** the fader and the scene picks, the edit switches, Looper On (it arms the
+  recorder, which must run before a loop can be grabbed), the chain's order, and everything the
+  surface keeps for itself. Everything else is: levels, macros (a macro moved by the fader drives
+  its matrix targets), every module's parameters, the LFOs, the matrix, the looper's controls.
+- **Modulation** adds to the morphed value, as it adds to the knob's.
+- **The fader is smoothed**: the engine follows `xfade` with a 15 ms one-pole per chunk, so a
+  Q-Link's 1/128 detents and MPC's 1/1000 steps sweep instead of stepping; the morph is worked out
+  per chunk for the locked parameters only.
+- **Edit:** EDIT A (or B) shows the scene picked at that end on every page: each knob reads its
+  lock, or the knob's own value where the scene has none, and **you hear the scene in full** (as
+  if the fader were at that end). Every parameter you move while editing is **locked** in it.
+  Tapping another scene tile at the edited end switches the edit to that scene. CLEAR removes the
+  edited scene's locks. Tapping the lit EDIT again, loading a preset or Init ends the edit: the knobs
+  come back as they were. While editing, the plugin's saved state keeps the knobs, not the scene.
+- **Saved** with the project and in presets as lines `sceneN.key=value` (N 1..8), values like the
+  other lines (real values, options by name), so they survive parameters being added. A preset
+  without scene lines has none.
+- **Lock store:** per scene a 0..1 value per parameter, -1 where nothing is locked, as atomics
+  (the surface writes on MPC's UI thread, the engine reads on the audio thread). A generation
+  counter tells the engine to rebuild its list of locked parameters (the union of A's and B's).
+
+### Looper
+
+A fixed stage, not one of the chain's modules: **Pre** (default) sits before everything (the loop
+goes through every module and the rack's Mix), **Post** after the rack's Mix (the loop replaces
+what the rack plays; the effects go on with the live input underneath).
+
+| Parameter | Range | What it does |
+|---|---|---|
+| `lp_on` Looper | Off · On | Arms the recorder: it records the stage's input all the time. Not lockable |
+| `lp_pos` Position | Pre · Post | Where the stage sits |
+| `lp_mix` Loop | 0..100% | Live ↔ loop, linear. Leaving 0 **grabs a loop**; back at 0 it lets go |
+| `lp_len` Length | 1/16 · 1/8 · 1/4 · 1/2 · 1 bar · 2 bars · 4 bars | The loop's length (ordered steps) |
+| `lp_rep` Repeat | Off · 1/2 · 1/4 · 1/8 · 1/16 · 1/32 | Repeats the slice that was playing, on the grid: a roll (ordered steps) |
+| `lp_speed` Speed | -1..2× | 1 plays as recorded, 0.5 half speed an octave down, 0 stops (tape stop), below 0 backwards |
+| `lp_hold` Hold | Off · On | Leaving 0 again plays the last loop instead of grabbing a new one |
+
+- **The grab:** the last complete cell of Length on MPC's beat grid (Length 1 bar: the bar just
+  played, from its downbeat), found from the song position at that moment and the tempo:
+  `end = now - (beats mod length) × samples per beat`. It then plays **in phase with the grid**:
+  at song position b it plays the loop at `b mod length`, so a fader flick in the middle of a bar
+  carries on from the middle of the bar, one bar earlier. While MPC is stopped the grid runs on at
+  the tempo, as the other synced modules' do.
+- **Repeat r:** the slice of length r the loop was playing when Repeat changed, `floor(pos / r) r`,
+  repeats on the grid (`+ b mod r`); a shorter r re-slices from where it plays now, so 1/4 → 1/8 →
+  1/16 rolls in. Off returns to the whole loop on the grid.
+- **Speed:** the read head moves `speed` frames per sample (4-point Hermite), wrapping inside the
+  loop or the slice. Below |speed| 1/8 the level fades with it, so a tape stop slows into silence
+  instead of a held DC level. At speed 1 a head that has left the grid (after another speed, a
+  locate, the sequence's loop point) crossfades back onto it; with any other speed it runs free.
+- **No clicks:** every jump (the wrap at the loop's or slice's end, a new slice, a return to the
+  grid) is a 5 ms crossfade: the old head plays on past the edge (the loop buffer keeps 512 frames
+  of what came before and after the cell) while the new one fades in. The live / loop crossfade is
+  smoothed over 3 ms.
+- **Memory, only where used:** a 2^20-frame stereo ring (23.8 s, 8 MB) records; the grabbed cell
+  is copied into a 10 s loop buffer (3.5 MB) at 8× real time in the background (1024 frames a
+  block), and until a frame is copied it is read from the ring, which still holds it: the oldest
+  frame a grab needs is 2 lengths back, and the ring is 2.38 longest loops long. Both are allocated
+  on MPC's UI thread **the first time Looper On is switched on** in that instance (and handed to
+  the audio thread through an atomic pointer), so an EffectForce without the looper costs nothing
+  more. The longest loop is 10 s: a Length longer than that at the tempo is halved until it fits
+  (4 bars from 96 BPM up).
+- **Tempo changes** while a loop plays: it keeps its length in samples (no resampling); the grid
+  lock only applies while the loop is still as long as Length at the current tempo.
 
 ## Pages
 
