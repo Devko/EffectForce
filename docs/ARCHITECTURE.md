@@ -25,7 +25,7 @@ flowchart LR
 - **`surface/surface.py`** is the single source of the parameter list, the pages and the factory
   presets' checks. It writes `params.json`, `layout.conf`, `vst.json`, `build/param_ids.h` and
   `build/factory_presets.h`, after checking the layout (PolyForce's checker) and every preset.
-- **`dsp/`** is the sound: eight modules with one contract (docs/DESIGN.md "Modules"), the rack that
+- **`dsp/`** is the sound: ten modules with one contract (docs/DESIGN.md "Modules"), the rack that
   chains them, the LFOs and the envelope follower. No VST, no files, no threads.
 - **`plugin/`** is everything between the sound and MPC: VST2 entry points, parameters, the
   modulation matrix, the touchscreen logic, presets and saved state.
@@ -42,8 +42,10 @@ flowchart LR
 | `dsp/svf.h`, `filter.*`, `eq.*` | Simper's state-variable filter, the Filter and the EQ |
 | `dsp/comp.*` | The compressor and the 3-band OTT |
 | `dsp/chorus.*`, `phaser.*` | Modulated delays (chorus, ensemble, dimension, flanger) and allpass cascades |
+| `dsp/pulse.*` | Tremolo, auto-pan and the 16-step gate on a beat-locked phase |
+| `dsp/grain.*` | An 8 s recording (three rates, for pitched grains without aliasing) replayed as grains, slices and notes on MPC's grid |
 | `dsp/delay.*` | Double-precision delay time, feedback filters, drive and limiter, wow, ducking |
-| `dsp/reverb.*` | Predelay, diffusion, an 8-line feedback delay network, modulation, freeze |
+| `dsp/reverb.*`, `pitch.h` | Predelay, diffusion, an 8-line feedback delay network, modulation, freeze; the shimmer's pitch shifter |
 | `dsp/mod.h` | LFOs (free or beat-locked), the envelope follower |
 | `dsp/rack.*` | The order, on / off fades, the reorder dip, levels, the global mix |
 | `plugin/plugin.cpp` | VST2 glue for an insert effect, the suspend rule, the output guard, the CPU meter |
@@ -55,6 +57,8 @@ flowchart LR
 | `presets/Factory/` | Factory presets: `NN_Category/NN_Name.efp` |
 | `test/` | Every module's suite, the rack, modulation, the plugin through a fake MPC (`host.h`) |
 | `tools/bench.cpp` | `efbench`: CPU per module and all at once, through the built `.so` |
+| `tools/pgo_train.cpp` | The profile-guided build's trainer: every module's options, everything at once, every preset |
+| `tools/make_presets.py` | Writes the factory presets (then `make preset-levels` sets their Output) |
 | `tools/levels.cpp`, `loudness.h` | Level-matching the factory presets on a reference mix |
 | `probe/` | The probe that measured MPC first (docs/PROBE.md); builds on its own |
 | `third_party/mpc-vst-plugins/` | Vendored skin generator and installer (MIT), with PolyForce's marked local patches |
@@ -63,7 +67,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  IN[Input] --> G[Input gain] --> M1[module] --> M2[module] --> D[...] --> M8[module] --> O[Output gain] --> X{Mix} --> GU[Guard] --> OUT[Output]
+  IN[Input] --> G[Input gain] --> M1[module] --> M2[module] --> D[...] --> M10[module] --> O[Output gain] --> X{Mix} --> GU[Guard] --> OUT[Output]
   IN --> X
   IN -. level .-> E[Envelope follower]
   L[LFO 1, LFO 2] -.-> MX[Matrix]
@@ -117,13 +121,18 @@ What MPC does with an insert effect was measured on the device first ([the probe
 ## Parameters and saved state
 
 - **Parameters** are free to change until v0.1, then **append-only**: MPC projects store values by
-  index.
+  index. Append-only covers option lists too: MPC stores an option as its 0..1 value, which moves
+  for every option when one is added (`order_*` grew from 8 to 10 options, `m*_dst` from 49 to 55
+  before v0.1), so a list that may grow gets a new parameter, or a fixed number of options from
+  v0.1 on.
 - **Kinds** (`surface.py`): sound parameters (saved, automatable), the chain's order (saved, moved
   only by MOVE, not automatable), the surface's own values (the selected slot, the browser), readouts,
   buttons, tiles, toggles, popup flags.
 - **Saved state** (projects and `.efp` preset files) is the text format `effectforce 1`: `key=value`
   lines of real values (Hz, seconds, dB), options by name (`dly_mode=Ping-Pong`, `order_3=Comp`), and
   in a project the preset it came from. Ranges and option lists can change without breaking saved
-  sounds; an order that isn't a permutation of the modules falls back to the default.
-- **Limits:** `surface.py`'s module, source, wave and division lists must match the C++ enums;
+  sounds; an order that names only some slots (0.0.1 saved eight) keeps them and fills the rest in
+  the default order, one that isn't a permutation of the modules falls back to the default.
+- **Limits:** `surface.py`'s module, source, wave and division lists, the pulse's modes and
+  patterns, the grain's modes and the shimmer's intervals must match the C++ enums;
   `plugin/rack_map.cpp` `static_assert`s it.

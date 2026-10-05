@@ -235,7 +235,7 @@ plugin-package: $(ARM_SO) $(SKIN)
 		echo "         Release packages come from CI (glibc 2.31)."; fi
 	$(PY) $(MV)/tools/release.py --so $(ARM_SO) --skin "$(SKIN_DIR)" --entry $(SURF_OUT)/pluginlist-entry.xml \
 		--version $(PLUGIN_VERSION) --repo Devko/EffectForce --license MIT \
-		--about "EffectForce effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, delay and reverb in any order, with macros, LFOs, an envelope follower and a mod matrix." \
+		--about "EffectForce effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix." \
 		--requires "root SSH (MockbaMod)" \
 		--user-data Presets --user-data preset_favorites.txt --user-data preset_recent.txt \
 		-o dist

@@ -75,6 +75,7 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
             if (saved(i)) s.setValue(i, PARAM_INFO[i].def);
     // A preset is complete (what it doesn't name is the default); a project changes only what it lists.
     std::string preset;
+    bool named[kNumModules] = {};   // the order's slots the text sets
     size_t at = text.find('\n');
     while (at != std::string::npos && at + 1 < text.size()) {
         const size_t end = text.find('\n', at + 1);
@@ -93,6 +94,7 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
                 if (PARAM_INFO[i].nopts > 0) {
                     const int o = option(i, val);
                     if (o >= 0) s.setValue(i, paramNorm(i, static_cast<float>(o)));
+                    if (o >= 0 && i >= P_ORDER_1 && i < P_ORDER_1 + kNumModules) named[i - P_ORDER_1] = true;
                 } else {
                     float v = 0.0f;
                     if (parse(val, v)) s.setValue(i, paramNorm(i, v));
@@ -100,9 +102,32 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
                 break;
             }
     }
-    // The order must name every module once; anything else (an old or hand-edited state) is the default.
+    // The order must name every module once. One saved before modules were added (0.0.1 had eight
+    // slots) names some of them: the slots it doesn't name get the modules it doesn't, in the
+    // default order (they were off in it: it sounds the same). Anything else (a module twice, a
+    // hand-edited state) is the default.
     int order[kNumModules];
     for (int k = 0; k < kNumModules; ++k) order[k] = static_cast<int>(paramValue(P_ORDER_1 + k, s.get(P_ORDER_1 + k)));
+    bool used[kNumModules] = {}, some = false, all = true, twice = false;
+    for (int k = 0; k < kNumModules; ++k) {
+        if (!named[k]) {
+            all = false;
+            continue;
+        }
+        some = true;
+        if (order[k] >= 0 && order[k] < kNumModules) {
+            twice = twice || used[order[k]];
+            used[order[k]] = true;
+        }
+    }
+    if (some && !all && !twice)
+        for (int k = 0, next = 0; k < kNumModules; ++k) {
+            if (named[k]) continue;
+            while (used[next]) ++next;
+            used[next] = true;
+            order[k] = next;
+            s.setValue(P_ORDER_1 + k, paramNorm(P_ORDER_1 + k, static_cast<float>(next)));
+        }
     if (!validOrder(order))
         for (int k = 0; k < kNumModules; ++k) s.setValue(P_ORDER_1 + k, PARAM_INFO[P_ORDER_1 + k].def);
     if (!asPreset) s.setPresetKey(preset);   // a project without one came from no preset

@@ -16,6 +16,9 @@ static_assert(kNumModSources == MS_COUNT && kNumLfoWaves == LW_COUNT, "surface.p
 static_assert(kNumDelayDivisions == kNumDelayDivs && kNumLfoDivisions == kNumLfoDivs,
               "surface.py DELAY_DIVS / LFO_DIVS must match dsp/common.h");
 static_assert(PARAM_INFO[P_PLS_PATTERN].nopts == Pulse::kPatterns, "surface.py PULSE_PATTERNS must match dsp/pulse.h");
+static_assert(PARAM_INFO[P_PLS_MODE].nopts == Pulse::kGate + 1, "surface.py pls_mode must match dsp/pulse.h Pulse::Mode");
+static_assert(PARAM_INFO[P_GRN_MODE].nopts == Grain::kModes, "surface.py grn_mode must match dsp/grain.h Grain::Mode");
+static_assert(PARAM_INFO[P_REV_SHIM_INT].nopts == Reverb::kIntervals, "surface.py rev_shim_int must match dsp/reverb.h");
 static_assert(PARAM_INFO[P_L2_WAVE].key[0] == 'l' && P_L2_PHASE - P_L2_WAVE == P_L1_PHASE - P_L1_WAVE,
               "LFO 2's parameters must mirror LFO 1's");
 

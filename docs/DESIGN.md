@@ -30,7 +30,7 @@ disagree, fix one of them.
 
 ```mermaid
 flowchart LR
-  IN[Input] --> G[Input gain] --> S1[slot 1] --> S2[slot 2] --> D[...] --> S8[slot 8] --> O[Output gain] --> M{Mix} --> OUT[Output]
+  IN[Input] --> G[Input gain] --> S1[slot 1] --> S2[slot 2] --> D[...] --> S10[slot 10] --> O[Output gain] --> M{Mix} --> OUT[Output]
   IN --> M
 ```
 
@@ -38,9 +38,11 @@ flowchart LR
   Reverb (Pulse, Grain and the Reverb's shimmer came after the first device run).
   Each has its own parameters and page, so MPC's automation, Q-Links and saved projects always
   mean the same thing (generic slots would not). The default order is the one above.
-- **Order:** eight hidden parameters `order_1..8` hold a permutation of the modules. The CHAIN
-  page moves the selected module left or right (a swap). Saved by name (`order_3=Comp`); a state
-  that isn't a permutation falls back to the default order.
+- **Order:** ten hidden parameters `order_1..10` hold a permutation of the modules. The CHAIN
+  page moves the selected module left or right (a swap). Saved by name (`order_3=Comp`). A state
+  that names only some slots (0.0.1 saved eight) keeps them and gives the rest the modules it
+  doesn't name, in the default order (they were off in it); one that isn't a permutation falls back
+  to the default order.
 - **On / off:** each module's own `*_on`. Switching fades over 10 ms; a module that is off is not
   processed at all (no CPU). A module switched on again starts from cleared state.
 - **Reordering** dips the rack's output to silence over 3 ms, swaps, and fades back over 3 ms: no
@@ -81,7 +83,7 @@ never gets into a feedback path. Each module's own Mix is a dry / wet blend insi
 | **Delay** | `dly_mode` Stereo · Ping-Pong · Mono; `dly_sync` Free · Sync (Sync); `dly_time` 1..2000 ms (375); `dly_div` 1/64..1 bar (1/8.); `dly_fb` 0..100% (40); `dly_spread` -50..50% R time (0); `dly_lc` 20..2000 Hz (100); `dly_hc` 500..20k Hz (8k); `dly_wow` (0); `dly_drive` (0); `dly_duck` (0); `dly_mix` (30%); `dly_glide` Tape · Fade | The probe's delay grown up: double-precision delay time that glides (Tape) or crossfades (Fade) to a new time, filters and a soft clipper in the feedback (100% feedback holds, never runs away), wow (slow + fast modulation of the time), ducking by the input's envelope |
 | **Pulse** | `pls_mode` Tremolo · Auto-Pan · Gate; `pls_sync` Free · Sync (Sync); `pls_rate` 0.1..20 Hz (4); `pls_div` (1/8); `pls_depth` (100%); `pls_shape` (0); `pls_stereo` 0..180° (0); `pls_pattern` 16 patterns; `pls_length` 5..100% (50); `pls_smooth` 0.5..50 ms (3); `pls_mix` (100%) | A beat-locked LFO (sine to square) on the level or the constant-power pan; the gate a 16-step mask with S-curve edges, step 0 on the downbeat; transport jumps crossfade |
 | **Grain** | `grn_mode` Cloud · Stretch · Mosaic · Stutter · Arp; `grn_sync` (Sync); `grn_size` 10..1000 ms (120); `grn_div` (1/16); `grn_density` (50%); `grn_pitch` ±24 st (0); `grn_reverse` (0); `grn_spread` (50%); `grn_fb` 0..95% (0); `grn_hold` Off · On; `grn_mix` (50%) | An 8 s stereo recording of the input replayed as windowed grains or beat-grid slices, pitched, reversed, reshuffled; feedback writes the output back; hold stops recording |
-| **Reverb** | `rev_mode` Room · Hall · Plate · Space; `rev_size` (50%); `rev_decay` 0.1..30 s (2.5); `rev_pre` 0..250 ms (20); `rev_damp` 1k..20k Hz (6k); `rev_lc` 20..1000 Hz (150); `rev_mod` (30%); `rev_width` (100%); `rev_freeze` Off · On; `rev_mix` (30%); `rev_shim` (0), `rev_shim_int` +12 · +7 · +19 · -12 | Predelay, input diffusion (allpasses), an 8-line feedback delay network (Hadamard mixing, per-line damping set from Decay and Damp, modulated lines), stereo taps. Freeze: lossless loop, input muted |
+| **Reverb** | `rev_mode` Room · Hall · Plate · Space; `rev_size` (50%); `rev_decay` 0.1..30 s (2.5); `rev_pre` 0..250 ms (20); `rev_damp` 1k..20k Hz (6k); `rev_lc` 20..1000 Hz (150); `rev_mod` (30%); `rev_width` (100%); `rev_freeze` Off · On; `rev_mix` (30%); `rev_shim` (0), `rev_shim_int` +12 · +7 · +19 · -12 | Predelay, input diffusion (allpasses), an 8-line feedback delay network (Hadamard mixing, per-line damping set from Decay and Damp, modulated lines), stereo taps. Freeze: lossless loop, input muted. Shimmer: a splice-searching pitch shifter on one of the network's eight directions, energy-preserving (bounded, frozen too; frozen with shimmer the tail drains as it climbs out of the band) |
 
 Every module also has `*_on` (Off / On). Sync divisions: delays `1/64 … 1 bar` (16 values),
 LFOs `1/16 … 16 bars` (14 values), each with triplets and dotted values where they make sense.
@@ -93,9 +95,9 @@ LFOs `1/16 … 16 bars` (14 values), each with triplets and dotted values where 
 - **LFO:** wave Sine · Triangle · Saw Up · Saw Down · Square · S&H · Smooth; Free (0.01..20 Hz)
   or Sync (1/16 … 16 bars, phase locked to MPC's beat while it plays); phase 0..360°.
 - **Envelope follower:** attack 1..500 ms, release 10..3000 ms, gain 0..36 dB (sensitivity).
-- **Matrix:** 8 slots of source, target, amount (-100..100%). A target is any of 48 continuous
-  parameters (the levels, every module's main knobs, the LFO rates; a rate only while its LFO or
-  phaser runs free). Modulation adds
+- **Matrix:** 8 slots of source, target, amount (-100..100%). A target is any of 54 continuous
+  parameters (the levels, every module's main knobs, the LFO rates; a rate only while its LFO,
+  phaser or pulse runs free). Modulation adds
   `amount × source` to the target's 0..1 value, clamped, so it follows the knob's own curve
   (log for frequencies, and so on). Computed per 32-sample chunk; modules smooth from there.
 
@@ -105,19 +107,20 @@ Five groups (MPC's tab strip shows five without a pager), each page with its own
 
 | Group | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order as 8 tiles (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
+| CHAIN | **CHAIN**: the order as 10 tiles in two rows of five (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
 | TONE | **DRIVE+FILTER** (a card each), **EQ**, **COMP** (Comp and OTT cards) |
-| MOTION | **CHORUS+PHASE** (a card each) |
-| SPACE | **DELAY**, **REVERB** |
+| MOTION | **CHORUS+PHASE** (a card each), **PULSE** (the LFO and the GATE card) |
+| SPACE | **DELAY**, **GRAIN**, **REVERB** (with its shimmer) |
 | MOD | **LFO+ENV** (LFO 1, LFO 2, envelope follower, macros), **MATRIX** (8 slots) |
 
 ## Presets
 
 - Factory chain presets in `presets/Factory/NN_Category/NN_Name.efp`, embedded at build time and
-  checked by `surface.py` like the synths'. Categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi,
-  Space, Creative. `Init`: everything off, unity.
-- **Level-matched:** each preset is rendered over reference material at -18 LUFS (Synth and Pads:
-  chords; Bass: a bass line; Drums: drums; the rest: all of it, `tools/loudness.h`) and its Output set
+  checked by `surface.py` like the synths' (`tools/make_presets.py` writes them). Categories:
+  Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative, Texture, Rhythm. `Init`: everything
+  off, unity.
+- **Level-matched:** each preset is rendered over reference material at -18 LUFS (Synth, Pads,
+  Texture and Rhythm: chords; Bass: a bass line; Drums: drums; the rest: all of it, `tools/loudness.h`) and its Output set
   so it comes out as loud as it went in (`make preset-levels`), within ±9 dB: a band-pass preset stays
   a little quieter rather than far too loud on material inside its band.
 - User presets: `User NNN.efp` in the plugin folder's Presets (no text entry on the device).
@@ -129,10 +132,12 @@ Targets on the Force (Cortex-A17), measured with `make bench-device`:
 
 | Module | Target |
 |---|---|
-| Reverb | ≤ 4% |
+| Reverb (shimmer on: ≤ 1% more) | ≤ 4% |
+| Grain (a dense pitched cloud) | ≤ 2.5% |
 | Drive (2× oversampled) | ≤ 1.5% |
 | Comp in OTT mode | ≤ 2% |
 | Chorus, Phaser, Delay, Filter, EQ, Comp | ≤ 0.8% each |
+| Pulse | ≤ 0.5% |
 
 ## Code layout
 
@@ -140,7 +145,8 @@ Targets on the Force (Cortex-A17), measured with `make bench-device`:
 |---|---|
 | `dsp/common.h` | Rate, chunk size, `Transport`, sync divisions, smoothing, fast math |
 | `dsp/simd.h`, `dsp/halfband.h` | SubForce's four-float vectors and halfband (plus the interpolator) |
-| `dsp/drive.*`, `filter.*`, `eq.*`, `comp.*`, `chorus.*`, `phaser.*`, `delay.*`, `reverb.*` | The modules |
+| `dsp/drive.*`, `filter.*`, `eq.*`, `comp.*`, `chorus.*`, `phaser.*`, `pulse.*`, `grain.*`, `delay.*`, `reverb.*` | The modules |
+| `dsp/pitch.h` | The shimmer's pitch shifter (splice-searching, for feedback paths) |
 | `dsp/mod.h` | LFOs, envelope follower, matrix sources |
 | `dsp/rack.*` | Order, fades, levels, modulation, the chunk loop |
 | `plugin/` | SubForce's surface (Force input handling, browser, presets, state), the effect glue from the probe, the CHAIN page's actions |
