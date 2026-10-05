@@ -119,6 +119,15 @@ public:
 
 class StereoDecimator : public StereoHalfband {
 public:
+#if EF_NEON
+    // Two frames (L R)(L R), early first, become one (L R): process()'s arithmetic, the lanes
+    // arranged in registers instead of assembled from scalars.
+    float32x2_t processPair(float32x4_t frames) {
+        const float32x2x2_t t = vtrn_f32(vget_low_f32(frames), vget_high_f32(frames));   // (Le Ll), (Re Rl)
+        const f4 a = run(vrev64q_f32(vcombine_f32(t.val[0], t.val[1])));
+        return vmul_f32(vpadd_f32(vget_low_f32(a), vget_high_f32(a)), vdup_n_f32(0.5f));
+    }
+#endif
     // (left early, left late, right early, right late) become one low-rate sample per channel.
     void process(f4 high, float& left, float& right) {
 #if EF_NEON

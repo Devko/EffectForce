@@ -25,7 +25,7 @@ public:
     float source(int s) const { return s >= 0 && s < MS_COUNT ? src_[s] : 0.0f; }
 
 private:
-    void modulate();   // patch_ = base_ moved by the matrix
+    void modulate();   // patch_ = base_ moved by the matrix (setParams() copies base_, this moves its targets)
 
     Rack rack_;
     Lfo lfo_[2];

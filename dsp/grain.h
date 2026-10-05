@@ -154,7 +154,7 @@ private:
 
     int w0_ = -1;          // level 0's newest frame
     int written_ = 0;      // level-0 frames written since reset(), up to what stays readable
-    int64_t now_ = 0;      // samples since reset()
+    double now_ = 0.0;     // samples since reset() (a whole number: exact in double for millennia)
     uint32_t rng_ = 1;
 
     // Settings, clamped.
@@ -197,6 +197,20 @@ private:
 
     int tail_ = 0;
     bool fresh_ = true;
+
+    // What the tail and Cloud's speed were worked out for (libm calls: only when these change).
+    struct TailKey {
+        int mode = -1;
+        float pitch = 0.0f, spread = 0.0f, density = 0.0f, fb = 0.0f;
+        double slice = 0.0;
+        bool hold = false;
+        bool operator==(const TailKey& o) const {
+            return mode == o.mode && pitch == o.pitch && spread == o.spread && density == o.density && fb == o.fb &&
+                   slice == o.slice && hold == o.hold;
+        }
+    } tailKey_;
+    float speedPitch_ = 0.0f;
+    double speed_ = 1.0;
 };
 
 } // namespace ef

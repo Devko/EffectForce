@@ -46,10 +46,10 @@ void Engine::setParams(const float* norm) {
         slots_[nSlots_++] = {src, kModTargetParam[dst], amount};
     }
     env_.set(base_.envAttackS, base_.envReleaseS, base_.envGainDb);
+    patch_ = base_;   // modulate() rewrites the fields the matrix reaches, every chunk
 }
 
 void Engine::modulate() {
-    patch_ = base_;
     int done[kNumModSlots];
     int nDone = 0;
     for (int s = 0; s < nSlots_; ++s) {
@@ -65,7 +65,7 @@ void Engine::modulate() {
         // A synced delay has no time of its own: the knob's move scales the synced time instead.
         if (param == P_DLY_TIME && base_.delay.sync) {
             const float baseV = paramValue(P_DLY_TIME, norm_[P_DLY_TIME]);
-            if (baseV > 0.0f) patch_.delay.divBeats = base_.delay.divBeats * v / baseV;
+            patch_.delay.divBeats = baseV > 0.0f ? base_.delay.divBeats * v / baseV : base_.delay.divBeats;
         }
     }
 }
