@@ -1,0 +1,10 @@
+effectforce 1
+grn_on=On
+grn_mode=Arp
+grn_div=1/16
+grn_density=0.5
+grn_mix=0.6
+dly_on=On
+dly_div=1/8.
+dly_fb=0.35
+dly_mix=0.2

@@ -1,0 +1,8 @@
+effectforce 1
+rev_on=On
+rev_mode=Plate
+rev_decay=5
+rev_shim=0.45
+rev_shim_int=+7
+rev_lc=250
+rev_mix=0.35

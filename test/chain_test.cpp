@@ -14,7 +14,8 @@ std::string tile(Host& h, int k) { return h.display(P_SLOT_1 + k); }
 
 void tiles() {
     Host h;
-    CHECK(tile(h, 0) == "[ DRIVE ]" && tile(h, 1) == "FILTER" && tile(h, 2) == "EQ" && tile(h, 7) == "REVERB");
+    CHECK(tile(h, 0) == "[ DRIVE ]" && tile(h, 1) == "FILTER" && tile(h, 2) == "EQ" && tile(h, 6) == "PULSE" &&
+          tile(h, 7) == "GRAIN" && tile(h, 9) == "REVERB");
     for (int k = 0; k < kNumModules; ++k) CHECK(h.get(P_SLOT_1 + k) < 0.5f);   // all off
     // A tap selects.
     h.tap(P_SLOT_1 + 2);
@@ -35,11 +36,11 @@ void tiles() {
     CHECK(tile(h, 0) == "[ EQ ]");
     // A module switched on its own page lights its tile too.
     h.on(P_REV_ON);
-    CHECK(h.get(P_SLOT_1 + 7) > 0.5f);
+    CHECK(h.get(P_SLOT_1 + 9) > 0.5f);
     // The tiles the plugin lit go to MPC (audioMasterAutomate) from the audio thread.
     h.log.automated.clear();
     h.blocks(8);
-    CHECK(h.log.automated.count(P_SLOT_1 + 7) == 1);
+    CHECK(h.log.automated.count(P_SLOT_1 + 9) == 1);
 }
 
 void releaseEcho() {
@@ -51,20 +52,20 @@ void releaseEcho() {
         h.setN(P_SLOT_1 + 5, h.get(P_SLOT_1 + 5) > 0.5f ? 0.0f : 1.0f);
     }
     CHECK(tile(h, 5) == "[ PHASER ]");
-    h.tap(P_SLOT_1 + 6);   // a second later: a real tap
-    CHECK(tile(h, 6) == "[ DELAY ]" && tile(h, 5) == "PHASER");
+    h.tap(P_SLOT_1 + 8);   // a second later: a real tap
+    CHECK(tile(h, 8) == "[ DELAY ]" && tile(h, 5) == "PHASER");
 }
 
 void saved() {
     Host a;
-    a.tap(P_SLOT_1 + 7);
+    a.tap(P_SLOT_1 + 9);
     a.press(P_MOVE_L);   // Reverb before Delay
     const std::string s = a.chunk();
-    CHECK(s.find("order_7=Reverb\n") != std::string::npos && s.find("order_8=Delay\n") != std::string::npos);
+    CHECK(s.find("order_9=Reverb\n") != std::string::npos && s.find("order_10=Delay\n") != std::string::npos);
     CHECK(s.find("chain_sel") == std::string::npos && s.find("slot_") == std::string::npos);   // the surface's own
     Host b;
     CHECK(b.load(s) == 1);
-    CHECK(tile(b, 6) == "REVERB" && tile(b, 7) == "DELAY");
+    CHECK(tile(b, 8) == "REVERB" && tile(b, 9) == "DELAY");
     // Not a permutation (a module twice): the default order.
     Host c;
     CHECK(c.load("effectforce 1\norder_1=Reverb\norder_2=Reverb\n") == 1);

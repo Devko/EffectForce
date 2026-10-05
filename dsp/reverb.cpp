@@ -67,6 +67,13 @@ constexpr float kInGain = 0.8f;                 // into each line, for a network
 constexpr float kRefLoop = 2705.0f;             // Hall's mean loop delay at size 0.5, samples
 constexpr float kTailDb = 80.0f;                // tailSamples(): down this far
 constexpr double kHadamard = 0.35355339059327373;   // 1 / sqrt(8): the 8x8 Hadamard orthonormal
+constexpr float kShimRatio[Reverb::kIntervals] = {2.0f, 1.49830708f, 3.17480210f, 0.5f};   // +12, +7, +19, -12
+constexpr int kShimGrain = 3528;                // the shifter's grains: 80 ms
+constexpr float kShimLowPass = 9000.0f;         // the shimmer path's low-pass at most (Hz) ...
+constexpr float kShimHighPass = 80.0f;          // ... and its high-pass
+constexpr float kShimStep = 1.0f / 882.0f;      // an interval change: 20 ms out, 20 ms in
+constexpr float kShimTurn = 1.5707963f / 882.0f;   // the shimmer's angle moves at most 90 degrees in 20 ms
+constexpr double kShimCorr = 1.0 / 2205.0;      // the pitched path's correlation with what stays: over 50 ms
 
 // --- the interpolator -------------------------------------------------------------------------
 
@@ -143,6 +150,16 @@ EF_INLINE float lane(f4 v) {
 #endif
 }
 
+// v with x in lane 3.
+EF_INLINE f4 withLane3(f4 v, float x) {
+#if EF_NEON
+    return vsetq_lane_f32(x, v, 3);
+#else
+    v[3] = x;
+    return v;
+#endif
+}
+
 // One line's 8-point read di + (ph + fr) / kPhases samples back from `w` (the index being written
 // now): the window, its coefficients, and their products, still to be summed (sums4()).
 EF_INLINE f4 lagrangeRead(const float* line, uint32_t mask, uint32_t w, int32_t di, int32_t ph, f4 fr) {
@@ -163,7 +180,7 @@ int predelaySamples(float ms) { return static_cast<int>(ms * (kRate / 1000.0f) +
 
 // --- setup -------------------------------------------------------------------------------------
 
-Reverb::Reverb() : preBuf_(2 * kPreSize, 0.0f) {
+Reverb::Reverb() : preBuf_(2 * kPreSize, 0.0f), shimBuf_(PitchShift::bufferSize(kShimRatio[UP_TWELFTH], kShimRatio[DOWN_OCTAVE], kShimGrain), 0.0f) {
     // Each line holds its longest reach in any mode: size 1, the deepest modulation, the read's window.
     uint32_t sizes[kLines];
     size_t total = 0;
@@ -199,6 +216,8 @@ Reverb::Reverb() : preBuf_(2 * kPreSize, 0.0f) {
     lfoStartS_[1] = load4(sn + 4);
     lfoStartC_[0] = load4(cs);
     lfoStartC_[1] = load4(cs + 4);
+    shift_.attach(shimBuf_.data(), static_cast<uint32_t>(shimBuf_.size()));
+    setInterval(UP_OCTAVE);
     reset();
 }
 
@@ -216,6 +235,8 @@ void Reverb::reset() {
     lfoS_[1] = lfoStartS_[1];
     lfoC_[0] = lfoStartC_[0];
     lfoC_[1] = lfoStartC_[1];
+    shimOn_ = false;
+    shimGate_ = 1.0f;
     fresh_ = true;
 }
 
@@ -234,6 +255,29 @@ void Reverb::forget() {
         }
     }
     lp_[0] = lp_[1] = splat(0.0f);
+    shimmerAfresh();
+}
+
+// The shimmer's interval: the shifter's ratio and the path's filters (in silence: the caller fades).
+void Reverb::setInterval(int interval) {
+    shimInterval_ = interval;
+    const float ratio = kShimRatio[interval];
+    shift_.setRatio(ratio, kShimGrain);
+    const float g = std::tan(kPi * std::min(kShimLowPass, kRate / 3.0f / ratio) / kRate);
+    shimFilter_.a1 = 1.0f / (1.0f + g * (g + kLowCutK));
+    shimFilter_.a2 = g * shimFilter_.a1;
+    shimFilter_.a3 = g * shimFilter_.a2;
+    const float gh = std::tan(kPi * kShimHighPass / kRate);
+    shimFilter_.hpA = gh / (1.0f + gh);
+    shift_.restart();
+}
+
+// The shimmer path starts over: the shifter forgets, the filters and the correlation are cleared.
+void Reverb::shimmerAfresh() {
+    shift_.restart();
+    shimFilter_.clear();
+    shimPP_ = shimCC_ = 0.0;
+    shimBeta_ = 0.0f;
 }
 
 void Reverb::loadMode(int m) {
@@ -277,6 +321,8 @@ void Reverb::set(const Params& p, const Transport&) {
     p_.width = clampParam(p.width, 0.0f, 1.0f, 1.0f);
     p_.freeze = p.freeze;
     p_.mix = clampParam(p.mix, 0.0f, 1.0f, 0.3f);
+    p_.shimmer = clampParam(p.shimmer, 0.0f, 1.0f, 0.0f);
+    p_.shimmerInterval = p.shimmerInterval < 0 ? 0 : (p.shimmerInterval >= kIntervals ? kIntervals - 1 : p.shimmerInterval);
 }
 
 int Reverb::tailSamples() const {
@@ -420,6 +466,37 @@ void Reverb::chunkSetup(int n) {
         input_.tapB = pre;
         input_.fade = 1;
     }
+
+    // Shimmer: an interval change fades the pitched path out, switches in silence and fades it
+    // back in. What stays and what is pitched share the power: cos and sin of shimmer x 90 degrees.
+    // Off and settled, the shifter doesn't run (and starts afresh when it does again).
+    if (jump) {
+        if (p_.shimmerInterval != shimInterval_) setInterval(p_.shimmerInterval);
+    } else if (p_.shimmerInterval != shimInterval_) {
+        if (!shimOn_ || shimGate_ == 0.0f) setInterval(p_.shimmerInterval);
+        else shimGate_ = std::max(0.0f, shimGate_ - fn * kShimStep);
+    }
+    if (p_.shimmerInterval == shimInterval_) shimGate_ = std::min(1.0f, shimGate_ + fn * kShimStep);
+    // The angle glides (90 degrees in 20 ms at most): switching what circulates in one chunk would
+    // click in the tail.
+    const float want = p_.shimmer * shimGate_ * (kPi / 2.0f);
+    const float angle = jump ? want : shimAngle_ + clampf(want - shimAngle_, -fn * kShimTurn, fn * kShimTurn);
+    float sn = shimSin_.target(), cs = shimCos_.target();
+    if (jump || angle != shimAngle_) {
+        shimAngle_ = angle;
+        sn = angle > 0.0f ? std::sin(angle) : 0.0f;
+        cs = angle > 0.0f ? std::cos(angle) : 1.0f;
+    }
+    if (jump) {
+        shimSin_.jump(sn);
+        shimCos_.jump(cs);
+    } else {
+        shimSin_.to(sn, n);
+        shimCos_.to(cs, n);
+    }
+    const bool on = sn != 0.0f || shimSin_.value() != 0.0f;
+    if (on && !shimOn_) shimmerAfresh();
+    shimOn_ = on;
 }
 
 // The read positions' next straight line: the sines a segment on, the size where it is going. The
@@ -444,18 +521,29 @@ void Reverb::process(float* L, float* R, int n) {
         if (segLeft_ == 0) nextSegment();
         const int m = std::min(n - i, segLeft_);
         if (young_) {
-            if (glide_) runNetwork<true, true>(L + i, R + i, m);
-            else runNetwork<false, true>(L + i, R + i, m);
+            if (shimOn_) {
+                if (glide_) runNetwork<true, true, true>(L + i, R + i, m);
+                else runNetwork<false, true, true>(L + i, R + i, m);
+            } else {
+                if (glide_) runNetwork<true, true, false>(L + i, R + i, m);
+                else runNetwork<false, true, false>(L + i, R + i, m);
+            }
             age_ = std::min(age_ + static_cast<uint32_t>(m), youngEnd_);
         } else {
-            if (glide_) runNetwork<true, false>(L + i, R + i, m);
-            else runNetwork<false, false>(L + i, R + i, m);
+            if (shimOn_) {
+                if (glide_) runNetwork<true, false, true>(L + i, R + i, m);
+                else runNetwork<false, false, true>(L + i, R + i, m);
+            } else {
+                if (glide_) runNetwork<true, false, false>(L + i, R + i, m);
+                else runNetwork<false, false, false>(L + i, R + i, m);
+            }
         }
         i += m;
         segLeft_ -= m;
         if (segLeft_ == 0) {   // lands exactly
             pos_[0] = posEnd_[0];
             pos_[1] = posEnd_[1];
+            if (shimOn_) shimBeta_ = static_cast<float>(clampf(static_cast<float>(shimPP_ / (shimCC_ + 1e-24)), -1.0f, 1.0f));
         }
     }
     g_[0] = gTgt_[0];
@@ -524,13 +612,29 @@ EF_INLINE void Reverb::InputPath::tick(float xl, float xr, float& ol, float& or_
     or_ = pr - kLowCutK * v1r - v2r;
 }
 
+// The shimmer path before the shifter: a trapezoidal one-pole high-pass, then two Simper SVF
+// low-passes (Butterworth each).
+EF_INLINE float Reverb::ShimmerFilter::tick(float x) {
+    const float v = (x - hp) * hpA, low = v + hp;
+    hp = low + v;
+    const float u = x - low;
+    const float v3a = u - ic2a, v1a = a1 * ic1a + a2 * v3a, v2a = ic2a + a2 * ic1a + a3 * v3a;
+    ic1a = v1a + v1a - ic1a;
+    ic2a = v2a + v2a - ic2a;
+    const float v3b = v2a - ic2b, v1b = a1 * ic1b + a2 * v3b, v2b = ic2b + a2 * ic1b + a3 * v3b;
+    ic1b = v1b + v1b - ic1b;
+    ic2b = v2b + v2b - ic2b;
+    return v2b;
+}
+
 // Part of a chunk (within one segment) through the whole reverb, in three passes so that each
 // loop keeps few values live (NEON has 16 registers, and VFP's scalars are its lower eight): the
 // input path into a local buffer, the network, then width and mix. The state sits in locals: as
 // members, every store into a buffer would make the compiler reload them. Glide: the loop gains
 // and damping poles move this chunk. Young: the network was started afresh (forget()) less than
-// youngEnd_ samples ago, and a read reaching back before that, t samples on, is a zero.
-template <bool Glide, bool Young>
+// youngEnd_ samples ago, and a read reaching back before that, t samples on, is a zero. Shimmer:
+// the pitched path runs.
+template <bool Glide, bool Young, bool Shimmer>
 void Reverb::runNetwork(float* L, float* R, int n) {
     float inL[kSegment], inR[kSegment], outL[kSegment], outR[kSegment];
     const uint32_t w0 = w_, age0 = age_;
@@ -587,6 +691,11 @@ void Reverb::runNetwork(float* L, float* R, int n) {
         const f4 step0 = posStep_[0], step1 = posStep_[1];
         f4 g0 = g_[0], g1 = g_[1], p0 = pole_[0], p1 = pole_[1], lp0 = lp_[0], lp1 = lp_[1];
         const f4 gs0 = gStep_[0], gs1 = gStep_[1], ps0 = poleStep_[0], ps1 = poleStep_[1];
+        PitchShift shift = shift_;
+        ShimmerFilter filter = shimFilter_;
+        Ramp keep = shimCos_, pitched = shimSin_;
+        double pp = shimPP_, cc = shimCC_;
+        const float beta = shimBeta_;
         for (int i = 0; i < n; ++i) {
             const uint32_t w = w0 + static_cast<uint32_t>(i), t = age0 + static_cast<uint32_t>(i);
 
@@ -636,9 +745,20 @@ void Reverb::runNetwork(float* L, float* R, int n) {
             const f4 y0 = g0 * lp0, y1 = g1 * lp1;
 
             // Hadamard: three butterfly stages (the gains hold its 1 / sqrt(8)).
-            const f4 ha = butterflyPairs(butterflyHalves(y0 + y1)), hb = butterflyPairs(butterflyHalves(y0 - y1));
+            f4 ha = butterflyPairs(butterflyHalves(y0 + y1));
+            const f4 hb = butterflyPairs(butterflyHalves(y0 - y1));
             outL[i] = lane<1>(ha);   // rows + - + - ... and + + - - ...
             outR[i] = lane<2>(ha);
+
+            // Shimmer: row 3's component c, part of it pitched. What the pitched copy holds of c itself
+            // (an octave landing on a frozen chord's own harmonics, in phase) comes out first: with
+            // only the rest, cos^2 + sin^2 can't add power, whatever the material.
+            if (Shimmer) {
+                const float c = lane<3>(ha), q = shift.tick(filter.tick(c));
+                pp += kShimCorr * (static_cast<double>(q) * c - pp);   // in double: no denormals from the quiet
+                cc += kShimCorr * (static_cast<double>(c) * c - cc);
+                ha = withLane3(ha, keep.next() * c + pitched.next() * (q - beta * c));
+            }
 
             // Back into the lines, rotated by one (H alone is its own inverse), with the input:
             // L into the even lines, R into the odd.
@@ -661,6 +781,14 @@ void Reverb::runNetwork(float* L, float* R, int n) {
             g_[1] = g1;
             pole_[0] = p0;
             pole_[1] = p1;
+        }
+        if (Shimmer) {
+            shift_ = shift;
+            shimFilter_ = filter;
+            shimCos_ = keep;
+            shimSin_ = pitched;
+            shimPP_ = pp;
+            shimCC_ = cc;
         }
     }
     w_ = w0 + static_cast<uint32_t>(n);

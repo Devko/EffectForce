@@ -12,4 +12,3 @@ env_gain=12
 m1_src=Envelope
 m1_dst=Reverb Mix
 m1_amt=-0.4
-out_gain=4.9

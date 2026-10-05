@@ -4,7 +4,8 @@
 //
 // The material: four bars at 120 BPM of chords (detuned saws), a bass line (square), kick, snare and
 // hats, 8 s. Each category plays what it is made for (a lead preset with a low cut isn't judged on a
-// kick drum): Synth and Pads the chords, Bass the bass line, Drums the drums, the rest all of it.
+// kick drum): Synth, Pads, Texture and Rhythm the chords, Bass the bass line, Drums the drums, the rest all
+// of it.
 // Whatever the parts, the reference plays at kRefLufs with its peaks under -1 dBFS: the level a track
 // reaches an insert at, so compressors and drives work as they would on it. Loudness: ITU-R BS.1770
 // K-weighting (the shelf and the high-pass, as libebur128 derives them), both sides, the whole signal.
@@ -60,7 +61,7 @@ enum Part : int { CHORDS = 1, BASS = 2, DRUMS = 4, ALL = 7 };
 
 // The parts a factory category is matched on (its folder name without the number).
 inline int partsFor(const std::string& category) {
-    if (category == "Synth" || category == "Pads") return CHORDS;
+    if (category == "Synth" || category == "Pads" || category == "Texture" || category == "Rhythm") return CHORDS;
     if (category == "Bass") return BASS;
     if (category == "Drums") return DRUMS;
     return ALL;

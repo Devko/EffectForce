@@ -9,11 +9,13 @@ namespace ef {
 // Option lists in surface.py against the engine's enums.
 static_assert(int(kNumModules) == int(RM_COUNT) && int(M_DRIVE) == int(RM_DRIVE) && int(M_FILTER) == int(RM_FILTER) &&
                   int(M_EQ) == int(RM_EQ) && int(M_COMP) == int(RM_COMP) && int(M_CHORUS) == int(RM_CHORUS) &&
-                  int(M_PHASER) == int(RM_PHASER) && int(M_DELAY) == int(RM_DELAY) && int(M_REVERB) == int(RM_REVERB),
+                  int(M_PHASER) == int(RM_PHASER) && int(M_PULSE) == int(RM_PULSE) && int(M_GRAIN) == int(RM_GRAIN) &&
+                  int(M_DELAY) == int(RM_DELAY) && int(M_REVERB) == int(RM_REVERB),
               "surface.py MODULES must match dsp/rack.h RackModule");
 static_assert(kNumModSources == MS_COUNT && kNumLfoWaves == LW_COUNT, "surface.py mod lists must match dsp/mod.h");
 static_assert(kNumDelayDivisions == kNumDelayDivs && kNumLfoDivisions == kNumLfoDivs,
               "surface.py DELAY_DIVS / LFO_DIVS must match dsp/common.h");
+static_assert(PARAM_INFO[P_PLS_PATTERN].nopts == Pulse::kPatterns, "surface.py PULSE_PATTERNS must match dsp/pulse.h");
 static_assert(PARAM_INFO[P_L2_WAVE].key[0] == 'l' && P_L2_PHASE - P_L2_WAVE == P_L1_PHASE - P_L1_WAVE,
               "LFO 2's parameters must mirror LFO 1's");
 
@@ -108,6 +110,7 @@ std::string paramDisplay(int id, float norm, const float* all) {
             break;
         }
         case Fmt::Count: std::snprintf(b, sizeof b, "%.0f", v); break;
+        case Fmt::Semi: std::snprintf(b, sizeof b, v == 0.0f ? "0 st" : "%+.0f st", v); break;
         default: return {};
     }
     return b;
@@ -213,6 +216,32 @@ void setField(RackPatch& p, int id, float v) {
         case P_REV_WIDTH: p.reverb.width = v; break;
         case P_REV_FREEZE: p.reverb.freeze = on; break;
         case P_REV_MIX: p.reverb.mix = v; break;
+        case P_REV_SHIM: p.reverb.shimmer = v; break;
+        case P_REV_SHIM_INT: p.reverb.shimmerInterval = opt; break;
+
+        case P_PLS_MODE: p.pulse.mode = opt; break;
+        case P_PLS_SYNC: p.pulse.sync = on; break;
+        case P_PLS_RATE: p.pulse.rateHz = v; break;
+        case P_PLS_DIV: p.pulse.divBeats = kLfoDivs[std::clamp(opt, 0, kNumLfoDivs - 1)].beats; break;
+        case P_PLS_DEPTH: p.pulse.depth = v; break;
+        case P_PLS_SHAPE: p.pulse.shape = v; break;
+        case P_PLS_STEREO: p.pulse.stereo = v; break;
+        case P_PLS_PATTERN: p.pulse.pattern = opt; break;
+        case P_PLS_LENGTH: p.pulse.length = v; break;
+        case P_PLS_SMOOTH: p.pulse.smooth = v * 1000.0f; break;
+        case P_PLS_MIX: p.pulse.mix = v; break;
+
+        case P_GRN_MODE: p.grain.mode = opt; break;
+        case P_GRN_SYNC: p.grain.sync = on; break;
+        case P_GRN_SIZE: p.grain.sizeMs = v * 1000.0f; break;
+        case P_GRN_DIV: p.grain.sizeBeats = kDelayDivs[std::clamp(opt, 0, kNumDelayDivs - 1)].beats; break;
+        case P_GRN_DENSITY: p.grain.density = v; break;
+        case P_GRN_PITCH: p.grain.pitch = v; break;
+        case P_GRN_REVERSE: p.grain.reverse = v; break;
+        case P_GRN_SPREAD: p.grain.spread = v; break;
+        case P_GRN_FB: p.grain.feedback = v; break;
+        case P_GRN_HOLD: p.grain.hold = on; break;
+        case P_GRN_MIX: p.grain.mix = v; break;
 
         case P_ENV_ATT: p.envAttackS = v; break;
         case P_ENV_REL: p.envReleaseS = v; break;

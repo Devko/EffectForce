@@ -164,5 +164,7 @@ void eqTests();
 void compTests();
 void chorusTests();
 void phaserTests();
+void pulseTests();
+void grainTests();
 void delayTests();
 void reverbTests();

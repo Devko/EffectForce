@@ -36,6 +36,8 @@ void Rack::resetModule(int m) {
         case RM_COMP: comp_.reset(); break;
         case RM_CHORUS: chorus_.reset(); break;
         case RM_PHASER: phaser_.reset(); break;
+        case RM_PULSE: pulse_.reset(); break;
+        case RM_GRAIN: grain_.reset(); break;
         case RM_DELAY: delay_.reset(); break;
         case RM_REVERB: reverb_.reset(); break;
         default: break;
@@ -45,8 +47,10 @@ void Rack::resetModule(int m) {
 
 int Rack::tailSamples() const {
     int t = 0;
-    const int tails[RM_COUNT] = {drive_.tailSamples(), filter_.tailSamples(), eq_.tailSamples(), comp_.tailSamples(),
-                                 chorus_.tailSamples(), phaser_.tailSamples(), delay_.tailSamples(), reverb_.tailSamples()};
+    const int tails[RM_COUNT] = {drive_.tailSamples(),  filter_.tailSamples(), eq_.tailSamples(),
+                                 comp_.tailSamples(),   chorus_.tailSamples(), phaser_.tailSamples(),
+                                 pulse_.tailSamples(),  grain_.tailSamples(),  delay_.tailSamples(),
+                                 reverb_.tailSamples()};
     for (int m = 0; m < RM_COUNT; ++m)
         if (fade_[m] > 0.0f) t = std::max(t, tails[m]);
     return t;
@@ -72,6 +76,8 @@ void Rack::runModule(int m, const RackPatch& p, const Transport& t, float* L, fl
         case RM_COMP: comp_.set(p.comp, t); comp_.process(L, R, n); break;
         case RM_CHORUS: chorus_.set(p.chorus, t); chorus_.process(L, R, n); break;
         case RM_PHASER: phaser_.set(p.phaser, t); phaser_.process(L, R, n); break;
+        case RM_PULSE: pulse_.set(p.pulse, t); pulse_.process(L, R, n); break;
+        case RM_GRAIN: grain_.set(p.grain, t); grain_.process(L, R, n); break;
         case RM_DELAY: delay_.set(p.delay, t); delay_.process(L, R, n); break;
         case RM_REVERB: reverb_.set(p.reverb, t); reverb_.process(L, R, n); break;
         default: break;

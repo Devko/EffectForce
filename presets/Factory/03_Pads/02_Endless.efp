@@ -8,4 +8,3 @@ rev_decay=12
 rev_mod=0.7
 rev_damp=5000
 rev_mix=0.45
-out_gain=-1.1

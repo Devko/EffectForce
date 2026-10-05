@@ -50,7 +50,8 @@ ARM_OPT  := -O3 -march=armv7-a -mtune=cortex-a17 -mfpu=neon-vfpv4 -mfloat-abi=ha
 ARM_SO   := $(BUILD)/arm/effectforce.so
 ARM_BENCH := $(BUILD)/arm/efbench
 
-.PHONY: all surface skin preview test test-arm test-module test-module-arm bench levels preset-levels arm-plugin arm-bench bench-device \
+.PHONY: all surface skin preview test test-arm test-arm-pgo test-module test-module-arm bench levels preset-levels arm-plugin arm-bench \
+        bench-device rebuild-check \
         plugin-package plugin-install plugin-uninstall clean
 # A recipe that fails leaves no half-written target behind for the next make to trust.
 .DELETE_ON_ERROR:
@@ -141,6 +142,15 @@ preset-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
 	$(BUILD)/eflevels $(BUILD)/effectforce.so presets/Factory --write
 	python3 $(SURF)/surface.py
 
+# The suite against the objects the shipped .so is linked from (profile-guided), under qemu.
+test-arm-pgo: $(ARM_SO)
+ifeq ($(PGO_ON),1)
+	$(ARM_CXX) -std=c++17 $(ARM_OPT) -Wno-psabi -pthread $(INC) $(TESTS) $(PGO_OBJ)/*.o -o $(BUILD)/arm/plugin_test_pgo
+	$(ARM_RUN) $(BUILD)/arm/plugin_test_pgo
+else
+	@echo "test-arm-pgo: the .so is a plain build here (PGO=$(PGO)); test-arm covers it"
+endif
+
 # --- device -----------------------------------------------------------------------------------
 # The .so MPC loads: only VSTPluginMain exported (a version script hides the C++ template
 # instantiations and typeinfo -fvisibility leaves; -fno-gnu-unique keeps it unloadable);
@@ -148,10 +158,49 @@ preset-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
 ARM_SO_FLAGS = -std=c++17 $(ARM_OPT) -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -fno-gnu-unique -Wall -Wextra -Wno-psabi -pthread $(INC)
 ARM_SO_LINK  = -shared -Wl,--no-undefined -Wl,-soname,effectforce.so -Wl,--version-script=plugin/exports.map
 
+ARM_SO_CMD   = $(ARM_CXX) $(ARM_SO_FLAGS) $(ARM_SO_LINK)
+
+# Profile-guided: on by default when ARM programs can run here (qemu-arm installed, as test-arm
+# needs, or a native ARM build); PGO=0 builds without. A copy of the plugin compiled with counters
+# is linked into tools/pgo_train.cpp, which plays the reference mix through every module and preset;
+# then the .so is compiled from the same sources with the same flags plus that profile, which tells the
+# compiler which paths are hot. -fprofile-partial-training keeps functions the trainer never ran
+# optimised as usual. Objects keep one path (dir_name.o) in both rounds: GCC names the profile files
+# after it. A missing profile fails the build instead of quietly building without. (SubForce's.)
+PGO      ?= auto
+ARM_RUNS := $(if $(strip $(ARM_RUN)),$(shell command -v $(firstword $(ARM_RUN)) 2>/dev/null),native)
+PGO_ON   := $(if $(filter auto,$(PGO)),$(if $(ARM_RUNS),1,0),$(PGO))
+PGO_DIR  := $(BUILD)/arm/pgo
+PGO_PROF := $(abspath $(PGO_DIR)/profile)
+PGO_OBJ  := $(PGO_DIR)/obj
+PGO_O    = $(PGO_OBJ)/$$(echo $$f | tr / _ | sed 's/\.cpp$$/.o/')
+
+# The .so is rebuilt when the way it is built changes (PGO on/off, flags), not only its sources.
+ARM_SO_STAMP := $(BUILD)/arm/so_flags
+$(ARM_SO_STAMP): rebuild-check
+	@mkdir -p $(dir $@)
+	@echo '$(PGO_ON) $(ARM_SO_FLAGS)' | cmp -s - $@ || echo '$(PGO_ON) $(ARM_SO_FLAGS)' > $@
+rebuild-check:
+
 arm-plugin: $(ARM_SO)
-$(ARM_SO): $(SRC) $(HDR) $(GEN) plugin/exports.map
+$(ARM_SO): $(SRC) $(HDR) $(GEN) tools/pgo_train.cpp tools/loudness.h plugin/exports.map $(ARM_SO_STAMP)
 	mkdir -p $(BUILD)/arm
-	$(ARM_CXX) $(ARM_SO_FLAGS) $(ARM_SO_LINK) $(SRC) -o $@
+ifeq ($(PGO_ON),1)
+	rm -rf $(PGO_DIR) && mkdir -p $(PGO_OBJ) $(PGO_PROF)
+	for f in $(SRC); do $(ARM_CXX) $(ARM_SO_FLAGS) -fprofile-generate=$(PGO_PROF) -fprofile-update=prefer-atomic \
+		-c $$f -o $(PGO_O) || exit 1; done
+	$(ARM_CXX) $(ARM_SO_FLAGS) -fprofile-generate tools/pgo_train.cpp $(PGO_OBJ)/*.o -o $(PGO_DIR)/train
+	EF_DATA_DIR=$(PGO_DIR) EF_PRESET_ROOTS=$(PGO_DIR) EF_FIXED_SEED=1 $(ARM_RUN) $(PGO_DIR)/train
+	@n=$$(ls $(PGO_PROF)/*.gcda 2>/dev/null | wc -l); [ $$n -eq $(words $(SRC)) ] || \
+		{ echo "PGO: $$n of $(words $(SRC)) profiles written (PGO=0 builds without)"; exit 1; }
+	for f in $(SRC); do $(ARM_CXX) $(ARM_SO_FLAGS) -fprofile-use=$(PGO_PROF) -fprofile-partial-training -Werror=missing-profile \
+		-c $$f -o $(PGO_O) || exit 1; done
+	$(ARM_CXX) $(ARM_SO_FLAGS) $(ARM_SO_LINK) $(PGO_OBJ)/*.o -o $@
+	@echo "profile-guided build"
+else
+	$(ARM_SO_CMD) $(SRC) -o $@
+	@echo "plain build (PGO=$(PGO): $(firstword $(ARM_RUN)) $(if $(ARM_RUNS),found,not found))"
+endif
 	$(ARM_PREFIX)strip --strip-unneeded $@
 	@$(ARM_PREFIX)readelf -V $@ | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1 | sed 's/^/needs /'
 	@n=$$($(ARM_PREFIX)nm -D --defined-only $@ | wc -l); echo "exported symbols: $$n"; \

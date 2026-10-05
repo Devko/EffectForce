@@ -24,8 +24,8 @@ void runRack(Rack& r, const RackPatch& p, Buf& L, Buf& R) {
 }
 
 void orders() {
-    const int good[RM_COUNT] = {7, 6, 5, 4, 3, 2, 1, 0}, twice[RM_COUNT] = {0, 0, 2, 3, 4, 5, 6, 7},
-              outside[RM_COUNT] = {0, 1, 2, 3, 4, 5, 6, 8};
+    const int good[RM_COUNT] = {9, 8, 7, 6, 5, 4, 3, 2, 1, 0}, twice[RM_COUNT] = {0, 0, 2, 3, 4, 5, 6, 7, 8, 9},
+              outside[RM_COUNT] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 10};
     CHECK(validOrder(good) && !validOrder(twice) && !validOrder(outside));
 }
 

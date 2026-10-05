@@ -1,0 +1,14 @@
+effectforce 1
+grn_on=On
+grn_mode=Cloud
+grn_density=0.85
+grn_pitch=12
+grn_reverse=0.4
+grn_spread=0.8
+grn_fb=0.3
+grn_mix=0.55
+rev_on=On
+rev_mode=Space
+rev_decay=8
+rev_shim=0.4
+rev_mix=0.4

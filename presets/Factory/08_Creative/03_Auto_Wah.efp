@@ -10,4 +10,3 @@ env_rel=0.15
 m1_src=Envelope
 m1_dst=Filter Cutoff
 m1_amt=0.3
-out_gain=9.0

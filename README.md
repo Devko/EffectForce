@@ -3,7 +3,7 @@
 **An effect rack that runs natively inside MPC on the Akai Force.**
 
 EffectForce is a VST2 insert effect for MPC OS's built-in plugin host, with its own touchscreen pages
-and Q-Link sets: eight modules in one insert slot, in any order, with macros, LFOs and a modulation
+and Q-Link sets: ten modules in one insert slot, in any order, with macros, LFOs and a modulation
 matrix across all of them. It is built on the same groundwork as its siblings
 [PolyForce](https://github.com/Devko/PolyForce) and [SubForce](https://github.com/Devko/SubForce).
 
@@ -13,13 +13,15 @@ matrix across all of them. It is built on the same groundwork as its siblings
 
 ## Highlights
 
-- **Eight modules, any order:** Drive (2x oversampled: soft, tube, hard, fold, sine, crush), Filter
+- **Ten modules, any order:** Drive (2x oversampled: soft, tube, hard, fold, sine, crush), Filter
   (12/24 dB state-variable: low, high, band, notch; stereo spread), EQ (low and high cut, two shelves,
   a bell), Comp (a compressor with sidechain low cut, or OTT-style 3-band upward and downward
   compression), Chorus (chorus, ensemble, Juno-style dimension), Phaser (4, 8 or 12 stages, or a
-  flanger; synced to the beat), Delay (stereo, ping-pong or mono; tape wow, feedback filters and
-  drive, ducking) and Reverb (room, hall, plate, space; an 8-line feedback delay network with
-  modulation and freeze)
+  flanger; synced to the beat), Pulse (tremolo, auto-pan, a 16-step rhythmic gate), Grain (granular
+  textures on the beat: cloud, stretch, mosaic, stutter, arp; hold and feedback), Delay (stereo,
+  ping-pong or mono; tape wow, feedback filters and drive, ducking; tape glide or crossfade) and
+  Reverb (room, hall, plate, space; an 8-line feedback delay network with modulation, freeze and
+  shimmer)
 - **The CHAIN page:** the order as tiles; move a module left or right, switch it on or off. Switching
   fades, reordering never clicks, and a module that is off costs no CPU
 - **Modulation:** 4 macros, 2 LFOs (free or locked to MPC's beat), an envelope follower, and an
@@ -27,7 +29,7 @@ matrix across all of them. It is built on the same groundwork as its siblings
 - **Light on the CPU:** everything on at its heaviest, p99 11.3% of a block on the Force
 - **Built for MPC:** zero latency, tails that ring on through Stop, every getter cheap (MPC polls them
   hundreds of times a second), all measured on the device first ([the probe](docs/PROBE.md))
-- **37 factory presets** in 8 categories, level-matched on reference material so a preset changes
+- **52 factory presets** in 10 categories, level-matched on reference material so a preset changes
   the sound more than the level; user presets, favorites, a browser
 
 ## Documentation

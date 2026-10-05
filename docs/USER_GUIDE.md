@@ -15,7 +15,7 @@
 1. Install it (`make plugin-install`, or the release zip's `install.sh`; both restart MPC).
 2. On a track, a pad, or wherever MPC offers insert effects, add **EffectForce** from the insert
    effects.
-3. Open its screen. The **CHAIN** page shows the eight modules in their order; everything starts off.
+3. Open its screen. The **CHAIN** page shows the ten modules in their order; everything starts off.
 4. Pick a factory preset (**PRESETS** page, or the preset stepper at the top of CHAIN), or tap a
    module's tile, press **ON / OFF**, and set it up on its own page.
 
@@ -33,8 +33,8 @@ overlay shows the name without the page.
 |---|---|
 | CHAIN | **CHAIN**: the order, MOVE and ON / OFF, Input, Output, Mix, the macros, the preset stepper. **PRESETS**: the browser |
 | TONE | **DRIVE+FILTER**, **EQ**, **COMP** |
-| MOTION | **CHORUS+PHASE** |
-| SPACE | **DELAY**, **REVERB** |
+| MOTION | **CHORUS+PHASE**, **PULSE** |
+| SPACE | **DELAY**, **GRAIN**, **REVERB** |
 | MOD | **LFO+ENV** (both LFOs, the envelope follower, the macros), **MATRIX** (8 slots) |
 
 The status line at the top of every page: how many modules run, and the CPU EffectForce takes (the
@@ -42,8 +42,8 @@ average and the peak of the last half second, in percent of MPC's audio block).
 
 ## The chain
 
-The input goes through **Rack Input** gain, then the eight modules from left to right, then **Rack
-Output** gain; **Rack Mix** blends the result with the dry input (100% for an insert; lower to use the
+The input goes through **Rack Input** gain, then the ten modules in order (the first row of tiles left
+to right, then the second), then **Rack Output** gain; **Rack Mix** blends the result with the dry input (100% for an insert; lower to use the
 whole chain in parallel).
 
 - **The tiles** show the order. A lit tile is a module that is on; the selected one is in brackets.
@@ -110,6 +110,17 @@ time). **Phaser Center** is the centre of the sweep (Hz for a phaser, the base d
 flanger), **Phaser FB** the resonance (negative values
 put the notches elsewhere), **Phaser Stereo** the phase between left and right.
 
+### Pulse
+
+**Tremolo** (the level), **Auto-Pan** (the place in the stereo field, at constant power) or **Gate** (a
+rhythmic 16-step pattern). **Sync** runs it on MPC's beat (**Pulse Div**; for the gate, the length of
+a step, and the pattern's first step on the bar's downbeat), **Free** at **Pulse Rate**. **Pulse
+Depth**, **Pulse Shape** (sine, triangle, square for tremolo and pan; for the gate, hard steps to
+swells), **Pulse Stereo** (the tremolo's right side ahead of the left). The **GATE** card: **Gate
+Pattern** (1/16, 1/8, 1/4, Offbeat, Off 16ths, Dotted, Tresillo, Gallop, Rev Gallop, three Trance
+patterns, Pump, Stutter, Half Bar, Build), **Gate Length** (how long each step stays open) and **Gate
+Smooth** (its edges, so it never clicks).
+
 ### Delay
 
 **Stereo**, **Ping-Pong** (repeats bounce left, right, left) or **Mono**. **Sync** takes the time from
@@ -125,6 +136,23 @@ wobble). **Delay Duck** keeps the repeats down while you play and lets them bloo
 Time, modulation): **Tape** glides the time like a tape delay's motor, so repeats in flight bend in
 pitch; **Fade** crossfades to the new time over about 50 ms, no pitch bend at all.
 
+### Grain
+
+The last few seconds you played, replayed as grains and slices on MPC's beat (in the spirit of
+granular pedals such as the Microcosm). Five modes on the TEXTURE card:
+
+- **Cloud:** many short grains from all around the recent past: a shimmering haze.
+- **Stretch:** long grains that crawl through the recording far slower than it played: drones.
+- **Mosaic:** slices of the beat replayed in a new order, some reversed, some an octave away.
+- **Stutter:** the latest slice repeated, glitch style, then back to what you play.
+- **Arp:** grains on the beat stepping through intervals.
+
+**Grain Size** (Free, ms) or **Grain Div** (Sync, a note value) sets the grain or slice length;
+**Grain Density** how many grains overlap (Cloud, Stretch) or how much varies (Mosaic, Stutter, Arp);
+**Grain Pitch** in semitones; **Grain Reverse** the chance a grain plays backwards; **Grain Spread**
+how far back grains reach and how wide they sit; **Grain FB** feeds the output back into the
+recording, so textures evolve; **Grain Hold** freezes the recording and keeps playing it.
+
 ### Reverb
 
 **Room**, **Hall**, **Plate** and **Space** (very long, slowly moving). **Reverb Size**, **Reverb
@@ -132,6 +160,10 @@ Decay** (0.1 to 30 s), **Reverb Pre** (the pre-delay), **Reverb Damp** (above it
 room), **Reverb Lo Cut** (keeps the lows out of the tail), **Reverb Mod** (gentle movement in the
 tail: lusher, never metallic), **Reverb Width** and **Reverb Freeze** (the tail holds for ever, new
 sound stays out). Changing the mode clears the tail, as a hardware reverb's program change does.
+**Shimmer** sends the tail through a pitch shifter as it circulates, so it blooms upward with every
+pass (**Shimmer Pitch**: +12, +7, +19, or -12 for a sub shimmer). The climbing energy leaves the
+audible band in the end, so with a lot of shimmer a tail ends a little sooner than its Decay, and a
+frozen tail with shimmer slowly thins out instead of holding still.
 
 ## Modulation
 
@@ -159,9 +191,10 @@ LFO 1 synced to 1/8 → Filter Cutoff (a rhythmic filter).
 
 ## Presets
 
-- **Factory presets** in eight categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative.
-  Each is level-matched on reference material at a track's usual level (chords for Synth and Pads, a
-  bass line for Bass, drums for Drums, all of it for the rest): it comes out about as loud as it went
+- **Factory presets** in ten categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative,
+  Texture (Grain), Rhythm (Pulse).
+  Each is level-matched on reference material at a track's usual level (chords for Synth, Pads,
+  Texture and Rhythm, a bass line for Bass, drums for Drums, all of it for the rest): it comes out about as loud as it went
   in, so you compare sounds, not levels. Delay and reverb presets make up for the dry signal their Mix
   takes away. Band-pass sounds (Radio, Auto Wah) stay a little quieter: their Output stops at +9 dB.
 - **PRESETS page:** categories on the left (FAVORITES and RECENT first), presets on the right; tap to

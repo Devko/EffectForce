@@ -1,0 +1,10 @@
+effectforce 1
+pls_on=On
+pls_mode=Gate
+pls_div=1/8
+pls_pattern=Offbeat
+pls_length=0.7
+pls_smooth=0.008
+rev_on=On
+rev_decay=2.5
+rev_mix=0.3

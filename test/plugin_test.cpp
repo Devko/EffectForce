@@ -169,6 +169,15 @@ void testSuspend() {
     CHECK(t.op(vst::effGetTailSize) > kBlocksPerSec * kBlock);
 }
 
+// The option lists the plugin shows are the modules' own.
+void testLists() {
+    std::printf("== option lists\n");
+    for (int k = 0; k < Pulse::kPatterns; ++k)
+        CHECK(std::string(PARAM_INFO[P_PLS_PATTERN].opts[k]) == Pulse::kPatternNames[k]);
+    for (int k = 0; k < kNumDelayDivs; ++k) CHECK(std::string(PARAM_INFO[P_DLY_DIV].opts[k]) == kDelayDivs[k].name);
+    for (int k = 0; k < kNumLfoDivs; ++k) CHECK(std::string(PARAM_INFO[P_PHS_DIV].opts[k]) == kLfoDivs[k].name);
+}
+
 void testStatus() {
     std::printf("== the status line\n");
     Host h;
@@ -176,7 +185,7 @@ void testStatus() {
     h.on(P_CHR_ON);
     h.silence(kBlocksPerSec * kBlock);
     const std::string s = h.display(P_STATUS);
-    CHECK(s.find("2 OF 8 ON") == 0);
+    CHECK(s.find("2 OF 10 ON") == 0);
     CHECK(s.find("CPU") != std::string::npos);
     CHECK(h.log.updates > 0);
 }
@@ -231,6 +240,8 @@ int main() {
     compTests();
     chorusTests();
     phaserTests();
+    pulseTests();
+    grainTests();
     delayTests();
     reverbTests();
     rackTests();
@@ -241,6 +252,7 @@ int main() {
     testEveryModule();
     testSuspend();
     testStatus();
+    testLists();
     chainTests();
     presetTests();
     testStress();

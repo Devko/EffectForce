@@ -7,7 +7,8 @@
 //
 // Cases: everything off; each module alone with busy settings (compare them with the budgets in
 // docs/DESIGN.md; the verdict is the block's, below); then every module on at its heaviest (Drive 2x oversampled, OTT,
-// Phaser 12, ping-pong delay with wow and ducking, the Space reverb fully modulated) with all eight
+// Phaser 12, the gate, the densest pitched grain cloud, ping-pong delay with wow and ducking, the Space
+// reverb fully modulated with shimmer) with all eight
 // matrix slots moving targets from both LFOs and the envelope: the worst a preset can reach.
 // Hermetic: the plugin reads no user folders and saves nothing.
 #ifndef _GNU_SOURCE
@@ -115,6 +116,19 @@ void busy(const Setter& set, int module, bool heaviest) {
             set(P_PHS_RATE, 2.0f);
             set(P_PHS_FB, 0.7f);
             break;
+        case M_PULSE:
+            set.opt(P_PLS_ON, "On");
+            set.opt(P_PLS_MODE, heaviest ? "Gate" : "Tremolo");
+            set(P_PLS_DEPTH, 0.8f);
+            break;
+        case M_GRAIN:
+            set.opt(P_GRN_ON, "On");
+            set.opt(P_GRN_MODE, "Cloud");
+            set(P_GRN_DENSITY, 1.0f);
+            set(P_GRN_PITCH, 12.0f);
+            set(P_GRN_SPREAD, 0.8f);
+            set(P_GRN_FB, heaviest ? 0.5f : 0.0f);
+            break;
         case M_DELAY:
             set.opt(P_DLY_ON, "On");
             set.opt(P_DLY_MODE, "Ping-Pong");
@@ -130,6 +144,7 @@ void busy(const Setter& set, int module, bool heaviest) {
             set(P_REV_DECAY, 6.0f);
             set(P_REV_MOD, 1.0f);
             set(P_REV_SIZE, 0.8f);
+            set(P_REV_SHIM, heaviest ? 0.6f : 0.0f);
             break;
         default: break;
     }

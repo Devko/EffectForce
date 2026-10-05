@@ -1,7 +1,8 @@
 // dsp/reverb.h: decay time against the target (Schroeder integration), damping, evenness across
 // frequency, echo density, level, predelay, freeze, stereo decorrelation and width, mix, low cut,
-// modulation, and robustness (extremes, random jumps, NaN input, block sizes, reset and stale
-// buffers, clicks on changes, tailSamples()).
+// modulation, shimmer (pitch, bounds, clicks, off bit for bit as before), and robustness
+// (extremes, random jumps, NaN input, block sizes, reset and stale buffers, clicks on changes,
+// tailSamples()).
 #include "signal.h"
 #include "../dsp/reverb.h"
 
@@ -467,7 +468,9 @@ void randomJumps() {
         p.width = uni(-1.0f, 2.0f);
         p.freeze = uni(0.0f, 1.0f) < 0.2f;
         p.mix = uni(-0.2f, 1.2f);
-        if (uni(0.0f, 1.0f) < 0.05f) p.size = p.decayS = p.dampHz = p.mod = p.mix = std::nanf("");
+        p.shimmer = uni(-0.5f, 1.5f);
+        p.shimmerInterval = static_cast<int>(uni(-2.0f, 6.0f));
+        if (uni(0.0f, 1.0f) < 0.05f) p.size = p.decayS = p.dampHz = p.mod = p.mix = p.shimmer = std::nanf("");
     });
     CHECK(allFinite(L) && allFinite(R));
     CHECK(peak(L) < 20.0f && peak(R) < 20.0f);
@@ -476,30 +479,37 @@ void randomJumps() {
 // A NaN or infinity in the input is a 0 to the reverb: the output is the same as with a 0 there.
 void nanInput() {
     Reverb r;
-    P p;
-    p.mix = 0.5f;
-    Buf L = whiteNoise(secs(1.0), 0.5f), R = whiteNoise(secs(1.0), 0.5f, 5);
-    Buf L0 = L, R0 = R;
-    L[1000] = std::nanf("");
-    R[3000] = INFINITY;
-    L[5000] = -INFINITY;
-    L0[1000] = R0[3000] = L0[5000] = 0.0f;
-    const Stereo a = render(r, p, L, R), b = render(r, p, L0, R0);
-    CHECK(allFinite(a.L) && allFinite(a.R));
-    CHECK(a.L == b.L && a.R == b.R);
+    for (float shimmer : {0.0f, 0.6f}) {
+        P p;
+        p.mix = 0.5f;
+        p.shimmer = shimmer;
+        Buf L = whiteNoise(secs(1.0), 0.5f), R = whiteNoise(secs(1.0), 0.5f, 5);
+        Buf L0 = L, R0 = R;
+        L[1000] = std::nanf("");
+        R[3000] = INFINITY;
+        L[5000] = -INFINITY;
+        L0[1000] = R0[3000] = L0[5000] = 0.0f;
+        const Stereo a = render(r, p, L, R), b = render(r, p, L0, R0);
+        CHECK(allFinite(a.L) && allFinite(a.R));
+        CHECK(a.L == b.L && a.R == b.R);
+    }
 }
 
 // Constant parameters: the same output whatever the block size (everything per sample is the same).
 void blockSizes() {
     Reverb r;
-    P p;
-    p.mod = 1.0f;
-    p.mix = 0.5f;
-    const Buf L = whiteNoise(secs(1.0), 0.5f), R = whiteNoise(secs(1.0), 0.5f, 2);
-    const Stereo ref = render(r, p, L, R, 32);
-    for (int chunk : {1, 7}) {
-        const Stereo s = render(r, p, L, R, chunk);
-        CHECK(s.L == ref.L && s.R == ref.R);
+    for (float shimmer : {0.0f, 0.7f}) {
+        P p;
+        p.mod = 1.0f;
+        p.mix = 0.5f;
+        p.shimmer = shimmer;
+        p.shimmerInterval = Reverb::UP_FIFTH;
+        const Buf L = whiteNoise(secs(1.0), 0.5f), R = whiteNoise(secs(1.0), 0.5f, 2);
+        const Stereo ref = render(r, p, L, R, 32);
+        for (int chunk : {1, 7}) {
+            const Stereo s = render(r, p, L, R, chunk);
+            CHECK(s.L == ref.L && s.R == ref.R);
+        }
     }
 }
 
@@ -509,10 +519,13 @@ void resetClears() {
     P p;
     p.mix = 1.0f;
     p.freeze = true;
+    p.shimmer = 1.0f;
     Buf L = whiteNoise(secs(0.5), 0.5f), R = L;
     run(used, p, L, R);
     p.freeze = false;
     p.mode = Reverb::SPACE;
+    p.shimmer = 0.5f;
+    p.shimmerInterval = Reverb::DOWN_OCTAVE;
     used.reset();
     Buf a = impulseAt(secs(1.0), 10), b = a, c = a, d = a;
     run(used, p, a, b);
@@ -534,6 +547,7 @@ void noStaleTail() {
     p.mod = 1.0f;
     p.predelayMs = 250.0f;
     p.mix = 1.0f;
+    p.shimmer = 1.0f;
     Buf L = whiteNoise(secs(1.5), 1.0f, 31), R = whiteNoise(secs(1.5), 1.0f, 32);
     run(r, p, L, R);
     CHECK(rms(L, at(1.0), at(1.5)) > 0.1);
@@ -642,9 +656,245 @@ void clicks() {
     }
 }
 
+// A fingerprint of the output (FNV-1a over the samples' bits, -0 as 0).
+uint64_t fingerprint(const Buf& L, const Buf& R) {
+    uint64_t h = 1469598103934665603ull;
+    for (const Buf* b : {&L, &R}) {
+        for (float v : *b) {
+            uint32_t bits;
+            const float x = v == 0.0f ? 0.0f : v;
+            std::memcpy(&bits, &x, sizeof bits);
+            for (int k = 0; k < 4; ++k) {
+                h ^= (bits >> (8 * k)) & 0xffu;
+                h *= 1099511628211ull;
+            }
+        }
+    }
+    return h;
+}
+
+// Every mode through one second of everything moving: size, predelay, freeze, modulation, decay,
+// damping, low cut, width, mix, and a mode change.
+uint64_t goldenRun(int mode) {
+    Reverb r;
+    Buf L = whiteNoise(secs(1.0), 0.5f, 41 + static_cast<uint32_t>(mode)), R = whiteNoise(secs(1.0), 0.5f, 51);
+    for (size_t i = at(0.3); i < at(0.6); ++i) L[i] = R[i] = 0.0f;
+    P p;
+    p.mode = mode;
+    runChanging(r, p, L, R, [mode](size_t pos, P& q) {
+        const double t = static_cast<double>(pos) / ef::kRate;
+        q.size = t < 0.2 ? 0.5f : 0.9f;
+        q.predelayMs = t < 0.4 ? 20.0f : 60.0f;
+        q.freeze = t >= 0.5 && t < 0.7;
+        q.mod = t < 0.1 ? 0.3f : 0.8f;
+        q.decayS = t < 0.25 ? 2.5f : 8.0f;
+        q.dampHz = t < 0.35 ? 6000.0f : 3000.0f;
+        q.lowCutHz = t < 0.45 ? 150.0f : 400.0f;
+        q.width = t < 0.55 ? 1.0f : 0.6f;
+        q.mix = t < 0.65 ? 0.3f : 0.7f;
+        q.mode = t < 0.8 ? mode : (mode + 1) % Reverb::kModes;
+    });
+    return fingerprint(L, R);
+}
+
+// Shimmer 0 is the reverb as it was before shimmer, bit for bit: the fingerprints it had then (the
+// x86 test build and the device's differ: GCC fuses multiply-adds for NEON).
+void golden() {
+#if EF_NEON
+    const uint64_t before[Reverb::kModes] = {0xdd8cbf74d06f96c3ull, 0x39827f258658b59cull, 0xc476a1cf2992a1aeull, 0xb88c6356e4a4538eull};
+#else
+    const uint64_t before[Reverb::kModes] = {0x982cafd935fb49caull, 0x7769d083c90a8076ull, 0xb926f8e8c89084baull, 0xc81be01a1943df90ull};
+#endif
+    for (int mode = 0; mode < Reverb::kModes; ++mode) CHECK(goldenRun(mode) == before[mode]);
+}
+
+// --- shimmer -----------------------------------------------------------------------------------
+
+// The amplitude of the hz component of x[from..to) (Goertzel through a precomputed Hann window).
+double toneAt(const Buf& x, double hz, size_t from, const std::vector<double>& window) {
+    const double w = 2.0 * kPi * hz / ef::kRate, c = 2.0 * std::cos(w);
+    double s1 = 0.0, s2 = 0.0, sum = 0.0;
+    for (size_t i = 0; i < window.size(); ++i) {
+        const double s0 = x[from + i] * window[i] + c * s1 - s2;
+        s2 = s1;
+        s1 = s0;
+        sum += window[i];
+    }
+    const double re = s1 - s2 * std::cos(w), im = s2 * std::sin(w);
+    return 2.0 * std::sqrt(re * re + im * im) / sum;
+}
+
+// A 440 Hz tone grows a component at 440 x the interval in the wet, where there was none, and it
+// is at that pitch to within a few cents (the shifter splices in phase: a clean line, not a smear
+// between lines half the grain rate apart). Measured while the tone plays: once it stops, the
+// tail is the network's own modes around 440 Hz, which spread over tens of cents with or without
+// shimmer.
+void shimmerPitch() {
+    Reverb r;
+    const double ratio[Reverb::kIntervals] = {2.0, 1.4983070768766815, 3.1748021039363987, 0.5};
+    const size_t from = at(1.5), len = at(2.0);
+    std::vector<double> window(len);
+    for (size_t i = 0; i < len; ++i) window[i] = 0.5 - 0.5 * std::cos(2.0 * kPi * static_cast<double>(i) / static_cast<double>(len));
+    std::printf("  reverb: a 440 Hz tone's shimmer, gain at the new pitch and cents off it:");
+    for (int iv = 0; iv < Reverb::kIntervals; ++iv) {
+        const double target = 440.0 * ratio[iv];
+        double level[2] = {};
+        Stereo s;
+        for (int on = 0; on < 2; ++on) {
+            P p = wetOnly(Reverb::HALL, 8.0f);
+            p.mod = 0.0f;
+            p.dampHz = 8000.0f;
+            p.shimmer = on ? 0.5f : 0.0f;
+            p.shimmerInterval = iv;
+            const Buf x = sine(440.0, secs(3.5), 0.3f);
+            s = render(r, p, x, x);
+            level[on] = toneAt(s.L, target, from, window);
+        }
+        // The peak within 50 cents: every 5 cents, then every quarter cent around the best.
+        double best = 0.0, top = -1.0;
+        for (double c = -50.0; c <= 50.0; c += 5.0) {
+            const double m = toneAt(s.L, target * std::pow(2.0, c / 1200.0), from, window);
+            if (m > top) {
+                top = m;
+                best = c;
+            }
+        }
+        const double coarse = best;
+        for (double c = coarse - 5.0; c <= coarse + 5.0; c += 0.25) {
+            const double m = toneAt(s.L, target * std::pow(2.0, c / 1200.0), from, window);
+            if (m > top) {
+                top = m;
+                best = c;
+            }
+        }
+        std::printf(" %.0f Hz %+.0f dB %+.1f", target, db(level[1] / level[0]), best);
+        CHECK(db(level[1] / level[0]) > 30.0);
+        CHECK(std::fabs(best) < 5.0);
+    }
+    std::printf("\n");
+}
+
+// Shimmer 1 at the extremes: every mode (each with another interval), decay 30 s, size 1, full
+// modulation, loud noise and a tone for 2 s, frozen from 10 s to 20 s, 30 s in all. The energy
+// never rises over what the input left (the shifter adds none; what climbs out of its band
+// leaves), frozen it doesn't grow. And a frozen chord with shimmer 0.5, where the pitched copy and
+// what stays could add up if they were alike: it doesn't grow either.
+void shimmerBounded() {
+    Reverb r;
+    Buf x = whiteNoise(secs(30.0), 0.5f, 61);
+    const Buf tone = sine(220.0, secs(2.0), 0.3f);
+    for (size_t i = 0; i < x.size(); ++i) x[i] = i < tone.size() ? x[i] + tone[i] : 0.0f;
+    double worstRise = -100.0, worstFrozen = -100.0;
+    float worstPeak = 0.0f;
+    for (int mode = 0; mode < Reverb::kModes; ++mode) {
+        P p;
+        p.mode = mode;
+        p.decayS = 30.0f;
+        p.size = 1.0f;
+        p.mod = 1.0f;
+        p.dampHz = 20000.0f;
+        p.lowCutHz = 20.0f;
+        p.mix = 1.0f;
+        p.shimmer = 1.0f;
+        p.shimmerInterval = mode;
+        Buf L = x, R = x;
+        r.reset();
+        runChanging(r, p, L, R, [](size_t pos, P& q) { q.freeze = pos >= at(10.0) && pos < at(20.0); });
+        CHECK(allFinite(L) && allFinite(R));
+        worstPeak = std::max({worstPeak, peak(L), peak(R)});
+        const Stereo s{L, R};
+        const double ref = rmsLR(s, at(2.0), at(3.0));
+        for (double t = 3.0; t < 30.0; t += 1.0) worstRise = std::max(worstRise, db(rmsLR(s, at(t), at(t + 1.0)) / ref));
+        const double frozen = rmsLR(s, at(11.0), at(12.0));
+        for (double t = 12.0; t < 20.0; t += 1.0) worstFrozen = std::max(worstFrozen, db(rmsLR(s, at(t), at(t + 1.0)) / frozen));
+    }
+    // The chord, frozen with shimmer 0.5.
+    P p = wetOnly(Reverb::HALL, 30.0f);
+    p.shimmer = 0.5f;
+    Buf c = sine(220.0, secs(30.0), 0.2f);
+    const Buf e = sine(330.0, secs(30.0), 0.2f), a = sine(440.0, secs(30.0), 0.2f);
+    for (size_t i = 0; i < c.size(); ++i) c[i] = i < at(2.0) ? c[i] + e[i] + a[i] : 0.0f;
+    Buf L = c, R = c;
+    r.reset();
+    runChanging(r, p, L, R, [](size_t pos, P& q) { q.freeze = pos >= at(2.0); });
+    const Stereo s{L, R};
+    const double held = rmsLR(s, at(3.0), at(4.0));
+    double chordRise = -100.0;
+    for (double t = 4.0; t < 30.0; t += 1.0) chordRise = std::max(chordRise, db(rmsLR(s, at(t), at(t + 1.0)) / held));
+    std::printf("  reverb: shimmer 1, decay 30 s, 30 s: highest second %+.1f dB over the input's last, frozen %+.1f dB, "
+                "peak %.2f; a frozen chord at shimmer 0.5: %+.1f dB\n", worstRise, worstFrozen, worstPeak, chordRise);
+    CHECK(worstRise < 1.0);
+    CHECK(worstFrozen < 1.0);
+    CHECK(worstPeak < 20.0f);
+    CHECK(chordRise < 1.0);
+}
+
+// The highs (above 12 kHz, 4th order) of x: where a click shows. A low tone through the shimmer
+// has hardly any there; a step has.
+Buf highs(const Buf& x) {
+    Buf y = x;
+    for (int stage = 0; stage < 2; ++stage) {
+        const double w = 2.0 * kPi * 12000.0 / ef::kRate, al = std::sin(w) / (2.0 * 0.7071), a0 = 1.0 + al;
+        const double b0 = (1.0 + std::cos(w)) / 2.0 / a0, b1 = -(1.0 + std::cos(w)) / a0, a1 = -2.0 * std::cos(w) / a0, a2 = (1.0 - al) / a0;
+        double x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
+        for (float& v : y) {
+            const double o = b0 * v + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2;
+            x2 = x1;
+            x1 = v;
+            y2 = y1;
+            y1 = o;
+            v = static_cast<float>(o);
+        }
+    }
+    return y;
+}
+
+// No clicks when the shimmer comes in, goes out, or changes interval (which fades it out and in):
+// the highs around the change stay where they are before it and once it has settled.
+void shimmerClicks() {
+    Reverb r;
+    struct Change {
+        const char* what;
+        float before, after;
+        int ivBefore, ivAfter;
+    };
+    for (const Change c : {Change{"in", 0.0f, 1.0f, 0, 0}, Change{"out", 1.0f, 0.0f, 0, 0}, Change{"+12 to +19", 1.0f, 1.0f, 0, 2},
+                           Change{"+12 to -12", 1.0f, 1.0f, 0, 3}, Change{"+7 to +12", 0.6f, 0.6f, 1, 0}}) {
+        P p = wetOnly(Reverb::HALL, 3.0f);
+        p.dampHz = 4000.0f;
+        Buf L = sine(150.0, secs(3.0), 0.5f), R = L;
+        r.reset();
+        runChanging(r, p, L, R, [&](size_t pos, P& q) {
+            const bool after = pos >= at(1.5);
+            q.shimmer = after ? c.after : c.before;
+            q.shimmerInterval = after ? c.ivAfter : c.ivBefore;
+        });
+        const Buf h = highs(L);
+        const float around = peak(h, at(1.45), at(1.7)), calm = std::max(peak(h, at(1.0), at(1.45)), peak(h, at(2.2), at(3.0)));
+        const bool ok = around <= 3.0f * calm + 1e-5f;
+        if (!ok) std::printf("  reverb: a click as the shimmer goes %s (%.2g against %.2g)\n", c.what, around, calm);
+        CHECK(ok);
+    }
+    // Shimmer back at 0: the shifter stops.
+    P p;
+    p.shimmer = 0.5f;
+    Buf L = whiteNoise(secs(0.2), 0.5f), R = L;
+    r.reset();
+    run(r, p, L, R);
+    CHECK(r.shimmering());
+    p.shimmer = 0.0f;
+    Buf l = whiteNoise(secs(0.05), 0.5f), rr = l;   // the angle glides out over 20 ms
+    run(r, p, l, rr);
+    CHECK(!r.shimmering());
+}
+
 } // namespace
 
 void reverbTests() {
+    golden();
+    shimmerPitch();
+    shimmerBounded();
+    shimmerClicks();
     decay();
     damping();
     evenDecay();

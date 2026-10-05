@@ -1,0 +1,12 @@
+effectforce 1
+grn_on=On
+grn_mode=Stretch
+grn_sync=Free
+grn_size=0.5
+grn_density=0.8
+grn_fb=0.4
+grn_mix=0.6
+rev_on=On
+rev_mode=Space
+rev_decay=12
+rev_mix=0.4

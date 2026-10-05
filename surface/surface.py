@@ -49,7 +49,7 @@ VST = {"name": "EffectForce", "vendor": "Devko", "uid": "EfFc", "version": 1000,
 # The modules, in their default order; the C++ Module enum (build/param_ids.h) follows this list.
 # (prefix, name on the CHAIN page and in saved state)
 MODULES = [("drv", "Drive"), ("flt", "Filter"), ("eq", "EQ"), ("cmp", "Comp"), ("chr", "Chorus"),
-           ("phs", "Phaser"), ("dly", "Delay"), ("rev", "Reverb")]
+           ("phs", "Phaser"), ("pls", "Pulse"), ("grn", "Grain"), ("dly", "Delay"), ("rev", "Reverb")]
 MODULE_NAMES = [m[1] for m in MODULES]
 
 
@@ -231,6 +231,41 @@ num("rev_mod", "Reverb Mod", "lin", 0, 1, 0.3, "pct")
 num("rev_width", "Reverb Width", "lin", 0, 1, 1, "pct")
 enum("rev_freeze", "Reverb Freeze", ON_OFF, "Off")
 num("rev_mix", "Reverb Mix", "lin", 0, 1, 0.3, "pct")
+num("rev_shim", "Shimmer", "lin", 0, 1, 0, "pct")                         # dsp/reverb.h: the pitched tail
+enum("rev_shim_int", "Shimmer Pitch", ["+12", "+7", "+19", "-12"], "+12")
+
+# Pulse (dsp/pulse.h): tremolo, auto-pan, a rhythmic gate. PULSE_PATTERNS = Pulse::kPatternNames.
+PULSE_PATTERNS = ["1/16", "1/8", "1/4", "Offbeat", "Off 16ths", "Dotted", "Tresillo", "Gallop", "Rev Gallop",
+                  "Trance 1", "Trance 2", "Trance 3", "Pump", "Stutter", "Half Bar", "Build"]
+enum("pls_on", "Pulse On", ON_OFF, "Off")
+enum("pls_mode", "Pulse Mode", ["Tremolo", "Auto-Pan", "Gate"], "Tremolo")
+enum("pls_sync", "Pulse Sync", FREE_SYNC, "Sync")
+num("pls_rate", "Pulse Rate", "log", 0.1, 20, 4, "lfohz")
+enum("pls_div", "Pulse Div", LFO_DIVS, "1/8")
+popup_flag("pls_div")
+num("pls_depth", "Pulse Depth", "lin", 0, 1, 1, "pct")
+num("pls_shape", "Pulse Shape", "lin", 0, 1, 0, "pct")
+num("pls_stereo", "Pulse Stereo", "lin", 0, 180, 0, "deg")
+enum("pls_pattern", "Gate Pattern", PULSE_PATTERNS, "1/16")
+popup_flag("pls_pattern")
+num("pls_length", "Gate Length", "lin", 0.05, 1, 0.5, "pct")
+num("pls_smooth", "Gate Smooth", "log", 0.0005, 0.05, 0.003, "time")
+num("pls_mix", "Pulse Mix", "lin", 0, 1, 1, "pct")
+
+# Grain (dsp/grain.h): the last seconds of input replayed as grains and slices, on MPC's beat.
+enum("grn_on", "Grain On", ON_OFF, "Off")
+enum("grn_mode", "Grain Mode", ["Cloud", "Stretch", "Mosaic", "Stutter", "Arp"], "Cloud")
+enum("grn_sync", "Grain Sync", FREE_SYNC, "Sync")
+num("grn_size", "Grain Size", "log", 0.01, 1, 0.12, "time")
+enum("grn_div", "Grain Div", DELAY_DIVS, "1/16")
+popup_flag("grn_div")
+num("grn_density", "Grain Density", "lin", 0, 1, 0.5, "pct")
+num("grn_pitch", "Grain Pitch", "int", -24, 24, 0, "semi")
+num("grn_reverse", "Grain Reverse", "lin", 0, 1, 0, "pct")
+num("grn_spread", "Grain Spread", "lin", 0, 1, 0.5, "pct")
+num("grn_fb", "Grain FB", "lin", 0, 0.95, 0, "pct")
+enum("grn_hold", "Grain Hold", ON_OFF, "Off")
+num("grn_mix", "Grain Mix", "lin", 0, 1, 0.5, "pct")
 
 # --- modulation (dsp/mod.h): two LFOs, the envelope follower, the matrix ---
 LFO_WAVES = ["Sine", "Triangle", "Saw Up", "Saw Down", "Square", "S&H", "Smooth"]   # dsp/mod.h LfoWave
@@ -257,7 +292,8 @@ MOD_TARGET_KEYS = ["in_gain", "out_gain", "mix",
                    "chr_rate", "chr_depth", "chr_mix",
                    "phs_rate", "phs_depth", "phs_center", "phs_fb", "phs_mix",
                    "dly_time", "dly_fb", "dly_spread", "dly_lc", "dly_hc", "dly_wow", "dly_duck", "dly_mix",
-                   "rev_size", "rev_decay", "rev_damp", "rev_mod", "rev_width", "rev_mix",
+                   "rev_size", "rev_decay", "rev_damp", "rev_mod", "rev_width", "rev_mix", "rev_shim",
+                   "pls_rate", "pls_depth", "grn_density", "grn_pitch", "grn_mix",
                    "l1_rate", "l2_rate"]
 _names = {p["key"]: p["name"] for p in P}
 MOD_TARGETS = ["Off"] + [_names[k] for k in MOD_TARGET_KEYS]
@@ -489,10 +525,10 @@ def build_layout():
     L.header(status_w=700)
     L.stepper(998, 121, 516, "preset")
     L.card(24, R1, 1232, 270, "CHAIN")
-    L.tiles(44, 212, 1192, 8, 1, 64, 8, "slot")
-    L.button(380, R1 + 200, "< MOVE", "move_l")
-    L.button(640, R1 + 200, "ON / OFF", "sel_on")
-    L.button(900, R1 + 200, "MOVE >", "move_r")
+    L.tiles(44, 206, 1192, 5, 2, 52, 8, "slot")   # the order reads left to right, then the second row
+    L.button(380, R1 + 220, "< MOVE", "move_l")
+    L.button(640, R1 + 220, "ON / OFF", "sel_on")
+    L.button(900, R1 + 220, "MOVE >", "move_r")
     L.card(24, R2, 608, 270, "LEVELS")
     for cx, k in zip(L4, levels):
         L.knob(cx, R2 + 126, k)
@@ -577,7 +613,24 @@ def build_layout():
     for cx, k in zip(S8[3:], phs5):
         L.knob(cx, R2 + 170, k)
 
-    # SPACE: delay and reverb.
+    pls5 = ("pls_depth", "pls_shape", "pls_stereo", "pls_mix")
+    L.page("PULSE", bank(("pls_rate", "pls_div") + pls5 + ("pls_sync", "pls_on"))
+           + ["pls_pattern", "pls_length", "pls_smooth", "pls_mode"])
+    L.header("pls_mode")
+    L.card(24, R1, 1232, 270, "PULSE")
+    on_seg(L, S8[0], R1, "pls_on")
+    L.hseg(S8[1] + 76, R1 + 76, "pls_sync", 100)
+    rate_or_div(L, S8[2], R1 + 170, "pls_sync", "pls_rate", "pls_div")
+    for cx, k in zip(S8[3:], pls5):
+        L.knob(cx, R1 + 170, k)
+    L.mode("pls_mode:Gate")
+    L.card(24, R2, 1232, 270, "GATE")
+    L.popup(S8[1] - 40, R2 + 126, 200, "pls_pattern")
+    L.knob(S8[3], R2 + 126, "pls_length")
+    L.knob(S8[4], R2 + 126, "pls_smooth")
+    L.mode(None)
+
+    # SPACE: delay, grain and reverb.
     L.group("SPACE")
     dly4 = ("dly_fb", "dly_spread", "dly_duck", "dly_mix")
     fbk4 = ("dly_lc", "dly_hc", "dly_drive", "dly_wow")
@@ -596,9 +649,24 @@ def build_layout():
         L.knob(cx, R2 + 126, k)
     L.vseg(S8[5], R2 + 160, "dly_glide", sw=124, label="TIME CHANGE")
 
+    grn5 = ("grn_density", "grn_pitch", "grn_reverse", "grn_spread", "grn_mix")
+    L.page("GRAIN", bank(("grn_size", "grn_div") + grn5 + ("grn_on",))
+           + ["grn_fb", "grn_hold", "grn_sync", "grn_mode"])
+    L.header()
+    L.card(24, R1, 1232, 270, "GRAIN")
+    on_seg(L, S8[0], R1, "grn_on")
+    L.hseg(S8[1] + 76, R1 + 76, "grn_sync", 100)
+    rate_or_div(L, S8[2], R1 + 170, "grn_sync", "grn_size", "grn_div")
+    for cx, k in zip(S8[3:], grn5):
+        L.knob(cx, R1 + 170, k)
+    L.card(24, R2, 1232, 270, "TEXTURE")
+    hseg_rows(L, 330, R2 + 130, "grn_mode", 96, 2, "MODE")
+    L.knob(S8[4], R2 + 126, "grn_fb")
+    L.vseg(S8[6], R2 + 160, "grn_hold", sw=110, label="HOLD")
+
     rev5 = ("rev_size", "rev_decay", "rev_pre", "rev_width", "rev_mix")
     rev3 = ("rev_damp", "rev_lc", "rev_mod")
-    L.page("REVERB", bank(rev5 + ("rev_freeze", "rev_mode", "rev_on")) + list(rev3))
+    L.page("REVERB", bank(rev5 + ("rev_freeze", "rev_mode", "rev_on")) + list(rev3) + ["rev_shim", "rev_shim_int"])
     L.header()
     L.card(24, R1, 1232, 270, "REVERB")
     on_seg(L, S8[0], R1, "rev_on")
@@ -606,9 +674,11 @@ def build_layout():
     for cx, k in zip(S8[2:], rev5):
         L.knob(cx, R1 + 126, k)
     L.vseg(S8[7], R1 + 160, "rev_freeze", sw=110, label="FREEZE")
-    L.card(24, R2, 1232, 270, "TONE")
+    L.card(24, R2, 1232, 270, "TONE AND SHIMMER")
     for cx, k in zip(S8, rev3):
         L.knob(cx, R2 + 126, k)
+    L.knob(S8[4], R2 + 126, "rev_shim")
+    L.vseg(S8[5] + 20, R2 + 160, "rev_shim_int", sw=110, label="PITCH")
 
     # MOD: the LFOs, the envelope follower and the macros; the matrix.
     L.group("MOD")
@@ -642,7 +712,7 @@ def build_layout():
         p = "m%d_" % k
         L.text(x + 40, cy - 8, str(k))
         L.popup(x + 160, cy, 150, p + "src")
-        L.popup(x + 365, cy, 170, p + "dst")   # 170: the open list of 49 targets fits the screen in 7 columns
+        L.popup(x + 365, cy, 150, p + "dst")   # 150: the open list of 55 targets fits the screen in 8 columns
         L.knob(x + 545, cy, p + "amt", "small")
     return L
 
@@ -1045,7 +1115,7 @@ def check_layout(text, groups):
 CURVE = {"readout": "Readout", "enum": "Enum", "lin": "Lin", "log": "Log", "int": "Int", "pow": "Pow"}
 FMT = {"none": "None", "enum": "Enum", "pct": "Percent", "bipct": "Bipolar", "hz": "Hz", "hzlo": "HzLo",
        "hzhi": "HzHi", "time": "Time", "db": "Db", "ratio": "Ratio", "mult": "Mult", "q": "Q", "oct": "Oct",
-       "deg": "Degrees", "lfohz": "LfoHz", "center": "Center", "count": "Count", "text": "Text"}
+       "deg": "Degrees", "lfohz": "LfoHz", "center": "Center", "count": "Count", "text": "Text", "semi": "Semi"}
 KIND = {"synth": "Synth", "chain": "Chain", "ui": "Ui", "readout": "Readout", "stepper": "Stepper",
         "button": "Button", "tile": "Tile", "toggle": "Toggle", "popup": "Popup"}
 
@@ -1084,7 +1154,7 @@ enum ParamId : int {
 
 enum class Curve : unsigned char { Readout, Enum, Lin, Log, Int, Pow };
 enum class Fmt : unsigned char { None, Enum, Percent, Bipolar, Hz, HzLo, HzHi, Time, Db, Ratio, Mult, Q, Oct, Degrees,
-                                 LfoHz, Center, Count, Text };
+                                 LfoHz, Center, Count, Text, Semi };
 // Who owns the value and what a set does: see surface.py "kind".
 enum class Kind : unsigned char { Synth, Chain, Ui, Readout, Stepper, Button, Tile, Toggle, Popup };
 

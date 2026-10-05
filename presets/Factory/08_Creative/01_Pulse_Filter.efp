@@ -9,4 +9,3 @@ l1_div=1/8
 m1_src=LFO 1
 m1_dst=Filter Cutoff
 m1_amt=0.35
-out_gain=0.8

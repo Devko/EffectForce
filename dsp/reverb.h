@@ -30,7 +30,20 @@
 //
 // Freeze: the loop gains glide to 1 (to float precision: 1 - 2e-8), the damping out and the input
 // fades (46 ms); leaving it glides back to the normal decay.
+//
+// Shimmer: a pitch shifter (dsp/pitch.h) on one direction of the feedback, the Hadamard's row 3:
+// that component c goes back as cos(a) c + sin(a) (P(c) - b c), a = shimmer x 90 degrees, P the
+// shifter, b c the part of P(c) correlated with c (measured over 50 ms) taken out, so the two
+// terms add in power, never more. Every pass an eighth of the tail's energy moves up (or down) by
+// the interval, so the tail blooms. The shifter never adds energy and the rest of the loop is as
+// before, so the network stays as bounded as without it, frozen too (there, what climbs past the
+// shimmer path's low-pass, or under its high-pass, leaves: a frozen sound slowly thins). The path:
+// a high-pass at 80 Hz and a 24 dB/oct low-pass under rate / 3 / ratio (9 kHz at most), so +19
+// doesn't fold. The angle glides (20 ms); an interval change fades the path out (20 ms), switches
+// and fades it back in. Shimmer 0 (settled) doesn't run the shifter: the reverb is bit for bit the
+// one without it.
 #include "common.h"
+#include "pitch.h"
 #include "simd.h"
 
 #include <cstdint>
@@ -54,7 +67,10 @@ public:
         float width = 1.0f;         // 0..1: stereo width of the wet (0 = mono wet)
         bool freeze = false;        // endless decay, input muted
         float mix = 0.3f;           // 0..1 dry / wet
+        float shimmer = 0.0f;       // 0..1: how much of the feedback's pitched path circulates
+        int shimmerInterval = 0;    // 0: +12, 1: +7, 2: +19, 3: -12 semitones
     };
+    enum Interval : int { UP_OCTAVE, UP_FIFTH, UP_TWELFTH, DOWN_OCTAVE, kIntervals };
 
     Reverb();
     void reset();
@@ -62,8 +78,10 @@ public:
     void process(float* L, float* R, int n);
     int tailSamples() const;
 
-    // Whether the last chunk's loop gains or damping moved (the slower network loop): for tests.
+    // Whether the last chunk's loop gains or damping moved (the slower network loop), and whether
+    // the shimmer's shifter ran: for tests.
     bool gliding() const { return glide_; }
+    bool shimmering() const { return shimOn_; }
 
 private:
     enum Phase : int { RUN, FADE_OUT, FADE_IN };
@@ -84,11 +102,22 @@ private:
         void tick(float xl, float xr, float& ol, float& or_);
     };
 
+    // The shimmer path's filters before the shifter: a one-pole high-pass, two 2-pole low-passes.
+    struct ShimmerFilter {
+        float hp = 0.0f, ic1a = 0.0f, ic2a = 0.0f, ic1b = 0.0f, ic2b = 0.0f;   // state
+        float hpA = 0.0f, a1 = 1.0f, a2 = 0.0f, a3 = 0.0f;                       // coefficients
+
+        void clear() { hp = ic1a = ic2a = ic1b = ic2b = 0.0f; }
+        float tick(float x);
+    };
+
     void loadMode(int m);
     void forget();
+    void setInterval(int interval);
+    void shimmerAfresh();
     void chunkSetup(int n);
     void nextSegment();
-    template <bool Glide, bool Young>
+    template <bool Glide, bool Young, bool Shimmer>
     void runNetwork(float* L, float* R, int n);
 
     // The network's memory, one block: the lines (each a power of two plus a guard copy of its
@@ -130,6 +159,17 @@ private:
     Ramp in_, dry_, wet_, width_;
     float fz_ = 0.0f, gate_ = 1.0f;   // freeze amount, the mode change's gate
     Phase phase_ = RUN;
+
+    // Shimmer.
+    std::vector<float> shimBuf_;
+    PitchShift shift_;
+    ShimmerFilter shimFilter_;
+    Ramp shimCos_, shimSin_;          // what stays, what is pitched
+    float shimGate_ = 1.0f, shimAngle_ = 0.0f;   // the interval change's fade; the angle (gliding)
+    double shimPP_ = 0.0, shimCC_ = 0.0;           // the pitched path's correlation with what stays, its power
+    float shimBeta_ = 0.0f;                        // ... their ratio: how much of it is taken out
+    int shimInterval_ = UP_OCTAVE;
+    bool shimOn_ = false;             // the shifter runs (shimmer on, or still fading out)
 
     Params p_;
     bool fresh_ = true, jumpCoefs_ = true, glide_ = false;

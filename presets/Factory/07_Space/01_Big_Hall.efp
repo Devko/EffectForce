@@ -4,4 +4,3 @@ rev_size=0.8
 rev_decay=4
 rev_pre=0.04
 rev_mix=0.35
-out_gain=2.7

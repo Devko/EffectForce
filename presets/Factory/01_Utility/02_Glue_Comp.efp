@@ -6,4 +6,3 @@ cmp_att=0.03
 cmp_rel=0.2
 cmp_knee=8
 cmp_makeup=2
-out_gain=3.3

@@ -1,0 +1,8 @@
+effectforce 1
+rev_on=On
+rev_size=0.75
+rev_decay=6
+rev_pre=0.03
+rev_mod=0.5
+rev_shim=0.5
+rev_mix=0.4

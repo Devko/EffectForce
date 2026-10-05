@@ -1,6 +1,7 @@
 # The release build. The plugin catalog (sd88me/mpc-vst-plugins) lists only plugins that need glibc 2.32 or
 # less, so they load on MPC OS 2.x as well as 3.x: the device build runs in arm32v7/gcc:11-bullseye (GCC 11,
-# glibc 2.31) under QEMU, as the catalog's own ports do, and the test suite runs on ARM there too. The
+# glibc 2.31) under QEMU, as the catalog's own ports do, profile-guided, and the test suite runs against the
+# objects the .so is linked from. The
 # sanitizer suite runs on x86. The zip is checked with the catalog's checker and kept as an artifact; a vX.Y.Z
 # tag also publishes it as a GitHub release. A tag with a suffix (v0.1.0-beta) publishes a prerelease: the
 # catalog's beta channel. The plugin's version is the tag without the suffix (X.Y.Z only), as PolyForce's.
@@ -24,7 +25,7 @@ jobs:
       - run: make test
 
   device:
-    name: Device build (armhf, glibc 2.31), package, catalog check
+    name: Device build (armhf, glibc 2.31, PGO), package, catalog check
     runs-on: ubuntu-24.04
     permissions:
       contents: write   # the release, on a tag
@@ -43,11 +44,11 @@ jobs:
       - name: Device build and the suite on ARM, in arm32v7/gcc:11-bullseye
         run: >-
           docker run --rm --platform linux/arm/v7 -v "$PWD:/w" -w /w arm32v7/gcc:11-bullseye
-          make ARM_PREFIX= ARM_RUN= arm-plugin test-arm
+          make ARM_PREFIX= ARM_RUN= PGO=1 arm-plugin test-arm-pgo
       - name: Package
         run: |
           case "$GITHUB_REF" in refs/tags/v*) v="${GITHUB_REF_NAME#v}"; version="PLUGIN_VERSION=${v%%-*}" ;; *) version= ;; esac
-          make $version plugin-package   # the .so above is up to date; a rebuild here would fail loudly (no ARM compiler)
+          make PGO=1 $version plugin-package   # the .so above is up to date; a rebuild here would fail loudly (no ARM compiler)
       - name: Catalog check
         run: >-
           python3 third_party/mpc-vst-plugins/tools/catalog_check.py dist/*-mpc-armv7.zip
