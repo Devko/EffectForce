@@ -4,36 +4,28 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
-### Hand-off (2026-10-05, branch `shimmer-grain-pulse`)
+### Hand-off (2026-10-05, branch `shimmer-grain-pulse`), finished in a cloud session
 
-Work in progress, moved from the local machine to a cloud session. Shimmer, Pulse and Grain are
-integrated on this branch (parameters, pages, rack with ten modules, presets, docs); `main` holds
-the last state that passed everything (Delay Glide).
+Shimmer, Pulse and Grain were integrated on `shimmer-grain-pulse` and handed over unfinished; the
+cloud session's branch carries it on.
 
 | Item | State |
 |---|---|
-| Shimmer (dsp/reverb.*, dsp/pitch.h) | Done: 163 module checks pass on x86 and ARM; +27k ARM instructions per block when on |
-| Pulse (dsp/pulse.*) | Done: 68 module checks pass on x86 and ARM; ~7.5k instructions per block |
-| Grain (dsp/grain.*) | Nearly done: its last run passed all 299 module checks on x86 (`make test-module M=grain`); **the ARM run (`make test-module-arm M=grain`) was never done**, and nobody reviewed it yet. The spec is the Grain row in [Design](DESIGN.md#modules): five modes (Cloud, Stretch, Mosaic, Stutter, Arp), synced to MPC's beat, cheap reset (hide old samples like the Delay), target ≤ 2.5% of a block |
-| Integration (surface.py, rack, rack_map, bench, tests, presets) | Written; the full suite compiled and passed everything except Grain's (then unfinished) checks and the preset levels |
-| Factory presets | 52 (15 new). `tools/make_presets.py` regenerated all of them, which drops every out_gain: **all 52 need `make preset-levels`** before `make test` passes |
+| Grain on ARM | ✅ its 299 module checks passed under qemu-arm as they had on x86 |
+| Preset levels | ✅ `make preset-levels`: the 37 older presets came back exactly as on `main`, the 15 new ones set |
+| Full suites | ✅ x86 (ASan/UBSan) and ARM (qemu), 12913 checks after the fixes below; CI green |
+| Review: Grain | ✅ memory and real-time safety held (no stale or unwritten frame read in 50M+ instrumented reads). Fixed: held Stutter silent when Hold came near a grid line; short pitched-up Stutter never repeating; the grid missing loops shorter than a slice (and loops wrapping on a block edge) and firing twice on a mid-block wrap; held slices off the grid; a second release lifting the samples before it; a stalled slice cut dead; a backwards read's margin. 16 new checks |
+| Review: Pulse, Shimmer | ✅ Pulse clean. Shimmer: the shifter's first splice after a restart read silence (+19 dropped out), the path faded in while the shifter was still silent (a dip), the tail length ignored the shifter's delay; a frozen shimmer drains (now documented). 9 new checks |
+| Review: integration | ✅ an order saved by 0.0.1 (eight slots) fell back to the default (now kept), Choppy Pads' gate on 1/8 steps (now 1/16, the patterns' unit), option lists checked against the enums, stale docs |
+| Performance | ✅ everything on: avg -9%, p99 -27% in ARM instructions; the p99 had been the shimmer's splice search ([Performance](PERFORMANCE.md#instruction-counts)) |
 
-To finish, in order:
+Still to do, in order:
 
-1. `make test-module-arm M=grain`; fix what fails.
-2. `make preset-levels`, then `make test` and `make test-arm`: all must pass (the last full run before
-   the hand-off: 12867 passed, 20 failed, all of them Grain's and the levels).
-3. A review of dsp/grain.* (as the other modules had: real-time safety, clicks, transport jumps,
-   buffer indexing, NaN), and fix its findings.
-4. Merge the branch into `main`; CI must be green.
-5. On the device (needs the local machine: the Force is on the home network): `make bench-device`
-   with all ten modules (budget: everything on at its heaviest, p99 ≤ 15%; Grain and Shimmer add
-   about 2-3 points to 11.1%), then `make plugin-install` (ask first: it restarts MPC) and play
-   Shimmer, Pulse and Grain.
-
-Notes: the profile-guided build (PGO, `make arm-plugin` with qemu-arm) gained only ~2% here (the
-modules are hand-tuned already). Device access and the WSL toolchain (arm-linux-gnueabihf-g++,
-qemu-arm, a Python with Pillow as `local.mk`'s PY) are the local machine's.
+1. Merge the branch into `main` (CI green on it).
+2. On the device (needs the local machine): `make bench-device` with all ten modules (budget:
+   everything on at its heaviest, p99 ≤ 15%), then `make plugin-install` (ask first: it restarts
+   MPC) and play Shimmer, Pulse and Grain; Grain's Sync with MPC looping (the slice grid's locate
+   tolerance is a host block: whether MPC's song position ever jitters more than that is untested).
 
 ### Before the hand-off
 
@@ -60,6 +52,9 @@ Design record: [Design](DESIGN.md).
 - ✅ Eight modules in any order: Drive (2x oversampled, six shapers), Filter, EQ, Comp / OTT,
   Chorus (three modes), Phaser / Flanger (synced), Delay (stereo, ping-pong, mono; tape character),
   Reverb (four modes, 8-line FDN, freeze)
+- ✅ Then (2026-10-05, after the first device run): Pulse (tremolo, auto-pan, a 16-step gate), Grain
+  (cloud, stretch, mosaic, stutter, arp on MPC's beat; hold, feedback), the Reverb's shimmer; ten
+  modules, 52 presets in 10 categories, 54 modulation targets
 - ✅ The rack: order, 10 ms on / off fades, a 3 ms dip for a new order, no CPU for modules that are
   off, bit-exact pass-through with everything off
 - ✅ Modulation: 4 macros, 2 LFOs (free or beat-locked), an envelope follower, an 8-slot matrix
@@ -80,7 +75,7 @@ Design record: [Design](DESIGN.md).
 | Sidechain input | MPC's VST2 host gives an insert 2 inputs |
 | Lookahead limiting, linear-phase EQ | MPC can't compensate latency (`acceptIOChanges`: no) |
 | Drawn curves (EQ, compressor) | MPC skins can't draw dynamic graphics |
-| Shimmer, granular, pitch | After v0.1, if the CPU budget allows |
+| A pitch shifter module | The shimmer's shifter (dsp/pitch.h) is built for feedback paths; a module of its own would want formants and lower latency |
 
 ## Decisions
 
@@ -92,4 +87,11 @@ Design record: [Design](DESIGN.md).
 - 2026-10-05 — **Delay time changes:** both behaviours, as Delay Glide: Tape (repeats bend in pitch)
   or Fade (a crossfade, no bend).
 - 2026-10-05 — **Level-matching by category:** Synth and Pads on chords, Bass on a bass line, Drums
-  on drums, the rest on the full mix.
+  on drums, the rest on the full mix (Texture and Rhythm on chords too).
+- 2026-10-05 — **Shimmer, Pulse, Grain before v0.1:** the CPU budget allowed them.
+- 2026-10-05 — **Frozen shimmer drains** rather than holding: what climbs out of the band leaves, the
+  loop stays bounded. Shimmer 0 freezes for good.
+- 2026-10-05 — **Grain's grid follows locates and loops** by the song position's distance from where
+  it should be (more than a host block: a jump), not only by a new slice number.
+- 2026-10-05 — **An order saved with fewer modules** keeps its slots; the new modules (off in it) fill
+  the rest in the default order.

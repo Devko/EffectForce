@@ -26,7 +26,9 @@ matrix across all of them. It is built on the same groundwork as its siblings
   fades, reordering never clicks, and a module that is off costs no CPU
 - **Modulation:** 4 macros, 2 LFOs (free or locked to MPC's beat), an envelope follower, and an
   8-slot matrix reaching 54 parameters across the chain
-- **Light on the CPU:** everything on at its heaviest, p99 11.3% of a block on the Force
+- **Light on the CPU:** everything on at its heaviest, p99 11.3% of a block on the Force with the first
+  eight modules; all ten measured in ARM instructions until the next device run
+  ([Performance](docs/PERFORMANCE.md))
 - **Built for MPC:** zero latency, tails that ring on through Stop, every getter cheap (MPC polls them
   hundreds of times a second), all measured on the device first ([the probe](docs/PROBE.md))
 - **52 factory presets** in 10 categories, level-matched on reference material so a preset changes

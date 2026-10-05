@@ -2,6 +2,7 @@
 
 - [The budget](#the-budget)
 - [Device measurements](#device-measurements)
+- [Instruction counts](#instruction-counts)
 - [What keeps it cheap](#what-keeps-it-cheap)
 
 ---
@@ -36,8 +37,37 @@ plugin's own entry points and times every block with the thread's CPU clock.
 
 Every case passes. Net of the overhead, every module is within (or, for Chorus and Delay, about
 0.1-0.3 point above) its share of the design budget; the total, which is what MPC sees, has 3.7
-points to spare. A profile-guided build (as PolyForce and SubForce ship) is the next lever if it is
-ever needed.
+points to spare. These are the first eight modules: Pulse, Grain and the shimmer came after, and
+their device run is still to do ([Roadmap](ROADMAP.md)); until then, the instruction counts below.
+The release build is profile-guided (as PolyForce's and SubForce's: `make arm-plugin` with qemu-arm,
+and CI), worth about 2% here: the modules are hand-tuned already.
+
+## Instruction counts
+
+Without the device, ARM instructions per 128-frame block are the measure: the bench's cases
+(tools/bench.cpp) through the plain `.so` (GCC 13, the device flags) under a plugin-enabled
+qemu-arm, per `processReplacing` call. On the first eight modules' everything-on case, 328k
+instructions were 9.1% of the block on the Force, Hall alone 98k net for 2.25%: about 36k-44k
+instructions to a point of the block. They miss what the Force adds (cache misses, VFP divisions and
+flag transfers that stall), which the device's p99 over its average (1.24) shows.
+
+2026-10-05, the ten modules, thousands of instructions per block:
+
+| Case | At the hand-off (avg / p99) | Now (avg / p99) |
+|---|---|---|
+| Everything off (the plugin's own work) | 17.8 / – | 9.8 / – |
+| Pulse alone (Gate) | 25.1 / 25.3 | 17.1 / 17.3 |
+| Grain alone (Cloud, densest, +12, feedback) | 97.2 / 108.1 | 72.1 / 79.8 |
+| Reverb alone (Space, full modulation, shimmer 0.6) | 140.7 / 284.6 | 122.4 / 148.4 |
+| **Everything on, heaviest**, 8 mod slots | **446.5 / 592.7** | **407.4 / 435.1** |
+
+Everything on is about 9-11% of the block on average by that measure. At the hand-off its p99 was
+the shimmer's splice search (a correlation of a few thousand multiply-adds in one sample, every 80 ms:
+one block in 28, a p99 of over 16% before the device's own jitter); now the search sums sixteen lags
+at a time in vector lanes, and Grain, the rack's per-sample overhead and the control paths are
+leaner too (the commits of 2026-10-05 say what and by how much). Every change but two leaves the
+output bit for bit as it was; the shimmer's shifter (a contiguous read) and Grain's read segments
+(aligned to time since reset) move it by float rounding (-130 and -100 dB).
 
 ## What keeps it cheap
 
@@ -46,8 +76,15 @@ ever needed.
   every module glides across the chunk.
 - **NEON where the work is parallel:** left and right as two lanes (Filter, EQ, Comp, Delay), the
   halfband filters of both sides in one vector (Drive), four chorus voices per load, the reverb's
-  eight lines as two vectors.
-- **No libm per sample:** SubForce's fast math (`dsp/fastmath.h`) and per-chunk coefficients.
+  eight lines as two vectors, two of a grain's samples (left and right each) per vector, the
+  shimmer's splice search sixteen lags at a time.
+- **No VFP compares per sample where NEON lanes do:** VFP has no min or max, and moving its flags
+  to the core stalls; limiters, envelope followers and gates keep their state in a NEON lane.
+- **No libm per sample:** SubForce's fast math (`dsp/fastmath.h`) and per-chunk coefficients; what
+  needs libm (a tail length, a pitch's speed, a loop gain) is worked out again only when what it
+  depends on changes.
+- **Settled is free:** a gain or mix that isn't moving runs as a constant, four samples at a time
+  (and a unity gain not at all).
 - **Cheap resets:** a module switched back on doesn't clear megabytes of delay line on the audio
   thread; the Delay and the Reverb count what they have written since and read older samples as
   silence.
