@@ -1,17 +1,21 @@
 effectforce 1
 scene_b=2
 scene2.name=Hall Wash
+scene2.move=4 bars
+scene2.play=Once
 scene2.rev_on=On
 scene2.rev_mode=Hall
 scene2.rev_size=0.8
 scene2.rev_decay=6
-scene2.rev_mix=0.6
+scene2.rev_mix=0>0.6
 scene3.name=Shimmer Wash
+scene3.move=8 bars
+scene3.play=Once
 scene3.rev_on=On
 scene3.rev_mode=Space
 scene3.rev_decay=10
-scene3.rev_shim=0.6
-scene3.rev_mix=0.6
+scene3.rev_shim=0>0.6
+scene3.rev_mix=0.3>0.6
 scene4.name=Dark Space
 scene4.rev_on=On
 scene4.rev_mode=Space

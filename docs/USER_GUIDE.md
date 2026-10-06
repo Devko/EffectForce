@@ -32,7 +32,7 @@ overlay shows the name without the page.
 
 | Tab | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order, MOVE and ON / OFF, Input, Output, Mix, the macros, the preset stepper. **PERFORM**: the scenes, the crossfader and the FX library. **LOOPER**: REC, the loop and how it plays. **PRESETS**: the browser |
+| CHAIN | **CHAIN**: the order, MOVE and ON / OFF, Input, Output, Mix, the macros, the preset stepper. **PERFORM**: the scenes, the crossfader, the FX library and the scene's move. **LOOPER**: REC, the loop and how it plays. **PRESETS**: the browser |
 | TONE | **DRIVE+FILTER**, **EQ**, **COMP** |
 | MOTION | **CHORUS+PHASE**, **PULSE** |
 | SPACE | **DELAY**, **GRAIN**, **REVERB** |
@@ -239,6 +239,27 @@ gates, tremolo, auto-pan, bit crush, drive, fold, OTT, destroy).
   knobs. Effects that need an LFO or the matrix use **LFO 2** and **matrix slot 8**, so LFO 1 and slots
   1-7 stay yours. Effects of the Loop bank switch the looper on.
 - Change a picked effect like any scene (EDIT B, turn knobs): its name gets a `*`.
+
+### Moves
+
+Some effects move by themselves once you bring them in: **LP Sweep** closes from wide open to 150 Hz over
+8 bars, **Build Roll** rolls 1/4, 1/8, 1/16, 1/32 over 4 bars as its high-pass rises, **Tape Stop** winds
+down over a beat. Push the fader and the move starts on the **next bar line** (the next beat for a move
+shorter than a bar). Until then the effect sits at its starting point, so a push in the middle of a bar
+lines the move up with the music.
+
+- **Once** moves play to their end and stay there; **Loop** moves start again; **Ping-pong** moves go
+  there and back (Notch Sweep, Phaser Sweep).
+- Pull the fader all the way back to A and the move resets: the next push starts it over on the bar.
+  With the fader in between you hear part of it, as with any scene.
+- **MOVE** on the PERFORM page shows and sets the move of the scene at B (or the one you are editing):
+  how long (**Off**, 1 or 2 beats, 1 to 16 bars) and what it does at the end (**Once**, **Loop**,
+  **Ping-pong**). Off keeps the effect still at its end point.
+- The scenes' line follows it: `MOVES ON THE BAR`, then `BAR 3 OF 8`, then `HELD`.
+- The moving effects: LP Sweep, HP Sweep, Notch Sweep, Phaser Sweep, Comb Riser, Hall Wash, Shimmer
+  Wash, Echo Throw, Tape Stop, Build Roll, Build Gate. Turning one of their moving settings while you
+  edit the scene fixes it where you put it.
+- The tempo can change under a move (it bends with it), and a sequence looping back doesn't restart it.
 
 ### Scenes
 

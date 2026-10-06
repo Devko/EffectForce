@@ -362,6 +362,16 @@ for k in range(1, FX_TILES + 1):
 button("fx_prev", "FX Bank Prev")
 button("fx_next", "FX Bank Next")
 readout("fx_bank", "FX Bank")
+# Scene moves (docs/DESIGN.md "Scene moves"): a scene's locks with a start value play from it to the lock
+# over the scene's LENGTH, once the fader brings the scene in. These two show and set the timing of the scene
+# at B (or the scene being edited); the surface keeps them (ui): the scene saves its own, as sceneN.move= and
+# sceneN.play= lines.
+MOVE_LENGTHS = ["Off", "1 beat", "2 beats", "1 bar", "2 bars", "4 bars", "8 bars", "16 bars"]   # plugin/scenes.h kMoveBeats
+MOVE_PLAYS = ["Once", "Loop", "Ping-pong"]                                                      # plugin/scenes.h MovePlay
+enum("mv_len", "Move Length", MOVE_LENGTHS, "4 bars", kind="ui")
+popup_flag("mv_len")
+enum("mv_play", "Move Play", MOVE_PLAYS, "Once", kind="ui")
+popup_flag("mv_play")
 
 # How a scene's lock moves with the fader (plugin/scenes.h SceneMorph): never locked; a straight line in
 # the knob's 0..1 space (continuous knobs, and ordered steps: an enum's value is its index / (options - 1),
@@ -614,8 +624,12 @@ def build_layout():
     L.card(24, R2, 1232, 270, "FX")
     L.tiles(44, 490, 1192, 8, 2, 48, 8, "fx")
     L.button(124, 650, "< BANK", "fx_prev")
-    L.readout(640, 650, 820, "fx_bank", h=36)
-    L.button(1156, 650, "BANK >", "fx_next")
+    L.button(264, 650, "BANK >", "fx_next")
+    L.readout(564, 650, 440, "fx_bank", h=36)
+    # The move of the scene at B (or the edited one): how long, and what it does at the end.
+    L.text(846, 643, "MOVE")
+    L.popup(964, 650, 150, "mv_len")
+    L.popup(1150, 650, 170, "mv_play")
 
     # LOOPER: the Octatrack's recorder. REC takes the coming cell of Length on the grid (or, Capture Last,
     # the one just played) and keeps it; Loop plays it, Swap crossfading the live input, Layer on top of
@@ -1326,18 +1340,36 @@ def _shown(entry):
     return re.sub(r"^\d+\s+", "", re.sub(r"\.efp$", "", entry).replace("_", " "))
 
 
-def check_preset_line(params, key, val):
+def check_move_line(key, val):
+    """None if a scene's move= or play= line is valid (key without the sceneN. prefix), else what is wrong."""
+    names = MOVE_LENGTHS if key == "move" else MOVE_PLAYS
+    return None if val in names else "%s=%r is not one of %s" % (key, val, ", ".join(names))
+
+
+def check_preset_line(params, key, val, moving=False):
     """None if key=val is a valid sound line, else what is wrong with it. Options go by name (or index).
-    A scene's lock is sceneN.key=value (N 1..SCENES) for a parameter a scene can lock."""
+    A scene's lock is sceneN.key=value (N 1..SCENES) for a parameter a scene can lock; a lock that moves
+    (docs/DESIGN.md "Scene moves") is start>end, for a parameter that moves on a line (continuous, or
+    ordered steps), and its scene has sceneN.move= and sceneN.play= lines. moving: an FX library line,
+    which may move too."""
     scene = re.match(r"scene(\d+)\.(.+)$", key)
     if scene:
         if not 1 <= int(scene.group(1)) <= SCENES:
             return "%r: scenes are 1..%d" % (key, SCENES)
         if scene.group(2) == "name":   # what the scene was made from (an effect of the FX library)
             return None if 0 < len(val) <= FX_NAME_MAX else "%r: a scene's name of 1..%d characters" % (key, FX_NAME_MAX)
+        if scene.group(2) in ("move", "play"):
+            return check_move_line(scene.group(2), val)
         if scene.group(2) not in params or scene_morph(params[scene.group(2)]) == "None":
             return "%r: a scene can't lock %s" % (key, scene.group(2))
-        key = scene.group(2)
+        key, moving = scene.group(2), True
+    if ">" in val:
+        if not moving:
+            return "%s=%s: only a scene's lock can move (start>end)" % (key, val)
+        if key not in params or scene_morph(params[key]) != "Line":
+            return "%s=%s: %s can't move (only knobs and ordered steps do)" % (key, val, key)
+        start, _, end = val.partition(">")
+        return check_preset_line(params, key, start) or check_preset_line(params, key, end)
     p = params.get(key)
     if not p or p["kind"] not in ("synth", "chain"):
         return "%r is not a sound parameter" % key
@@ -1444,8 +1476,8 @@ FX_NAME_MAX = 14   # an FX tile (1192 px / 8 columns)
 
 def fx_library():
     """[(bank, name, text)]: a folder per bank (at most FX_TILES each), in file order. A file is
-    "effectforce-fx 1", "name=<name>" and lines a scene can lock (checked like a preset's); names unique and
-    short enough for a tile."""
+    "effectforce-fx 1", "name=<name>" and lines a scene can lock (checked like a preset's; a lock that moves is
+    start>end, and then move= and play= give its timing); names unique and short enough for a tile."""
     params = {p["key"]: p for p in P}
     out, errors, names = [], [], set()
     for d in sorted(os.listdir(FX_DIR)) if os.path.isdir(FX_DIR) else []:
@@ -1467,13 +1499,23 @@ def fx_library():
             if not 0 < len(name) <= FX_NAME_MAX or name in names:
                 errors.append("%s: needs a unique name= of 1..%d characters" % (where, FX_NAME_MAX))
             names.add(name)
+            timing, arrows = set(), 0
             for n, line in enumerate(lines[2:], 3):
                 key, _, val = line.partition("=")
-                bad = check_preset_line(params, key, val)
-                if not bad and scene_morph(params[key]) == "None":
-                    bad = "%s can't be locked in a scene" % key
+                if key in ("move", "play"):   # the move's timing (docs/DESIGN.md "Scene moves")
+                    bad = check_move_line(key, val)
+                    timing.add(key)
+                else:
+                    bad = check_preset_line(params, key, val, moving=True)
+                    if not bad and scene_morph(params[key]) == "None":
+                        bad = "%s can't be locked in a scene" % key
+                    arrows += ">" in val
                 if bad:
                     errors.append("%s:%d: %s" % (where, n, bad))
+            if arrows and timing != {"move", "play"}:
+                errors.append("%s: a lock moves (start>end), so the effect needs move= and play=" % where)
+            if timing and not arrows:
+                errors.append("%s: move= and play= without a lock that moves (start>end)" % where)
             out.append((bank_name, name, text))
     if errors:
         raise SystemExit("FX library:\n  " + "\n  ".join(errors))
@@ -1511,9 +1553,11 @@ static constexpr SceneMorph kSceneMorph[P_COUNT] = {%s};
 constexpr int kNumScenes = %d;
 constexpr int kNumLoopLengths = %d;
 constexpr int kNumLoopRepeats = %d;
+constexpr int kNumMoveLengths = %d;
+constexpr int kNumMovePlays = %d;
 
 } // namespace ef
-""" % (morph, SCENES, len(LOOP_LENGTHS), len(LOOP_REPEATS))
+""" % (morph, SCENES, len(LOOP_LENGTHS), len(LOOP_REPEATS), len(MOVE_LENGTHS), len(MOVE_PLAYS))
 
 
 def main():

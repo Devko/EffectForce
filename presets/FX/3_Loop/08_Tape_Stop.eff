@@ -1,4 +1,6 @@
 effectforce-fx 1
 name=Tape Stop
+move=1 beat
+play=Once
 lp_mix=1
-lp_speed=0
+lp_speed=1>0

@@ -85,6 +85,15 @@ public:
     const std::string& sceneName(int scene) const;
     void        setSceneName(int scene, const std::string& name);
 
+    // A scene move as the scenes' line shows it (docs/DESIGN.md "Scene moves"), per end (0 A, 1 B): the
+    // plugin publishes the engine's clocks on the audio thread, the line reads them. state: Engine's
+    // MoveState; at: the bar (or beat) the move is in, 1-based, of `of`. True if it changed.
+    struct MoveShown {
+        int state = 0, at = 0, of = 0;
+        bool bars = true;
+    };
+    bool        setMoveShown(int side, const MoveShown& m);
+
     // The looper's REC presses so far (the engine captures on a change); any thread.
     uint32_t    loopRecs() const { return loopRecs_.load(std::memory_order_acquire); }
     // The texts changed underneath (the looper's line, from the audio thread): MPC redraws them.
@@ -156,6 +165,9 @@ private:
     std::atomic<uint32_t>    loopRecs_{0};
     std::string              sceneName_[kNumScenes];
     int                      fxBank_ = 0;           // the FX library's bank on the tiles
+    std::atomic<uint32_t>    moveShown_[2] = {};    // MoveShown, packed (state, at, of, bars)
+    std::string moveText(int side) const;           // ", BAR 3 OF 8" and the like; "" if nothing moves
+    int  moveTarget() const;                        // the scene LENGTH and PLAY set: B's, or the edited one
 
     // Every write of a value MPC should see goes through here.
     void put(int i, float v) {

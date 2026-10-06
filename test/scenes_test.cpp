@@ -40,6 +40,34 @@ void play(Engine& e, double seconds) {
     }
 }
 
+// A song for the moves: MPC's transport, rendered in its blocks up to a beat (silence in).
+struct Song {
+    Engine& e;
+    Transport t;
+    explicit Song(Engine& eng) : e(eng) {
+        t.bpm = 120.0;
+        t.valid = t.playing = true;
+    }
+    double beat() const { return t.beats; }
+    // On to beat b (while stopped, the same time at the tempo), one block at a time.
+    void to(double b) {
+        float L[kBlock] = {}, R[kBlock] = {};
+        double at = t.beats;
+        while (at < b - 1e-9) {
+            const int n = static_cast<int>(std::min<double>(kBlock, std::ceil((b - at) * 60.0 / t.bpm * kRate - 1e-6)));
+            e.render(L, R, std::max(n, 1), t);
+            const double d = std::max(n, 1) / static_cast<double>(kRate) * t.bpm / 60.0;
+            at += d;
+            if (t.playing) t.beats += d;
+        }
+        if (!t.playing) t.beats = b;   // stopped: the beat only as our clock (MPC's position doesn't move)
+    }
+    void wait(double beats) { to(t.beats + beats); }
+};
+
+// The cutoff the engine plays now, as the knob's 0..1.
+float cutNorm(const Engine& e) { return paramNorm(P_FLT_CUT, e.patch().filter.cutoffHz); }
+
 void classification() {
     std::printf("== scenes: what a scene can lock, and how it moves\n");
     CHECK(kSceneMorph[P_XFADE] == SceneMorph::None && kSceneMorph[P_SCENE_A] == SceneMorph::None &&
@@ -426,6 +454,344 @@ void looperInThePlugin() {
     CHECK(passes);
 }
 
+// --- scene moves (docs/DESIGN.md "Scene moves") ------------------------------------------------
+
+void moveStore() {
+    std::printf("== moves: a lock's start, a scene's timing\n");
+    Scenes s;
+    s.lock(1, P_FLT_CUT, 0.2f);
+    const uint32_t g = s.generation(), ep = s.moveEpoch(1);
+    s.setStart(1, P_FLT_CUT, 0.8f);
+    CHECK(s.start(1, P_FLT_CUT) == 0.8f && s.value(1, P_FLT_CUT) == 0.2f && s.moves(1));
+    CHECK(s.generation() != g && s.moveEpoch(1) != ep && s.moveEpoch(2) == 0);
+    s.setStart(1, P_FLT_TYPE, 0.5f);   // a switch can't move
+    s.setStart(1, P_FLT_RES, 0.5f);    // nor a parameter the scene doesn't lock
+    s.setStart(1, P_FLT_ON, 0.5f);     // nor a module's On
+    CHECK(s.start(1, P_FLT_TYPE) < 0.0f && s.start(1, P_FLT_RES) < 0.0f && s.start(1, P_FLT_ON) < 0.0f);
+    // Locked again by hand: it holds still (and the scene's other moves go on: no new epoch).
+    s.lock(1, P_FLT_RES, 0.5f);
+    s.setStart(1, P_FLT_RES, 0.9f);
+    const uint32_t ep2 = s.moveEpoch(1);
+    s.lock(1, P_FLT_CUT, 0.3f);
+    CHECK(s.start(1, P_FLT_CUT) < 0.0f && s.moves(1) && s.moveEpoch(1) == ep2);
+    // The timing: defaults, clamped, a change starts the move over.
+    CHECK(s.moveLength(0) == Scenes::kDefaultLength && kMoveBeats[Scenes::kDefaultLength] == 16.0 && s.movePlay(0) == kMoveOnce);
+    s.setMove(1, 99, -3);
+    CHECK(s.moveLength(1) == kNumMoveLengths - 1 && s.movePlay(1) == kMoveOnce && s.moveEpoch(1) != ep2);
+    // Unlocked or cleared: no start, and the timing back to its default.
+    s.unlock(1, P_FLT_RES);
+    CHECK(!s.moves(1) && s.start(1, P_FLT_RES) < 0.0f);
+    s.setStart(1, P_FLT_CUT, 0.7f);
+    s.clear(1);
+    CHECK(!s.moves(1) && s.moveLength(1) == Scenes::kDefaultLength && s.count(1) == 0);
+}
+
+// Scene 2 (B) closes the cutoff from 0.8 to 0.2 (the knob's 0..1) over a bar.
+struct MoveRig {
+    Scenes sc;
+    Engine e;
+    Knobs k;
+    explicit MoveRig(int length = 3, int play = kMoveOnce) {
+        sc.lock(1, P_FLT_ON, 1.0f);
+        sc.lock(1, P_FLT_CUT, 0.2f);
+        sc.setStart(1, P_FLT_CUT, 0.8f);
+        sc.setMove(1, length, play);
+        e.attachScenes(&sc);
+        e.setParams(k.v);
+    }
+    void fader(float x) {
+        k.v[P_XFADE] = x;
+        e.setParams(k.v);
+    }
+};
+
+void moveClock() {
+    std::printf("== moves: armed by the fader, on the bar line, for LENGTH\n");
+    MoveRig r;   // 1 bar, Once
+    Song s(r.e);
+    s.to(9.0);   // bar 3, beat 2
+    CHECK(r.e.moveStatus(1).state == kMoveIdle && r.e.moveStatus(0).state == kMoveNone);
+    r.fader(1.0f);
+    s.wait(0.5);   // the fader's glide over
+    CHECK(r.e.moveStatus(1).state == kMoveArmed && std::fabs(cutNorm(r.e) - 0.8f) < 1e-3f);   // B's start
+    s.to(11.98);
+    CHECK(r.e.moveStatus(1).state == kMoveArmed && std::fabs(cutNorm(r.e) - 0.8f) < 1e-3f);   // not before bar 4
+    // From beat 12: 0.8 down to 0.2 in a straight line over 4 beats.
+    for (double at : {13.0, 14.0, 15.0}) {
+        s.to(at);
+        const float want = 0.8f - 0.6f * static_cast<float>((at - 12.0) / 4.0);
+        CHECK(std::fabs(cutNorm(r.e) - want) < 2e-3f);
+        if (std::fabs(cutNorm(r.e) - want) >= 2e-3f) std::printf("  beat %.1f: %.4f, want %.4f\n", at, cutNorm(r.e), want);
+    }
+    CHECK(r.e.moveStatus(1).state == kMoveRunning && std::fabs(r.e.moveStatus(1).beats - 3.0) < 0.01);
+    s.to(16.02);
+    CHECK(r.e.moveStatus(1).state == kMoveDone);   // held: the lock, exactly as a lock that holds still
+    CHECK(std::fabs(r.e.patch().filter.cutoffHz - paramValue(P_FLT_CUT, 0.2f)) < 0.01f);
+    s.to(20.0);
+    CHECK(r.e.moveStatus(1).state == kMoveDone);
+    // Back at A: it resets once the fader is there (after its glide); out again, it waits for the bar.
+    r.fader(0.0f);
+    s.wait(0.01);
+    CHECK(r.e.moveStatus(1).state == kMoveDone);   // still gliding out
+    s.wait(0.5);
+    CHECK(r.e.moveStatus(1).state == kMoveIdle);
+    s.to(21.0);
+    r.fader(1.0f);
+    s.to(23.9);
+    CHECK(r.e.moveStatus(1).state == kMoveArmed);
+    s.to(25.0);
+    CHECK(std::fabs(cutNorm(r.e) - 0.65f) < 2e-3f);
+    // A push a hair after the line counts from it.
+    r.fader(0.0f);
+    s.to(28.1);
+    r.fader(1.0f);
+    s.wait(0.01);
+    CHECK(r.e.moveStatus(1).state == kMoveRunning);
+    s.to(29.0);
+    CHECK(std::fabs(cutNorm(r.e) - 0.65f) < 2e-3f);
+    // A fader resting a hair off A doesn't arm it; one Q-Link detent does.
+    r.fader(0.0f);
+    s.wait(1.0);
+    r.fader(0.003f);
+    s.wait(1.0);
+    CHECK(r.e.moveStatus(1).state == kMoveIdle);
+    r.fader(1.0f / 128.0f);
+    s.wait(0.01);
+    CHECK(r.e.moveStatus(1).state == kMoveArmed || r.e.moveStatus(1).state == kMoveRunning);
+
+    std::printf("== moves: Loop, Ping-pong, a beat's move, a new scene\n");
+    {
+        MoveRig x(3, kMoveLoop);
+        Song sx(x.e);
+        x.fader(1.0f);   // at beat 0: on the line, so it runs from 0
+        sx.wait(0.01);
+        CHECK(x.e.moveStatus(1).state == kMoveRunning);
+        sx.to(4.5);   // the second pass, an eighth in
+        CHECK(std::fabs(cutNorm(x.e) - (0.8f - 0.6f * 0.125f)) < 2e-3f && x.e.moveStatus(1).state == kMoveRunning);
+    }
+    {
+        MoveRig x(3, kMovePingPong);
+        Song sx(x.e);
+        x.fader(1.0f);
+        sx.to(6.0);   // back half way
+        CHECK(std::fabs(cutNorm(x.e) - 0.5f) < 2e-3f);
+        sx.to(8.0);   // back at the start
+        CHECK(std::fabs(cutNorm(x.e) - 0.8f) < 2e-3f);
+        sx.to(10.0);
+        CHECK(std::fabs(cutNorm(x.e) - 0.5f) < 2e-3f);
+    }
+    {
+        MoveRig x(1, kMoveOnce);   // 1 beat: on the next beat
+        Song sx(x.e);
+        sx.to(2.3);
+        x.fader(1.0f);
+        sx.to(2.99);
+        CHECK(x.e.moveStatus(1).state == kMoveArmed);
+        sx.to(3.5);
+        CHECK(std::fabs(cutNorm(x.e) - 0.5f) < 3e-3f);
+        sx.to(4.1);
+        CHECK(x.e.moveStatus(1).state == kMoveDone);
+        // Another scene at B: its clock (scene 3 has no move); back to scene 2: armed again.
+        x.k.v[P_SCENE_B] = 2.0f / 7.0f;
+        x.e.setParams(x.k.v);
+        sx.wait(0.1);
+        CHECK(x.e.moveStatus(1).state == kMoveNone);
+        x.k.v[P_SCENE_B] = 1.0f / 7.0f;
+        x.e.setParams(x.k.v);
+        sx.wait(0.01);
+        CHECK(x.e.moveStatus(1).state == kMoveArmed && std::fabs(cutNorm(x.e) - 0.8f) < 1e-3f);
+        // The move changed on the UI thread (a new LENGTH): it starts over, on the bar this time.
+        sx.to(6.0);
+        x.sc.setMove(1, 3, kMoveOnce);
+        sx.wait(0.01);
+        CHECK(x.e.moveStatus(1).state == kMoveArmed && std::fabs(x.e.moveStatus(1).beats - 2.0) < 0.02);
+        // LENGTH Off: the scene holds its lock, no clock.
+        x.sc.setMove(1, 0, kMoveOnce);
+        sx.wait(0.01);
+        CHECK(x.e.moveStatus(1).state == kMoveNone && std::fabs(cutNorm(x.e) - 0.2f) < 1e-4f);
+    }
+
+    std::printf("== moves: the tempo bends a move, a locate doesn't, stopped it runs on\n");
+    {
+        MoveRig x;
+        Song sx(x.e);
+        x.fader(1.0f);
+        sx.to(2.0);   // half way
+        sx.t.bpm = 60.0;
+        sx.to(3.0);   // a beat at 60: a second
+        CHECK(std::fabs(cutNorm(x.e) - 0.35f) < 2e-3f);
+        sx.t.beats = 0.0;   // the sequence loops back to its start
+        sx.to(0.5);
+        CHECK(std::fabs(cutNorm(x.e) - (0.8f - 0.6f * 3.5f / 4.0f)) < 2e-3f);
+    }
+    {
+        MoveRig x;
+        Song sx(x.e);
+        sx.t.playing = false;   // MPC stopped: the grid runs on from where the engine began
+        sx.to(1.0);
+        x.fader(1.0f);
+        sx.to(3.9);
+        CHECK(x.e.moveStatus(1).state == kMoveArmed);
+        sx.to(5.0);
+        CHECK(std::fabs(cutNorm(x.e) - 0.65f) < 2e-3f);
+    }
+    {
+        // Scene A moves too: at A from the start, its move runs from the first line; B's waits for the fader.
+        MoveRig x;
+        x.sc.lock(0, P_FLT_CUT, 0.9f);
+        x.sc.setStart(0, P_FLT_CUT, 0.5f);
+        x.sc.setMove(0, 3, kMoveOnce);
+        Song sx(x.e);
+        sx.to(2.0);
+        CHECK(x.e.moveStatus(0).state == kMoveRunning && x.e.moveStatus(1).state == kMoveIdle);
+        CHECK(std::fabs(cutNorm(x.e) - 0.7f) < 2e-3f);
+        // Out to B: A resets once it is fully out.
+        x.fader(1.0f);
+        sx.wait(0.5);
+        CHECK(x.e.moveStatus(0).state == kMoveIdle && x.e.moveStatus(1).state != kMoveIdle);
+    }
+}
+
+void moveValues() {
+    std::printf("== moves: half way on the fader, steps in order, a lock equal to the other end\n");
+    {
+        // A fresh engine given only the fader (a project saved at B): B's values before anything plays.
+        Scenes sc;
+        sc.lock(1, P_FLT_CUT, 0.2f);
+        Engine e;
+        e.attachScenes(&sc);
+        Knobs k;
+        k.v[P_XFADE] = 1.0f;
+        e.setParams(k.v);
+        CHECK(std::fabs(e.patch().filter.cutoffHz - paramValue(P_FLT_CUT, 0.2f)) < 0.01f);
+    }
+    {
+        MoveRig x;
+        Song sx(x.e);
+        x.fader(0.5f);
+        sx.to(2.0);   // B's move half way (0.5); A plays the knob
+        const float knob = PARAM_INFO[P_FLT_CUT].def;
+        CHECK(std::fabs(cutNorm(x.e) - (knob + (0.5f - knob) * 0.5f)) < 2e-3f);
+    }
+    {
+        // Repeat 1/4 -> 1/32 over a bar: every step in order, none skipped.
+        Scenes sc;
+        sc.lock(1, P_LP_REP, optionNorm(P_LP_REP, "1/32"));
+        sc.setStart(1, P_LP_REP, optionNorm(P_LP_REP, "1/4"));
+        sc.setMove(1, 3, kMoveOnce);
+        Engine e;
+        e.attachScenes(&sc);
+        Knobs k;
+        k.v[P_XFADE] = 1.0f;
+        e.setParams(k.v);
+        Song s(e);
+        int prev = -1, seen = 0;
+        bool order = true;
+        for (double b = 0.01; b < 4.5; b += 0.05) {   // from the first block on (the patch before it is A's)
+            s.to(b);
+            const double rep = e.patch().looper.repeatBeats;   // 1/4 is a beat, 1/32 an eighth of one
+            const int idx = rep >= 1.0 - 1e-6 ? 2 : rep >= 0.5 - 1e-6 ? 3 : rep >= 0.25 - 1e-6 ? 4 : 5;
+            if (idx != prev) {
+                order = order && (prev < 0 || idx == prev + 1);
+                prev = idx;
+                ++seen;
+            }
+        }
+        CHECK(order && seen == 4 && prev == 5);
+    }
+    {
+        // B's lock equals the knob (A); only its start differs: it still moves.
+        Scenes sc;
+        Knobs k;
+        k.v[P_FLT_ON] = 1.0f;
+        k.v[P_FLT_CUT] = 0.2f;
+        k.v[P_XFADE] = 1.0f;
+        sc.lock(1, P_FLT_CUT, 0.2f);
+        sc.setStart(1, P_FLT_CUT, 0.8f);
+        sc.setMove(1, 3, kMoveOnce);
+        Engine e;
+        e.attachScenes(&sc);
+        e.setParams(k.v);
+        CHECK(e.movingParams() == 1);
+        Song s(e);
+        s.to(2.0);
+        CHECK(std::fabs(cutNorm(e) - 0.5f) < 2e-3f);
+    }
+    {
+        // A move never steps further per chunk than its line (no jumps), at any tempo.
+        MoveRig x(3, kMovePingPong);
+        Song sx(x.e);
+        sx.t.bpm = 177.0;
+        x.fader(1.0f);
+        float L[kChunk] = {}, R[kChunk] = {};
+        const auto chunk = [&] {   // exactly one chunk
+            x.e.render(L, R, kChunk, sx.t);
+            sx.t.beats += kChunk / static_cast<double>(kRate) * sx.t.bpm / 60.0;
+        };
+        chunk();   // the first chunk plays B
+        float prev = cutNorm(x.e), worst = 0.0f;
+        for (int k = 0; k < 4000; ++k) {
+            chunk();
+            const float n = cutNorm(x.e);
+            worst = std::max(worst, std::fabs(n - prev));
+            prev = n;
+        }
+        const float line = 0.6f / 4.0f * static_cast<float>(kChunk / static_cast<double>(kRate) * 177.0 / 60.0);
+        CHECK(worst < 1.5f * line + 1e-5f);
+    }
+}
+
+void movesThroughThePlugin() {
+    std::printf("== moves: saved and loaded, LENGTH and PLAY, an edit, the scenes' line\n");
+    Host h;
+    h.play(true);
+    CHECK(h.load("effectforce 1\nscene_b=2\nscene2.name=Sweep\nscene2.move=1 bar\nscene2.play=Ping-pong\nscene2.flt_on=On\n"
+                 "scene2.flt_cut=18000>150\nscene2.flt_type=LP 24>BP\nscene3.move=7 bars\nscene3.flt_res=0.1>0.2>0.3\n"
+                 "scene4.flt_res=x>0.5\n") == 1);
+    std::string s = h.chunk();
+    CHECK(s.find("\nscene2.move=1 bar\nscene2.play=Ping-pong\n") != std::string::npos);
+    CHECK(s.find("\nscene2.flt_cut=18000>150\n") != std::string::npos && s.find("scene2.flt_type") == std::string::npos);
+    CHECK(s.find("scene3.") == std::string::npos && s.find("scene4.") == std::string::npos);   // nothing valid there
+    CHECK(s.find("mv_len") == std::string::npos);   // the surface's own, not a knob
+    Host b;
+    CHECK(b.load(s) == 1 && b.chunk() == s);
+    // LENGTH and PLAY show and set scene B's.
+    CHECK(h.display(P_MV_LEN) == "1 bar" && h.display(P_MV_PLAY) == "Ping-pong");
+    h.option(P_MV_LEN, "2 bars");
+    h.option(P_MV_PLAY, "Once");
+    s = h.chunk();
+    CHECK(s.find("\nscene2.move=2 bars\nscene2.play=Once\n") != std::string::npos && s.find("scene2.name=Sweep*") != std::string::npos);
+    h.tap(P_SCB_1 + 2);   // scene 3 at B: its own (the default)
+    CHECK(h.display(P_MV_LEN) == "4 bars" && h.display(P_MV_PLAY) == "Once");
+    h.tap(P_SCB_1 + 1);
+    CHECK(h.display(P_MV_LEN) == "2 bars");
+    // The scenes' line follows the move: armed, its bars, held.
+    h.blocks(4);
+    CHECK(h.display(P_SCN_INFO).find("B: SCENE 2 SWEEP*") != std::string::npos);
+    h.silence(static_cast<int>(1.25 * 22050) / kBlock * kBlock);   // beat 1.25
+    h.set(P_XFADE, 1.0f);
+    h.blocks(4);
+    CHECK(h.display(P_SCN_INFO).find("SWEEP*, MOVES ON THE BAR") != std::string::npos);
+    const int before = h.log.updates;
+    h.silence(3 * 22050);   // beat ~4.3: bar 1 of 2
+    CHECK(h.display(P_SCN_INFO).find("SWEEP*, BAR 1 OF 2") != std::string::npos && h.log.updates > before);
+    h.silence(4 * 22050);   // beat ~8.3
+    CHECK(h.display(P_SCN_INFO).find("SWEEP*, BAR 2 OF 2") != std::string::npos);
+    h.silence(4 * 22050);   // beat ~12.3: done
+    CHECK(h.display(P_SCN_INFO).find("SWEEP*, HELD") != std::string::npos);
+    h.set(P_XFADE, 0.0f);
+    h.blocks(40);
+    CHECK(h.display(P_SCN_INFO).find("SWEEP*     ") == std::string::npos && h.display(P_SCN_INFO).find(", HELD") == std::string::npos);
+    // EDIT B: the knob shows the lock (the end); turned, it holds still (no move left: no timing lines).
+    h.tap(P_EDIT_B);
+    CHECK(std::fabs(h.value(P_FLT_CUT) - 150.0f) < 1.0f);
+    CHECK(h.display(P_MV_LEN) == "2 bars");   // the edited scene's
+    h.set(P_FLT_CUT, 300.0f);
+    h.tap(P_EDIT_B);
+    s = h.chunk();
+    CHECK(s.find("\nscene2.flt_cut=300\n") != std::string::npos && s.find("scene2.move") == std::string::npos);
+}
+
 } // namespace
 
 void eft::scenesTests() {
@@ -437,4 +803,8 @@ void eft::scenesTests() {
     soundAtEachEnd();
     faderBar();
     looperInThePlugin();
+    moveStore();
+    moveClock();
+    moveValues();
+    movesThroughThePlugin();
 }

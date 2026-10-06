@@ -1,6 +1,8 @@
 effectforce-fx 1
 name=LP Sweep
+move=8 bars
+play=Once
 flt_on=On
 flt_type=LP 24
-flt_cut=150
+flt_cut=18000>150
 flt_res=0.3

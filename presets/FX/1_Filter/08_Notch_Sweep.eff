@@ -1,7 +1,9 @@
 effectforce-fx 1
 name=Notch Sweep
+move=4 bars
+play=Ping-pong
 flt_on=On
 flt_type=Notch
-flt_cut=600
+flt_cut=250>2500
 flt_res=0.6
 flt_spread=0.5

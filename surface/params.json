@@ -3519,6 +3519,53 @@
    "max": 0,
    "display": "string",
    "type": "readout"
+  },
+  {
+   "key": "mv_len",
+   "name": "Move Length",
+   "options": [
+    "Off",
+    "1 beat",
+    "2 beats",
+    "1 bar",
+    "2 bars",
+    "4 bars",
+    "8 bars",
+    "16 bars"
+   ],
+   "default": "4 bars"
+  },
+  {
+   "key": "mv_len__open",
+   "name": "Move Length List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "mv_len",
+   "type": "enum"
+  },
+  {
+   "key": "mv_play",
+   "name": "Move Play",
+   "options": [
+    "Once",
+    "Loop",
+    "Ping-pong"
+   ],
+   "default": "Once"
+  },
+  {
+   "key": "mv_play__open",
+   "name": "Move Play List",
+   "options": [
+    "Closed",
+    "Open"
+   ],
+   "default": "Closed",
+   "popup_of": "mv_play",
+   "type": "enum"
   }
  ]
 }

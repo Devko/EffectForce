@@ -211,6 +211,8 @@ CATS = ["Utility", "Synth", "Pads", "Bass", "Drums", "Lo-Fi", "Space", "Creative
 
 
 def fmt(v):
+    if isinstance(v, tuple):   # a scene's lock that moves (an effect of the FX library): start>end
+        return "%s>%s" % (fmt(v[0]), fmt(v[1]))
     if isinstance(v, str):
         return v
     if isinstance(v, float) and v != int(v):

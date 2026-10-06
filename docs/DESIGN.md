@@ -152,6 +152,47 @@ parameter, also on a Q-Link and on the PERFORM page.
   (the surface writes on MPC's UI thread, the engine reads on the audio thread). A generation
   counter tells the engine to rebuild its list of locked parameters (the union of A's and B's).
 
+### Scene moves
+
+A scene can move by itself (2026-10-06; the decisions in
+[plans/2026-10-06-scene-moves-design.md](plans/2026-10-06-scene-moves-design.md)): LP Sweep closes
+from 18 kHz to 150 Hz over 8 bars once the fader brings it in. The fader stays the A/B mixer; the
+motion is the scene's.
+
+- **A move:** some of a scene's locks have a **start** besides the lock (its end), and the scene a
+  **LENGTH** (Off · 1 beat · 2 beats · 1 bar · 2 · 4 · 8 · 16 bars) and a **PLAY** (Once holds the end,
+  Loop starts again, Ping-pong goes back, LENGTH each way). What can move: the Line kinds, continuous
+  on the knob's curve and ordered steps in order (Repeat 1/4 → 1/32 is a build). Switches and a
+  module's On can't. LENGTH Off: the scene holds its locks, as before moves.
+- **When:** a scene's move runs while the scene is heard and starts over once it is fully out. The
+  fader leaving A (by more than half a Q-Link detent) arms B's; it starts on the grid's next line, a
+  bar (a beat for a move under a bar), and until then B plays its starts. A push up to a 16th of the
+  line late counts from that line. Back at A (the fader's target, and its glide, there) resets it.
+  Scene A mirrors it, so at load with the fader at A, A's move starts on the first bar line. Another
+  scene at an end, or a change to the scene's move (a start, its timing, an effect loaded), starts
+  that end's over.
+- **Time:** the grid is MPC's song position while it plays, and runs on at the tempo while it is
+  stopped (the looper's rule). Once armed or running, a move counts beats played, chunk by chunk:
+  a tempo change bends it, a locate or the sequence's loop point doesn't move it. Bars are 4 beats.
+- **Values:** an end plays `start + (lock − start) · at` for each moving lock, `at` from its clock
+  (0 armed, a line for Once and Loop, a triangle for Ping-pong, exactly the lock once a Once is done),
+  and the fader blends the two ends as before; modulation adds on top. `rebuild()` keeps a lock whose
+  ends agree only at the lock (B sweeping down to the knob's own value still moves).
+- **Cost:** the morph runs per chunk while either clock is armed or running, as it does while the
+  fader glides; a log-curve parameter then goes by the fast exp2 (`modulate()`'s), and exactly
+  (`paramValue`) once nothing moves. Nothing moving: nothing to pay.
+- **On the page:** PERFORM's LENGTH and PLAY show and set the move of the scene at B, or of the scene
+  being edited (the FX tiles' rule); not knobs, not lockable, saved with the scene. A change marks an
+  effect's name `*`. The scenes' line shows each end's move: `MOVES ON THE BAR`, `BAR 3 OF 8`,
+  `HELD`. In EDIT the knobs show (and you hear) the locks; a moving lock turned there becomes a plain
+  lock.
+- **Saved** as `sceneN.move=8 bars` and `sceneN.play=Once` (only for a scene with a move) and a
+  moving lock as `sceneN.flt_cut=18000>150`; in an effect file the same without `sceneN.`. Files
+  without arrows load as before. `surface.py` checks them: an arrow only on a Line parameter, both
+  values in range, an effect with arrows has `move=` and `play=` and the other way round.
+- **Store:** a second table of starts per scene (atomics, -1: holds still), the timing per scene,
+  and a per-scene move epoch that tells the engine to start that scene's move over.
+
 ### The FX library
 
 64 effects in four banks of 16 (Filter, Space, Loop, Rhythm), `presets/FX/N_Bank/NN_Name.eff`,
@@ -225,7 +266,7 @@ Five groups (MPC's tab strip shows five without a pager), each page with its own
 
 | Group | Pages |
 |---|---|
-| CHAIN | **CHAIN**: the order as 10 tiles in two rows of five (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PERFORM**: the scene tiles of each end (lit = picked, the lock count), EDIT A / B, CLEAR, the scenes' line (by name), the Crossfader knob and its bar; the FX library (16 tiles of a bank, the bank arrows). Q-Link 1 is the crossfader. **LOOPER**: On, Place, Length, Capture, REC, Hold, the looper's line; Loop, Blend, Repeat, Speed, the crossfader. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
+| CHAIN | **CHAIN**: the order as 10 tiles in two rows of five (lit = on, the selected one in brackets), MOVE ◀ / ▶, ON/OFF; Input, Output, Mix; Macros 1-4; the preset stepper. **PERFORM**: the scene tiles of each end (lit = picked, the lock count), EDIT A / B, CLEAR, the scenes' line (by name), the Crossfader knob and its bar; the FX library (16 tiles of a bank, the bank arrows), the move's LENGTH and PLAY. Q-Link 1 is the crossfader. **LOOPER**: On, Place, Length, Capture, REC, Hold, the looper's line; Loop, Blend, Repeat, Speed, the crossfader. **PRESETS**: the browser (categories, presets, favorites, random, save, init) |
 | TONE | **DRIVE+FILTER** (a card each), **EQ**, **COMP** (Comp and OTT cards) |
 | MOTION | **CHORUS+PHASE** (a card each), **PULSE** (the LFO and the GATE card) |
 | SPACE | **DELAY**, **GRAIN**, **REVERB** (with its shimmer) |
@@ -259,7 +300,9 @@ Targets on the Force (Cortex-A17), measured with `make bench-device`:
 | The performance layer: the looper rolling, the fader sweeping a dozen locks and four sends | ≤ 1.5% on top of what the modules cost |
 
 `make bench-device` has the performance layer's cases: the looper rolling with the fader sweeping (scene 2
-switching four modules in and moving a dozen parameters), alone and with everything on at its heaviest.
+switching four modules in and moving a dozen parameters), alone and with everything on at its heaviest;
+and scene 2 moving 14 locks (7 on a log curve) as a Loop over a beat, every chunk, alone and with
+everything on.
 
 ## Code layout
 
@@ -272,7 +315,7 @@ switching four modules in and moving a dozen parameters), alone and with everyth
 | `dsp/mod.h` | LFOs, envelope follower, matrix sources |
 | `dsp/rack.*` | Order, fades, levels, the modules' sends, the looper's place, the chunk loop |
 | `dsp/looper.*` | The looper: recorder ring, the grab on the grid, slices, speed, crossfaded jumps |
-| `plugin/scenes.*` | The scenes' locks (lock-free between the threads) and how each kind of parameter morphs |
+| `plugin/scenes.*` | The scenes' locks and moves (lock-free between the threads) and how each kind of parameter morphs |
 | `plugin/engine.*` | The morph (the fader's glide, the locked parameters per chunk) and the modulation |
 | `plugin/` | SubForce's surface (Force input handling, browser, presets, state), the effect glue from the probe, the CHAIN page's actions |
 | `surface/surface.py` | Parameters, pages (PolyForce's layout machinery and checks), factory presets |
@@ -291,4 +334,8 @@ sample names the recorded frame it came from (the grab on the grid, slices, spee
 wrapping under a 10 s loop, a locate, block sizes; `test/looper_test.cpp`); the scenes' morph rules,
 the engine following the fader, a send bit for bit equal to the module switched on by its knob at the
 On end and the input bit for bit at the Off end, a tail ringing out, a module resting; EDIT A / B,
-tiles, CLEAR and the state through the plugin as a Force drives it (`test/scenes_test.cpp`).
+tiles, CLEAR and the state through the plugin as a Force drives it; scene moves: the store, the clock
+(armed by the fader, on the bar line, for LENGTH; Loop, Ping-pong; the tempo, a locate, MPC stopped),
+the values (half way, steps in order, a lock equal to the other end, never a jump), LENGTH and PLAY,
+the scenes' line (`test/scenes_test.cpp`); every effect that moves played whole, no clicks
+(`test/fx_test.cpp`).

@@ -1,7 +1,9 @@
 effectforce-fx 1
 name=Hall Wash
+move=4 bars
+play=Once
 rev_on=On
 rev_mode=Hall
 rev_size=0.8
 rev_decay=6
-rev_mix=0.6
+rev_mix=0>0.6

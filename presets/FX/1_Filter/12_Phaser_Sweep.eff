@@ -1,9 +1,12 @@
 effectforce-fx 1
 name=Phaser Sweep
+move=4 bars
+play=Ping-pong
 phs_on=On
 phs_mode=Phaser 8
 phs_sync=Sync
 phs_div=1 bar
 phs_depth=0.9
+phs_center=0.2>0.8
 phs_fb=0.7
 phs_mix=0.6

@@ -82,9 +82,11 @@ flowchart LR
 Everything runs in **32-sample chunks** (four per MPC block). Per chunk:
 
 0. **The scenes** (`plugin/engine.cpp`): the crossfader glides (15 ms one-pole) toward its parameter;
-   every parameter scene A or B locks is set to its morph at that position (a line in the knob's 0..1
-   space, a switch at the middle, or a module's send). The list of locked parameters is rebuilt only
-   when a parameter or a lock changes.
+   each end's move clock is armed, started on the grid's line, advanced or reset by it; every
+   parameter scene A or B locks is set to its morph at that position (each end's value along its move,
+   then a line in the knob's 0..1 space, a switch at the middle, or a module's send), worked out only
+   while the fader glides or a move runs. The list of locked parameters is rebuilt only when a
+   parameter or a lock changes.
 1. **Modulation** (`plugin/engine.cpp`): every matrix slot adds amount × source to its target's 0..1
    value, clamped, through the knob's own curve, into a copy of the patch. Sources are the ones of
    the chunk before (0.7 ms: inaudible).
@@ -142,7 +144,8 @@ What MPC does with an insert effect was measured on the device first ([the probe
   buttons, tiles, toggles, popup flags.
 - **Saved state** (projects and `.efp` preset files) is the text format `effectforce 1`: `key=value`
   lines of real values (Hz, seconds, dB), options by name (`dly_mode=Ping-Pong`, `order_3=Comp`), and
-  in a project the preset it came from; then the scenes' locks as `sceneN.key=value` lines. Ranges and
+  in a project the preset it came from; then the scenes' locks as `sceneN.key=value` lines (a moving
+  lock `start>end`, its scene's timing as `sceneN.move=` and `sceneN.play=`). Ranges and
   option lists can change without breaking saved sounds; an order that names only some slots (0.0.1
   saved eight) keeps them and fills the rest in the default order, one that isn't a permutation of the
   modules falls back to the default. While a scene is being edited, the state keeps the knobs as they

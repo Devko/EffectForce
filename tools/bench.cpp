@@ -179,7 +179,19 @@ const char* kPerformState =
     "scene2.rev_on=On\nscene2.rev_mix=0.7\nscene2.rev_freeze=On\nscene2.drv_on=On\nscene2.drv_amt=30\n"
     "scene2.chr_mix=0.9\nscene2.phs_depth=1\nscene2.mac_1=1\nscene2.in_gain=-6\nscene2.mix=0.8\n";
 
-Result runCase(void* lib, int seconds, const char* name, int module, bool all, bool perform = false) {
+// Scene moves at their busiest (docs/DESIGN.md "Scene moves"): the fader at B, scene 2 moving 14 locks
+// (7 on a log curve) as a Loop over a beat, so every chunk works every one of them out again.
+const char* kMovesState =
+    "effectforce 1\nxfade=1\nscene_b=2\nscene2.move=1 beat\nscene2.play=Loop\n"
+    "scene2.flt_on=On\nscene2.flt_cut=18000>200\nscene2.flt_res=0.1>0.7\nscene2.eq_on=On\nscene2.eq_mf=300>3000\n"
+    "scene2.dly_on=On\nscene2.dly_lc=50>800\nscene2.dly_hc=12000>2000\nscene2.dly_fb=0.2>0.7\nscene2.rev_on=On\n"
+    "scene2.rev_damp=15000>2000\nscene2.rev_decay=1>8\nscene2.rev_mix=0.1>0.6\nscene2.chr_on=On\nscene2.chr_rate=0.2>4\n"
+    "scene2.phs_on=On\nscene2.phs_center=0.1>0.9\nscene2.mac_1=0>1\nscene2.in_gain=0>-6\nscene2.mix=0.6>1\n";
+
+enum Mode { kPlain, kPerform, kMoves };
+
+Result runCase(void* lib, int seconds, const char* name, int module, bool all, int mode = kPlain) {
+    const bool perform = mode == kPerform;
     auto entry = reinterpret_cast<AEffect* (*)(audioMasterCallback)>(dlsym(lib, "VSTPluginMain"));
     AEffect* e = entry ? entry(master) : nullptr;
     if (!e) {
@@ -194,9 +206,10 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, b
     } else if (module >= 0) {
         busy(set, module, false);
     }
-    if (perform)   // a project's state: it changes only what it lists
-        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(std::strlen(kPerformState)),
-                      const_cast<char*>(kPerformState), 0.0f);
+    if (mode != kPlain) {   // a project's state: it changes only what it lists
+        const char* state = perform ? kPerformState : kMovesState;
+        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(std::strlen(state)), const_cast<char*>(state), 0.0f);
+    }
     std::vector<float> L(kBlock), R(kBlock);
     float* io[2] = {L.data(), R.data()};
     uint32_t seed = 12345u;
@@ -208,7 +221,8 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, b
             R[static_cast<size_t>(i)] = 0.7f * x + 0.05f;
         }
     };
-    const int warm = perform ? 3 * 44100 / kBlock : 64;   // performing: the looper records a bar first
+    // Performing: the looper records a bar first. Moving: the move is under way (it starts on a beat).
+    const int warm = perform ? 3 * 44100 / kBlock : mode == kMoves ? 44100 / kBlock : 64;
     for (int b = 0; b < warm; ++b) {   // the patch settles, buffers warm up
         fill();
         e->processReplacing(e, io, io, kBlock);
@@ -279,8 +293,10 @@ int main(int argc, char** argv) {
         check(runCase(lib, seconds, name.c_str(), m, false));
     }
     check(runCase(lib, seconds, "everything on, heaviest, 8 mod slots", -1, true));
-    check(runCase(lib, seconds, "looper rolling, fader sweeping", -1, false, true));
-    check(runCase(lib, seconds, "all that, everything on heaviest", -1, true, true));
+    check(runCase(lib, seconds, "looper rolling, fader sweeping", -1, false, kPerform));
+    check(runCase(lib, seconds, "all that, everything on heaviest", -1, true, kPerform));
+    check(runCase(lib, seconds, "scene moving 14 locks, every chunk", -1, false, kMoves));
+    check(runCase(lib, seconds, "that, everything on heaviest", -1, true, kMoves));
     dlclose(lib);
     return fail ? 1 : 0;
 }

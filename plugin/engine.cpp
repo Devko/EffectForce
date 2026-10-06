@@ -14,10 +14,32 @@ constexpr int kSlotStride = P_M2_SRC - P_M1_SRC;
 const float kFaderCoef = 1.0f - std::exp(-static_cast<float>(kChunk) / (0.015f * kRate));   // 15 ms per chunk
 float unit(float v) { return v > 0.0f ? (v < 1.0f ? v : 1.0f) : 0.0f; }                     // NaN: 0
 
+// A scene is heard once the fader is this far from the other end (and out again below it): half a
+// Q-Link detent (1/128), so one detent brings it in while a fader resting a hair off its end doesn't.
+constexpr float kHeard = 0.005f;
+
+// What an end plays of a lock: its start, the lock, or on the line between (exactly the lock once a
+// move is done, as a lock that holds still).
+float along(float from, float to, float at) { return at >= 1.0f ? to : from + (to - from) * at; }
+
 int moduleOf(int param) {
     for (int m = 0; m < kNumModules; ++m)
         if (kModuleOnParam[m] == param) return m;
     return -1;
+}
+
+// Where a running move plays, 0 (its starts) .. 1 (its locks), `beats` after it started: Once a
+// straight line, then held; Loop the line again and again; Ping-pong there and back, `length` each way.
+float moveAt(double beats, double length, int play) {
+    const double u = beats / length;
+    switch (play) {
+        case kMoveLoop: return static_cast<float>(u - std::floor(u));
+        case kMovePingPong: {
+            const double v = u - 2.0 * std::floor(u * 0.5);
+            return static_cast<float>(v <= 1.0 ? v : 2.0 - v);
+        }
+        default: return static_cast<float>(std::min(u, 1.0));
+    }
 }
 }
 
@@ -57,12 +79,14 @@ void Engine::setParams(const float* norm) {
     // The crossfader alone moved (the common case while it is played): no rebuild, the next chunks
     // glide to it.
     xTarget_ = unit(norm[P_XFADE]);
+    const bool jumped = xFresh_ && x_ != xTarget_;
     if (xFresh_) x_ = xTarget_;   // nothing played yet (a project loading): no glide from 0
     bool onlyFader = haveRaw_;
     for (int i = 0; i < P_COUNT && onlyFader; ++i) onlyFader = i == P_XFADE || norm[i] == raw_[i];
     std::copy(norm, norm + P_COUNT, raw_);
     haveRaw_ = true;
     if (!onlyFader) rebuild();
+    else if (jumped) morph();   // no glide will follow it: the scenes' parameters there at once
 }
 
 void Engine::rebuild() {
@@ -73,24 +97,50 @@ void Engine::rebuild() {
         if (!scenes_->editing()) {           // while editing, the knobs already show the scene
             const int sa = static_cast<int>(paramValue(P_SCENE_A, raw_[P_SCENE_A]));
             const int sb = static_cast<int>(paramValue(P_SCENE_B, raw_[P_SCENE_B]));
+            // Each end's clock: another scene there, or its move changed, starts it over.
+            const int sides[2] = {sa, sb};
+            for (int side = 0; side < 2; ++side) {
+                Clock& c = clock_[side];
+                const int sc = sides[side];
+                const uint32_t epoch = scenes_->moveEpoch(sc);
+                const double length = kMoveBeats[scenes_->moveLength(sc)];
+                const bool has = length > 0.0 && scenes_->moves(sc);
+                if (sc == c.scene && epoch == c.epoch && has == (c.state != kMoveNone)) continue;
+                c = Clock{};
+                c.scene = sc;
+                c.epoch = epoch;
+                c.length = length;
+                c.play = scenes_->movePlay(sc);
+                c.state = has ? kMoveIdle : kMoveNone;
+            }
             for (int p = 0; p < P_COUNT; ++p) {
                 if (!Scenes::lockable(p)) continue;
                 const float la = scenes_->value(sa, p), lb = scenes_->value(sb, p);
                 if (la < 0.0f && lb < 0.0f) continue;
                 const float a = la >= 0.0f ? la : raw_[p], b = lb >= 0.0f ? lb : raw_[p];
+                // Where each end's move starts it: its start, while that end's scene has a move.
+                const float fa = la >= 0.0f && clock_[0].state != kMoveNone ? scenes_->start(sa, p) : -1.0f;
+                const float fb = lb >= 0.0f && clock_[1].state != kMoveNone ? scenes_->start(sb, p) : -1.0f;
+                const float a0 = fa >= 0.0f ? fa : a, b0 = fb >= 0.0f ? fb : b;
                 const SceneMorph kind = kSceneMorph[p];
-                const bool moves = kind == SceneMorph::Send ? (a > 0.5f) != (b > 0.5f) : a != b;
+                // Not only the ends' locks: an end that moves it may meet the other end only at its lock.
+                const bool moves = kind == SceneMorph::Send ? (a > 0.5f) != (b > 0.5f) : a != b || a0 != a || b0 != b;
                 if (!moves) {   // both ends the same (a lock against an equal knob, or both locked alike)
                     norm_[p] = a;
                     continue;
                 }
-                locks_[nLocks_++] = {p, kind == SceneMorph::Send ? moduleOf(p) : -1, a, b, kind};
+                const ParamSpec& spec = PARAM_SPECS[p];
+                const float logRatio = spec.curve == Curve::Log ? static_cast<float>(std::log2(static_cast<double>(spec.hi) / spec.lo)) : 0.0f;
+                locks_[nLocks_++] = {p, kind == SceneMorph::Send ? moduleOf(p) : -1, a, b, a0, b0, logRatio, kind};
                 if (kind == SceneMorph::Send) norm_[p] = 1.0f;   // runs while either end has it on
             }
         }
     }
-    for (int k = 0; k < nLocks_; ++k)
-        if (locks_[k].kind != SceneMorph::Send) norm_[locks_[k].param] = Scenes::morph(locks_[k].param, locks_[k].a, locks_[k].b, x_);
+    for (int k = 0; k < nLocks_; ++k) {
+        const Lock& l = locks_[k];
+        if (l.kind != SceneMorph::Send)
+            norm_[l.param] = Scenes::morph(l.param, along(l.a0, l.a, clock_[0].at), along(l.b0, l.b, clock_[1].at), x_);
+    }
     base_ = patchFromParams(norm_);
     base_.looper.rec = loopRec_;
     for (int k = 0; k < nLocks_; ++k)
@@ -116,8 +166,9 @@ void Engine::routes() {
     patch_ = base_;   // modulate() rewrites the fields the matrix reaches, every chunk
 }
 
-void Engine::morph() {
+void Engine::morph(bool fast) {
     bool rerouted = false;
+    const float atA = clock_[0].at, atB = clock_[1].at;
     for (int k = 0; k < nLocks_; ++k) {
         const Lock& l = locks_[k];
         // patch_ too: it is base_ as of the last routes(), the matrix only rewrites its own targets.
@@ -127,10 +178,12 @@ void Engine::morph() {
                     Scenes::send(l.a, l.b, x_);
             continue;
         }
-        const float n = Scenes::morph(l.param, l.a, l.b, x_);
+        const float n = Scenes::morph(l.param, along(l.a0, l.a, atA), along(l.b0, l.b, atB), x_);
         if (n == norm_[l.param]) continue;
         norm_[l.param] = n;
-        const float v = paramValue(l.param, n);
+        // While a move runs, a log curve (a cutoff sweeping) by the fast exp2, as modulate() does; at
+        // rest the exact value.
+        const float v = fast && l.logRatio != 0.0f ? PARAM_SPECS[l.param].lo * exp2Fast(n * l.logRatio) : paramValue(l.param, n);
         setField(base_, l.param, v);
         setField(patch_, l.param, v);
         rerouted = rerouted || (l.param >= P_M1_SRC && l.param <= P_M8_AMT) || l.param == P_ENV_ATT ||
@@ -166,16 +219,75 @@ void Engine::modulate() {
     }
 }
 
+bool Engine::tick(double grid, double beats) {
+    bool moved = false;
+    for (int side = 0; side < 2; ++side) {
+        Clock& c = clock_[side];
+        if (c.state == kMoveNone) continue;
+        // The fader's target leaving the other end brings this end in; it is out once the target and the
+        // fader as played are both back there.
+        const float heard = side ? xTarget_ : 1.0f - xTarget_;
+        const float played = side ? x_ : 1.0f - x_;
+        const float was = c.at;
+        if (c.state == kMoveIdle) {
+            if (heard >= kHeard) {
+                // On the grid's next line: a bar, or a beat for a move under a bar. A push up to a 16th
+                // of the line late counts from that line.
+                const double q = c.length < 4.0 ? 1.0 : 4.0;
+                const double since = grid - std::floor(grid / q) * q;
+                if (since < q / 16.0) {
+                    c.state = kMoveRunning;
+                    c.beats = since;
+                } else {
+                    c.state = kMoveArmed;
+                    c.wait = q - since;
+                }
+            }
+        } else if (heard < kHeard && played < kHeard) {
+            c.state = kMoveIdle;   // fully out: ready for the next push
+            c.wait = c.beats = 0.0;
+        }
+        if (c.state == kMoveArmed && c.wait <= 0.0) {
+            c.state = kMoveRunning;
+            c.beats = -c.wait;
+        }
+        if (c.state == kMoveRunning && c.play == kMoveOnce && c.beats >= c.length) c.state = kMoveDone;
+        c.at = c.state == kMoveRunning ? moveAt(c.beats, c.length, c.play) : c.state == kMoveDone ? 1.0f : 0.0f;
+        // On to the next chunk: the counts go by beats played, so a locate or a loop point doesn't move them.
+        if (c.state == kMoveArmed) c.wait -= beats;
+        else if (c.state == kMoveRunning) c.beats += beats;
+        moved = moved || c.at != was;
+    }
+    return moved;
+}
+
+Engine::MoveStatus Engine::moveStatus(int side) const {
+    MoveStatus s;
+    if (side < 0 || side > 1) return s;
+    const Clock& c = clock_[side];
+    s.state = c.state;
+    s.beats = c.state == kMoveArmed ? c.wait : c.beats;
+    s.length = c.length;
+    s.play = c.play;
+    return s;
+}
+
 void Engine::render(float* L, float* R, int n, Transport t) {
     if (scenes_ && scenes_->generation() != sceneGen_ && haveRaw_) rebuild();   // a lock changed (UI thread)
     xFresh_ = false;
     for (int pos = 0; pos < n; pos += kChunk) {
         const int m = std::min(kChunk, n - pos);
-        if (x_ != xTarget_) {   // the crossfader glides; the scenes' parameters follow it
+        const double beats = m / static_cast<double>(kRate) * t.bpm / 60.0;
+        // The grid the moves start on: MPC's song position while it plays; stopped, it runs on at the tempo.
+        const double grid = t.valid && t.playing && std::isfinite(t.beats) ? t.beats : freeBeat_;
+        freeBeat_ = grid + beats;
+        const bool glide = x_ != xTarget_;
+        if (glide) {   // the crossfader glides; the scenes' parameters follow it
             x_ += (xTarget_ - x_) * kFaderCoef;
             if (std::fabs(xTarget_ - x_) < 1e-4f) x_ = xTarget_;
-            morph();
         }
+        const bool moved = tick(grid, beats);
+        if (glide || moved) morph(clock_[0].state == kMoveRunning || clock_[1].state == kMoveRunning);
         for (int k = 0; k < 4; ++k) src_[MS_MACRO1 + k] = norm_[P_MAC_1 + k];   // a macro's knob is its value
         const RackPatch* use = &base_;
         if (nSlots_ > 0) {
@@ -187,7 +299,7 @@ void Engine::render(float* L, float* R, int n, Transport t) {
         src_[MS_LFO1] = lfo_[0].next(use->lfo[0], t, m);
         src_[MS_LFO2] = lfo_[1].next(use->lfo[1], t, m);
         rack_.process(*use, t, L + pos, R + pos, m);
-        t.beats += m / static_cast<double>(kRate) * t.bpm / 60.0;
+        t.beats += beats;
     }
 }
 

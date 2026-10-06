@@ -144,6 +144,16 @@ void Surface::set(int i, float n) {
         if (editSide_ == (i == P_SCENE_A ? 0 : 1) && sceneOf(editSide_) != editScene_) loadEdited();
         texts = true;
     }
+    if (i == P_MV_LEN || i == P_MV_PLAY) {   // the move's timing, of the scene at B or the edited one
+        const int sc = moveTarget();
+        const int len = static_cast<int>(paramValue(P_MV_LEN, want_[P_MV_LEN].load()));
+        const int play = static_cast<int>(paramValue(P_MV_PLAY, want_[P_MV_PLAY].load()));
+        if (len != scenes_.moveLength(sc) || play != scenes_.movePlay(sc)) {
+            scenes_.setMove(sc, len, play);
+            std::string& name = sceneName_[sc];
+            if (!name.empty() && name.back() != '*' && scenes_.moves(sc)) name += '*';   // no longer as it came
+        }
+    }
     if (i == P_XFADE) {   // the fader's bar: MPC redraws texts only when told, so tell it when the bar moves
         const int bar = static_cast<int>(std::lround(want_[P_XFADE].load() * kFaderBarWidth));
         if (bar != shownBar_) {
@@ -537,16 +547,38 @@ std::string Surface::sceneInfo() const {
                       editScene_ + 1, name.c_str(), scenes_.count(editScene_));
     } else {
         const int a = sceneOf(0), c = sceneOf(1);
-        // A scene by its name (the effect it came from), or by how many settings it locks.
-        const auto said = [this](int sc) {
+        // A scene by its name (the effect it came from), or by how many settings it locks; then where its
+        // move is.
+        const auto said = [this](int sc, int side) {
             std::string t = "SCENE " + std::to_string(sc + 1);
-            if (!sceneName_[sc].empty()) return t + " " + upper(sceneName_[sc]);
-            const int n = scenes_.count(sc);
-            return n ? t + ", " + std::to_string(n) + " LOCKS" : t + ", CLEAN";
+            if (!sceneName_[sc].empty()) t += " " + upper(sceneName_[sc]);
+            else t += scenes_.count(sc) ? ", " + std::to_string(scenes_.count(sc)) + " LOCKS" : ", CLEAN";
+            return t + moveText(side);
         };
-        return "A: " + said(a) + "     B: " + said(c);
+        return "A: " + said(a, 0) + "     B: " + said(c, 1);
     }
     return b;
+}
+
+int Surface::moveTarget() const { return editSide_ >= 0 ? editScene_ : sceneOf(1); }
+
+bool Surface::setMoveShown(int side, const MoveShown& m) {
+    if (side < 0 || side > 1) return false;
+    const uint32_t v = static_cast<uint32_t>(clampi(m.state, 0, 15)) | static_cast<uint32_t>(clampi(m.at, 0, 255)) << 4 |
+                       static_cast<uint32_t>(clampi(m.of, 0, 255)) << 12 | (m.bars ? 1u : 0u) << 20;
+    return moveShown_[side].exchange(v, std::memory_order_relaxed) != v;
+}
+
+std::string Surface::moveText(int side) const {
+    const uint32_t v = moveShown_[side].load(std::memory_order_relaxed);
+    const int state = static_cast<int>(v & 15u), at = static_cast<int>(v >> 4 & 255u), of = static_cast<int>(v >> 12 & 255u);
+    const char* unit = v >> 20 & 1u ? "BAR" : "BEAT";
+    switch (state) {
+        case kMoveArmed: return std::string(", MOVES ON THE ") + unit;
+        case kMoveRunning: return ", " + std::string(unit) + " " + std::to_string(at) + " OF " + std::to_string(of);
+        case kMoveDone: return ", HELD";
+        default: return "";
+    }
 }
 
 std::string Surface::faderBar() const {
@@ -596,6 +628,7 @@ void Surface::savePreset() {
 std::string Surface::display(int i) const {
     if (i < 0 || i >= P_COUNT) return {};
     if (i == P_XF_BAR) return faderBar();   // follows the fader without a refresh
+    if (i == P_SCN_INFO) return sceneInfo();   // and the scenes' line its moves
     switch (PARAM_INFO[i].kind) {
         case Kind::Synth:
         case Kind::Chain:
@@ -701,6 +734,10 @@ void Surface::refresh() {
     put(P_EDIT_A, editSide_ == 0 ? 1.0f : 0.0f);
     put(P_EDIT_B, editSide_ == 1 ? 1.0f : 0.0f);
     t[P_SCN_INFO] = sceneInfo();
+    // LENGTH and PLAY: the move of the scene at B, or the edited one.
+    const int moving = moveTarget();
+    put(P_MV_LEN, static_cast<float>(scenes_.moveLength(moving)) / static_cast<float>(kNumMoveLengths - 1));
+    put(P_MV_PLAY, static_cast<float>(scenes_.movePlay(moving)) / static_cast<float>(kNumMovePlays - 1));
     t[P_XF_BAR] = faderBar();
     // The FX tiles: the bank's effects, lit = the one in scene B as it came.
     const int banks = fxBanks();

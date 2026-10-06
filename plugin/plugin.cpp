@@ -269,6 +269,24 @@ void publishLooper(Plugin* p) {
     }
 }
 
+// Each end's scene move for the scenes' line: which bar (or beat) of how many; a change asks MPC to
+// redraw the texts.
+void publishMoves(Plugin* p) {
+    bool changed = false;
+    for (int side = 0; side < 2; ++side) {
+        const Engine::MoveStatus st = p->engine.moveStatus(side);
+        Surface::MoveShown m;
+        m.state = st.state;
+        m.bars = st.length >= 4.0;
+        const double unit = m.bars ? 4.0 : 1.0;
+        m.of = static_cast<int>(std::lround(st.length / unit));
+        if (st.state == kMoveRunning && st.length > 0.0)   // Loop and Ping-pong count each pass again
+            m.at = std::min(static_cast<int>(std::fmod(st.beats, st.length) / unit) + 1, m.of);
+        changed = p->surface.setMoveShown(side, m) || changed;
+    }
+    if (changed) p->surface.textsChanged();
+}
+
 void runBlock(Plugin* p, float* L, float* R, int n, const Transport& tr) {
     // The sound only changes when a parameter does: then the engine takes a new snapshot. Looked
     // at only when something was written since the last look.
@@ -288,6 +306,7 @@ void runBlock(Plugin* p, float* L, float* R, int n, const Transport& tr) {
     p->engine.setLoopRec(p->surface.loopRecs());
     p->engine.render(L, R, n, tr);
     publishLooper(p);
+    publishMoves(p);
     p->tail.store(p->engine.tailSamples(), std::memory_order_relaxed);
     guard(L, n);
     guard(R, n);

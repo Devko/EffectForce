@@ -4,6 +4,21 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### Scene moves (2026-10-06, branch `scene-moves`)
+
+A scene that moves by itself, the Octatrack way of a filter sweep across 8 bars
+([Design](DESIGN.md#scene-moves), [User guide](USER_GUIDE.md#moves),
+[the decisions](plans/2026-10-06-scene-moves-design.md)): locks with a start, played to the lock over a
+LENGTH (Once, Loop, Ping-pong) from the bar line after the fader brings the scene in.
+
+| Item | State |
+|---|---|
+| Store, clocks, the engine's morph, state lines, PERFORM's LENGTH / PLAY, the scenes' line | ✅ test/scenes_test.cpp (moves), the whole suite green on x86 (ASan/UBSan) |
+| 11 effects of the FX library move; the Perform presets built from them follow | ✅ test/fx_test.cpp: every move played whole, no clicks |
+| Bench and PGO cases (14 locks moving every chunk) | ✅ x86; device numbers in [Performance](PERFORMANCE.md#device-measurements) |
+| Fixed on the way: a fresh engine given only the fader (before anything played) kept the scenes at the old position | ✅ a check |
+| On the device | 🔜 by ear: LP Sweep on the bar line, Build Roll, Tape Stop, back at A and again |
+
 ### The performance layer (2026-10-05, branch `ccr-eabecd3e-gfq4u1`)
 
 An Octatrack-style performance mixer in the rack ([Design](DESIGN.md#performance-scenes-and-the-looper),

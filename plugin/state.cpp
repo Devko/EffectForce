@@ -89,6 +89,41 @@ bool sceneNameKey(const std::string& key, int& scene) {
     std::string rest;
     return sceneOf(key, scene, rest) && rest == "name";
 }
+
+// A scene's move= or play= line (rest: what follows "sceneN."; an effect's line: the key itself).
+bool moveKey(const std::string& rest) { return rest == "move" || rest == "play"; }
+
+// A lock's value: "end", or "start>end" for a lock that moves. Each as parameter i's 0..1 (start -1
+// where it doesn't move); false if either isn't one, or a start on a parameter that can't move.
+bool lockOf(int i, const std::string& val, float& start, float& end) {
+    const size_t arrow = val.find('>');
+    start = -1.0f;
+    if (arrow == std::string::npos) {
+        end = normOf(i, val);
+        return end >= 0.0f;
+    }
+    if (kSceneMorph[i] != SceneMorph::Line) return false;
+    start = normOf(i, val.substr(0, arrow));
+    end = normOf(i, val.substr(arrow + 1));
+    return start >= 0.0f && end >= 0.0f;
+}
+
+// A move= or play= value into the scene's timing (the other half as it is); false if it isn't one.
+bool setTiming(Scenes& sc, int scene, const std::string& what, const std::string& val) {
+    const int p = what == "move" ? P_MV_LEN : P_MV_PLAY;
+    const int o = option(p, val);
+    if (o < 0) return false;
+    if (what == "move") sc.setMove(scene, o, sc.movePlay(scene));
+    else sc.setMove(scene, sc.moveLength(scene), o);
+    return true;
+}
+
+// A lock as a state line writes it: "end", or "start>end".
+std::string lockText(const Scenes& sc, int scene, int i) {
+    const float start = sc.start(scene, i);
+    const std::string end = valueText(i, sc.value(scene, i));
+    return start >= 0.0f ? valueText(i, start) + ">" + end : end;
+}
 } // namespace
 
 bool isStateText(const std::string& text) {
@@ -109,14 +144,17 @@ std::string saveState(const Surface& s, bool asPreset) {
         out += valueText(i, s.stateValue(i));   // while a scene is edited: the knobs, not the scene
         out += '\n';
     }
-    // The scenes: each one's name (the effect it was made from), then its locks, sceneN.key=value.
+    // The scenes: each one's name (the effect it was made from), its move's timing if it has one, then
+    // its locks, sceneN.key=value (start>end for a lock that moves).
     for (int sc = 0; sc < kNumScenes; ++sc) {
-        if (!s.sceneName(sc).empty()) out += "scene" + std::to_string(sc + 1) + ".name=" + s.sceneName(sc) + "\n";
-        for (int i = 0; i < P_COUNT; ++i) {
-            const float n = s.scenes().value(sc, i);
-            if (n < 0.0f) continue;
-            out += "scene" + std::to_string(sc + 1) + "." + PARAM_INFO[i].key + "=" + valueText(i, n) + "\n";
+        const std::string pre = "scene" + std::to_string(sc + 1) + ".";
+        if (!s.sceneName(sc).empty()) out += pre + "name=" + s.sceneName(sc) + "\n";
+        if (s.scenes().moves(sc)) {
+            out += pre + "move=" + PARAM_INFO[P_MV_LEN].opts[s.scenes().moveLength(sc)] + "\n";
+            out += pre + "play=" + PARAM_INFO[P_MV_PLAY].opts[s.scenes().movePlay(sc)] + "\n";
         }
+        for (int i = 0; i < P_COUNT; ++i)
+            if (s.scenes().locked(sc, i)) out += pre + PARAM_INFO[i].key + "=" + lockText(s.scenes(), sc, i) + "\n";
     }
     if (!asPreset && !s.presetKey().empty()) out += "preset=" + s.presetKey() + "\n";
     return out;
@@ -153,9 +191,17 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
             s.setSceneName(scene, val);
             continue;
         }
+        std::string rest;
+        if (sceneOf(key, scene, rest) && moveKey(rest)) {
+            setTiming(s.scenes(), scene, rest, val);
+            continue;
+        }
         if (sceneKey(key, scene, param)) {
-            const float n = normOf(param, val);
-            if (n >= 0.0f) s.scenes().lock(scene, param, n);
+            float start = 0.0f, end = 0.0f;
+            if (lockOf(param, val, start, end)) {
+                s.scenes().lock(scene, param, end);
+                if (start >= 0.0f) s.scenes().setStart(scene, param, start);
+            }
             continue;
         }
         const int i = savedParam(key);
@@ -216,11 +262,16 @@ std::string loadSceneText(Scenes& sc, int scene, const std::string& text, bool* 
             name = val;
             continue;
         }
+        if (moveKey(key)) {   // the move's timing; an effect without one leaves the scene's as it is
+            setTiming(sc, scene, key, val);
+            continue;
+        }
         const int i = savedParam(key);
         if (i < 0 || !Scenes::lockable(i)) continue;
-        const float n = normOf(i, val);
-        if (n < 0.0f) continue;
-        sc.lock(scene, i, n);
+        float from = 0.0f, to = 0.0f;
+        if (!lockOf(i, val, from, to)) continue;
+        sc.lock(scene, i, to);
+        if (from >= 0.0f) sc.setStart(scene, i, from);
         named[i] = true;
         if (looper && key.compare(0, 3, "lp_") == 0) *looper = true;
     }

@@ -8,6 +8,7 @@
 // (-fprofile-partial-training).
 #include "../plugin/vst2.h"
 #include "factory_presets.h"
+#include "fx_library.h"
 #include "loudness.h"
 #include "param_ids.h"
 
@@ -139,6 +140,26 @@ int main() {
                 play(e, 0.05);
             }
         }
+        close(e);
+        ++runs;
+    }
+
+    // Scene moves (docs/DESIGN.md "Scene moves"): each effect of the FX library that moves, as scene 2,
+    // its move under way at B.
+    for (int k = 0; k < kNumFx; ++k) {
+        const std::string fx = kFxLibrary[k].text;
+        if (fx.find('>') == std::string::npos) continue;
+        std::string state = "effectforce 1\nlp_on=On\nscene_b=2\n";
+        for (size_t at = fx.find('\n') + 1; at < fx.size();) {   // its lines, past the header, as scene 2's
+            const size_t end = std::min(fx.find('\n', at), fx.size());
+            state += "scene2." + fx.substr(at, end - at) + "\n";
+            at = end + 1;
+        }
+        AEffect* e = fresh();
+        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(state.size()), const_cast<char*>(state.data()), 0.0f);
+        play(e, 2.0);
+        e->setParameter(e, P_XFADE, 1.0f);
+        play(e, 2.5);
         close(e);
         ++runs;
     }

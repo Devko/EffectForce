@@ -1,7 +1,9 @@
 effectforce-fx 1
 name=Echo Throw
+move=2 bars
+play=Once
 dly_on=On
 dly_sync=Sync
 dly_div=1/8
-dly_fb=0.65
+dly_fb=0.4>0.8
 dly_mix=0.5
