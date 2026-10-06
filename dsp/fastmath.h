@@ -107,8 +107,8 @@ inline float softclip(float x) {
 
 // tanh(x) / x, a Pade approximant: within 1% of the real ratio up to |x| = 5 and 19% at 12
 // (x times it then reads 1.19 for tanh's 1.0); it falls toward 1/15 instead of 0, so far past
-// any level the engine reaches a stage keeps growing slowly. The ladder's per-stage gains
-// (dsp/ladder.h, Teemu "mystran" Voipio's cheap nonlinear zero-delay ladder).
+// any level the engine reaches a stage keeps growing slowly. (SubForce's, for its ladder's per-stage
+// gains.)
 inline float tanhXdX(float x) {
     const float a = x * x;
     return ((a + 105.0f) * a + 945.0f) / ((15.0f * a + 420.0f) * a + 945.0f);

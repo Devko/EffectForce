@@ -112,7 +112,8 @@ if bench:
 extra_md = "".join("- `%s` (data next to the plugin)\n" % e for e in extras)
 user_md = ("\nYour own files go in %s inside the plugin folder (`/sdcard/Synths/%s/`); the installer keeps them when you upgrade "
            "and uninstall, and moves them there from the old `/sdcard/vst` location if you had installed the plugin that way.\n"
-           % (", ".join("`%s/`" % d for d in a.user_data), skin_name)) if a.user_data else ""
+           % (", ".join("`%s`" % (d if "." in os.path.basename(d) else d + "/") for d in a.user_data),  # SubForce local patch 6: files get no slash
+              skin_name)) if a.user_data else ""
 install_md = """# {name} {ver}
 
 {about}A native MPC OS plugin ({kind}) with its own MPC screen skin, loaded by MPC's built-in plugin host.

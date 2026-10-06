@@ -4,6 +4,18 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### 0.0.1, the first release, in the plugin catalog (2026-10-06)
+
+| Item | State |
+|---|---|
+| CHANGELOG.md; the release workflow takes the tag's `## X.Y.Z` section as the notes (the catalog shows them) and fails before publishing without one | ✅ |
+| `make test-arm-pgo` runs: the target sat above PGO_ON's definition, so make always took its plain branch, in CI too (the release job's "suite against the shipped objects" never ran). The Delay's Tape hash, which pins one compilation's bits, now skips against profile-guided objects and stays in the plain builds | ✅ |
+| Release candidate from CI (glibc 2.31, GCC 11): `catalog_check.py --catalog` OK, 0 warnings; needs glibc 2.29 and GCC 11's libstdc++ (GLIBCXX_3.4.29) | ✅ |
+| Vendored `release.py`: SubForce's local patch 6 (INSTALL.md gave user-data files a folder's slash) | ✅ |
+| README: requirements, installation, releases, status, credits; page images (docs/img, rendered offline from the skin) | ✅ |
+| Tag `v0.0.1` (a regular release); the catalog entry's PR to sd88me/mpc-vst-plugins (`catalog/plugins/effectforce.json`) | 🔜 |
+| The release zip installed and played on the Force, then `tested.json` | 🔜 |
+
 ### Scene moves (2026-10-06, branch `scene-moves`)
 
 A scene that moves by itself, the Octatrack way of a filter sweep across 8 bars

@@ -536,7 +536,13 @@ uint64_t tapeHash(int scenario) {
 void tapeUnchanged() {
     // Tape is bit for bit what it was before Fade came: the hashes were taken from that code, on
     // x86 and on the device's build (NEON's reciprocal estimate and GCC's contractions differ; a new
-    // compiler may move the device's, not x86's).
+    // compiler may move the device's, not x86's). Not against the profile-guided objects (make
+    // test-arm-pgo): their profile moves the contractions with every change of the code, so no hash
+    // stays; the plain builds (make test, test-arm) keep the check.
+#if EF_PGO_OBJECTS
+    std::printf("  (the Tape hash is checked in the plain builds, not against profile-guided objects)\n");
+    return;
+#endif
 #if EF_NEON
     const uint64_t before[3] = {0x690cbedd772c6b55ull, 0x49268bdd94b108f1ull, 0x81639e54566b2b03ull};
 #else

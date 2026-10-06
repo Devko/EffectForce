@@ -41,6 +41,15 @@ overlay shows the name without the page.
 The status line at the top of every page: how many modules run, and the CPU EffectForce takes (the
 average and the peak of the last half second, in percent of MPC's audio block).
 
+Some of the pages, rendered offline from the skin (on the device MPC fills in the names, values and
+lines):
+
+| | |
+|---|---|
+| ![CHAIN](img/chain.png) **CHAIN** | ![PERFORM](img/perform.png) **PERFORM** |
+| ![LOOPER](img/looper.png) **LOOPER** | ![DELAY](img/delay.png) **DELAY** |
+| ![REVERB](img/reverb.png) **REVERB** | ![MATRIX](img/matrix.png) **MATRIX** |
+
 ## The chain
 
 The input goes through **Rack Input** gain, then the ten modules in order (the first row of tiles left

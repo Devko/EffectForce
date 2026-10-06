@@ -8,8 +8,15 @@ matrix across all of them. It is built on the same groundwork as its siblings
 [PolyForce](https://github.com/Devko/PolyForce) and [SubForce](https://github.com/Devko/SubForce).
 
 > [!NOTE]
-> **Preview.** The plugin ID (`EfFc`), the file name (`effectforce.so`) and the parameter list may
-> still change before v0.1.
+> **Preview (0.0.x).** The rack, the performance mixer, the pages and the factory presets are
+> complete and pass the full test suite on x86, under ARM emulation and on the Force's own CPU. On a
+> Force (MPC OS 3.9) it installs and plays, at 6-8% of a block for a Perform preset. The parameter
+> list may still change before v0.1: sounds and scenes are saved by name and survive that, but
+> recorded automation (stored by parameter index) could then move a different control.
+
+![EffectForce's REVERB page](docs/img/reverb.png)
+
+*The REVERB page, rendered offline from the skin (on the device MPC fills in the values).*
 
 ## Highlights
 
@@ -51,6 +58,39 @@ matrix across all of them. It is built on the same groundwork as its siblings
 | [Performance](docs/PERFORMANCE.md) | The CPU budget and what each module costs on the Force |
 | [Probe](docs/PROBE.md) | What MPC does with an insert effect, measured on the Force before the design |
 | [Roadmap](docs/ROADMAP.md) | What's done, what's next, decisions |
+| [Changelog](CHANGELOG.md) | What changed in each release |
+
+## Requirements
+
+- An **Akai Force**. Other first-generation (32-bit ARM) MPC OS devices may work but are untested.
+- **Root SSH access** to the device (for example through MockbaMod). Stock MPC OS has no way to
+  install third-party plugins.
+- **MPC OS 3.x** (tested on 3.9). Release builds are made against glibc 2.31 but need GCC 11's
+  libstdc++, and MPC OS 2.x doesn't draw a plugin's pages: 2.x is untested. A local build with a newer
+  cross toolchain needs glibc 2.38 (3.x only; see [Releases](#releases)).
+
+## Installation
+
+Download a release package (`EffectForce-<version>-mpc-armv7.zip`) from
+[Releases](https://github.com/Devko/EffectForce/releases) (or from the
+[plugin catalog](https://sd88me.github.io/mpc-vst-plugins/)), or build one with `make plugin-package`.
+Unzip it and follow the `INSTALL.md` inside. In short:
+
+```sh
+scp -r EffectForce-<version> root@<device-ip>:/tmp/
+ssh -t root@<device-ip> sh /tmp/EffectForce-<version>/install.sh
+```
+
+The installer asks for confirmation (`-y` skips it), **stops MPC** (save your project first), copies
+the plugin to `/sdcard/Synths/Devko - VST - EffectForce/`, backs up and edits `MPC.settings`, and
+starts MPC again. Running it again upgrades in place and keeps your own presets (`Presets/` in that
+folder) and favorites. Then add **EffectForce** to a track's insert (or a return, a submix, the
+master) from MPC's effect plugins. To play the performance mixer with the Force's crossfader, learn
+it to EffectForce's Crossfader ([how](docs/USER_GUIDE.md#the-crossfader)).
+
+To uninstall, run the package's `uninstall.sh` the same way: it stops MPC, removes the plugin and its
+`MPC.settings` entry (after a backup) and starts MPC again; your own presets and favorites stay in the
+plugin folder (delete it to remove them too).
 
 ## Building
 
@@ -72,7 +112,53 @@ make levels                # the factory presets' levels (make preset-levels set
 `surface/surface.py` is the single source of the parameter list, the pages and the factory presets'
 checks; it writes `params.json`, `layout.conf`, `vst.json` and the C++ headers.
 
+## Releases
+
+Release packages come from CI ([`.github/workflows/build.yml`](.github/workflows/build.yml)), never from
+a local build: the device build runs in `arm32v7/gcc:11-bullseye` (GCC 11, glibc 2.31) under QEMU,
+profile-guided, the suite runs against the objects the `.so` is linked from, and the zip must pass the
+[plugin catalog](https://github.com/sd88me/mpc-vst-plugins)'s `catalog_check.py`. Every run keeps the
+zip as an artifact. To release:
+
+1. Add a `## X.Y.Z` section to [CHANGELOG.md](CHANGELOG.md): it becomes the release's notes, which the
+   catalog shows (a tag without one fails before anything is published).
+2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. A plain tag publishes a regular release,
+   which the catalog lists with a download; `vX.Y.Z-beta` publishes a prerelease, the catalog's beta
+   channel (hidden unless a visitor asks for betas). The plugin's version is the tag without its suffix.
+3. The catalog picks the release up by itself (nightly). Once the release zip has been installed and
+   played on a Force, add it to `tested.json` (the repo's root; SubForce's has the form): the catalog
+   shows it as "Tested on".
+
+The version's first number is the catalog's `param_compat`: while it is 0 the parameter list may change;
+from v0.1 it is append-only.
+
+## Status
+
+| Stage | |
+|---|---|
+| The rack: ten modules, the chain, modulation, 14 pages, 62 presets, tests, package | ✅ |
+| The performance mixer: scenes, the FX library, scene moves, the looper | ✅ |
+| Release build in CI (glibc 2.31, profile-guided, catalog-checked) | ✅ |
+| On the device: installs, plays, benches (`make bench-device`), the suite on its CPU | ✅ |
+| 0.0.1 — the first release, in the plugin catalog | 🔜 |
+| v0.1 — parameter list frozen (append-only from then on) | ⬜ |
+
+Details in the [roadmap](docs/ROADMAP.md).
+
 ## License
 
-MIT. The vendored generator and installer: MIT, Copyright (c) 2026 sd88me
-(`third_party/mpc-vst-plugins/LICENSE`).
+EffectForce is released under the [MIT License](LICENSE). Third-party components keep their own
+licenses (below).
+
+## Credits
+
+- Plugin groundwork (VST2 glue, touchscreen logic, preset library, build and bench tooling):
+  [PolyForce](https://github.com/Devko/PolyForce) and [SubForce](https://github.com/Devko/SubForce), MIT.
+- DSP from the literature: Andrew Simper's linear trapezoidal state-variable filter (Cytomic) and
+  Vadim Zavalishin's topology-preserving transform; Laurent de Soras's HIIR halfband structure;
+  Jean-Marc Jot's decay gains for the reverb's feedback delay network.
+- Skin generator, previews, installer and the catalog checker:
+  [sd88me/mpc-vst-plugins](https://github.com/sd88me/mpc-vst-plugins) (MIT, Copyright (c) 2026 sd88me),
+  vendored in `third_party/mpc-vst-plugins` with a few small, marked patches.
+- Interface font: [Titillium Web](https://fonts.google.com/specimen/Titillium+Web), SIL Open Font
+  License 1.1 (`surface/fonts/OFL.txt`).

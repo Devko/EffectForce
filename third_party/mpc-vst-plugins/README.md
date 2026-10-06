@@ -34,3 +34,9 @@ are (SubForce uses patches 1-4; it has no meters). EffectForce copied SubForce's
    slider's (`sh_meter_<w>x<h>.png`) for a post-step to redraw (PolyForce's wave view:
    `surface/skin_polish.py`). With the browser renderer a meter still needs `strip=`.
 Re-apply them after re-copying upstream.
+
+## Local patch (SubForce)
+
+6. `tools/release.py` (marked `SubForce local patch 6`): the generated `INSTALL.md` gave every
+   `--user-data` entry a trailing slash, files too (`preset_favorites.txt/`); now only folders get one.
+   Ported to EffectForce from SubForce on 2026-10-06, before the first release. Worth sending upstream.

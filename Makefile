@@ -143,15 +143,6 @@ preset-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
 	$(BUILD)/eflevels $(BUILD)/effectforce.so presets/Factory --write
 	python3 $(SURF)/surface.py
 
-# The suite against the objects the shipped .so is linked from (profile-guided), under qemu.
-test-arm-pgo: $(ARM_SO)
-ifeq ($(PGO_ON),1)
-	$(ARM_CXX) -std=c++17 $(ARM_OPT) -Wno-psabi -pthread $(INC) $(TESTS) $(PGO_OBJ)/*.o -o $(BUILD)/arm/plugin_test_pgo
-	$(ARM_RUN) $(BUILD)/arm/plugin_test_pgo
-else
-	@echo "test-arm-pgo: the .so is a plain build here (PGO=$(PGO)); test-arm covers it"
-endif
-
 # --- device -----------------------------------------------------------------------------------
 # The .so MPC loads: only VSTPluginMain exported (a version script hides the C++ template
 # instantiations and typeinfo -fvisibility leaves; -fno-gnu-unique keeps it unloadable);
@@ -207,6 +198,18 @@ endif
 	@n=$$($(ARM_PREFIX)nm -D --defined-only $@ | wc -l); echo "exported symbols: $$n"; \
 		[ $$n -eq 1 ] || { $(ARM_PREFIX)nm -D --defined-only $@; echo "only VSTPluginMain may be exported"; exit 1; }
 
+# The suite against the objects the shipped .so is linked from (profile-guided), under qemu. Here, below
+# PGO_ON: make reads ifeq when it reads the line, so above its definition it was always the plain branch.
+# EF_PGO_OBJECTS: the checks that pin exact output bits to one compilation (the Delay's Tape hash) say so
+# and skip; the profile moves the compiler's fusing of float operations with every change of the code.
+test-arm-pgo: $(ARM_SO)
+ifeq ($(PGO_ON),1)
+	$(ARM_CXX) -std=c++17 $(ARM_OPT) -Wno-psabi -pthread -DEF_PGO_OBJECTS=1 $(INC) $(TESTS) $(PGO_OBJ)/*.o -o $(BUILD)/arm/plugin_test_pgo
+	$(ARM_RUN) $(BUILD)/arm/plugin_test_pgo
+else
+	@echo "test-arm-pgo: the .so is a plain build here (PGO=$(PGO)); test-arm covers it"
+endif
+
 arm-bench: $(ARM_BENCH)
 $(ARM_BENCH): tools/bench.cpp $(HDR) $(GEN)
 	mkdir -p $(BUILD)/arm
@@ -236,7 +239,7 @@ plugin-package: $(ARM_SO) $(SKIN)
 		echo "         Release packages come from CI (glibc 2.31)."; fi
 	$(PY) $(MV)/tools/release.py --so $(ARM_SO) --skin "$(SKIN_DIR)" --entry $(SURF_OUT)/pluginlist-entry.xml \
 		--version $(PLUGIN_VERSION) --repo Devko/EffectForce --license MIT \
-		--about "EffectForce effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix." \
+		--about "EffectForce effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix; and an Octatrack-style performance mixer: two scenes on the crossfader, 64 effects that fade in (the sweeps and risers move on the bar), a looper on the grid." \
 		--requires "root SSH (MockbaMod)" \
 		--user-data Presets --user-data preset_favorites.txt --user-data preset_recent.txt \
 		-o dist
