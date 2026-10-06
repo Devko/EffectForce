@@ -140,7 +140,8 @@ from v0.1 it is append-only.
 | The performance mixer: scenes, the FX library, scene moves, the looper | ✅ |
 | Release build in CI (glibc 2.31, profile-guided, catalog-checked) | ✅ |
 | On the device: installs, plays, benches (`make bench-device`), the suite on its CPU | ✅ |
-| 0.0.1 — the first release, in the plugin catalog | 🔜 |
+| [0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) — the first release (regular, catalog-checked) | ✅ |
+| In the plugin catalog (the registry entry's PR) | 🔜 |
 | v0.1 — parameter list frozen (append-only from then on) | ⬜ |
 
 Details in the [roadmap](docs/ROADMAP.md).
