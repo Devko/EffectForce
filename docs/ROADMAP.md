@@ -13,11 +13,12 @@ LENGTH (Once, Loop, Ping-pong) from the bar line after the fader brings the scen
 
 | Item | State |
 |---|---|
-| Store, clocks, the engine's morph, state lines, PERFORM's LENGTH / PLAY, the scenes' line | ✅ test/scenes_test.cpp (moves), the whole suite green on x86 (ASan/UBSan) |
-| 11 effects of the FX library move; the Perform presets built from them follow | ✅ test/fx_test.cpp: every move played whole, no clicks |
-| Bench and PGO cases (14 locks moving every chunk) | ✅ x86; device numbers in [Performance](PERFORMANCE.md#device-measurements) |
+| Store, clocks, the engine's morph, state lines, PERFORM's LENGTH / PLAY, the scenes' line | ✅ test/scenes_test.cpp (moves); 13420 checks on x86 (ASan/UBSan), under qemu-arm and on the Force's own CPU |
+| 11 effects of the FX library move; the Perform presets built from them follow | ✅ test/fx_test.cpp: every move played whole, through the engine before the output guard, no clicks |
+| Bench and PGO cases | ✅ on the Force: 14 locks moving every chunk cost 0.9 points over the same scene held still ([Performance](PERFORMANCE.md#device-measurements)) |
+| Review | ✅ a lock and its start published as one change; the move epoch release / acquire; the scenes' line no longer reads UI-thread strings from display(); a test that couldn't fail (behind the output guard) |
 | Fixed on the way: a fresh engine given only the fader (before anything played) kept the scenes at the old position | ✅ a check |
-| On the device | 🔜 by ear: LP Sweep on the bar line, Build Roll, Tape Stop, back at A and again |
+| On the device | ✅ installed (2026-10-06); 🔜 by ear: LP Sweep on the bar line, Build Roll, Tape Stop, back at A and again |
 
 ### The performance layer (2026-10-05, branch `ccr-eabecd3e-gfq4u1`)
 
@@ -52,11 +53,12 @@ cloud session's branch carries it on.
 
 Still to do, in order:
 
-1. Merge the branch into `main` (CI green on it).
-2. On the device (needs the local machine): `make bench-device` with all ten modules (budget:
-   everything on at its heaviest, p99 ≤ 15%), then `make plugin-install` (ask first: it restarts
-   MPC) and play Shimmer, Pulse and Grain; Grain's Sync with MPC looping (the slice grid's locate
-   tolerance is a host block: whether MPC's song position ever jitters more than that is untested).
+1. ✅ Merge the branch into `main`.
+2. On the device: ✅ `make bench-device` with all ten modules (2026-10-06: everything on at its
+   heaviest p99 14.9%, within the 15% budget with nothing to spare; with the performance layer on top,
+   16.6-16.9, a warning: [Performance](PERFORMANCE.md#device-measurements)); ✅ installed. 🔜 Play
+   Shimmer, Pulse and Grain; Grain's Sync with MPC looping (the slice grid's locate tolerance is a
+   host block: whether MPC's song position ever jitters more than that is untested).
 
 ### Before the hand-off
 

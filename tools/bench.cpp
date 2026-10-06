@@ -188,7 +188,7 @@ const char* kMovesState =
     "scene2.rev_damp=15000>2000\nscene2.rev_decay=1>8\nscene2.rev_mix=0.1>0.6\nscene2.chr_on=On\nscene2.chr_rate=0.2>4\n"
     "scene2.phs_on=On\nscene2.phs_center=0.1>0.9\nscene2.mac_1=0>1\nscene2.in_gain=0>-6\nscene2.mix=0.6>1\n";
 
-enum Mode { kPlain, kPerform, kMoves };
+enum Mode { kPlain, kPerform, kMoves, kHeld };   // kHeld: kMovesState with LENGTH Off, the move's reference
 
 Result runCase(void* lib, int seconds, const char* name, int module, bool all, int mode = kPlain) {
     const bool perform = mode == kPerform;
@@ -207,8 +207,9 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
         busy(set, module, false);
     }
     if (mode != kPlain) {   // a project's state: it changes only what it lists
-        const char* state = perform ? kPerformState : kMovesState;
-        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(std::strlen(state)), const_cast<char*>(state), 0.0f);
+        std::string state = perform ? kPerformState : kMovesState;
+        if (mode == kHeld) state.replace(state.find("move=1 beat"), 11, "move=Off");
+        e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(state.size()), state.data(), 0.0f);
     }
     std::vector<float> L(kBlock), R(kBlock);
     float* io[2] = {L.data(), R.data()};
@@ -222,7 +223,7 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
         }
     };
     // Performing: the looper records a bar first. Moving: the move is under way (it starts on a beat).
-    const int warm = perform ? 3 * 44100 / kBlock : mode == kMoves ? 44100 / kBlock : 64;
+    const int warm = perform ? 3 * 44100 / kBlock : mode >= kMoves ? 44100 / kBlock : 64;
     for (int b = 0; b < warm; ++b) {   // the patch settles, buffers warm up
         fill();
         e->processReplacing(e, io, io, kBlock);
@@ -295,6 +296,7 @@ int main(int argc, char** argv) {
     check(runCase(lib, seconds, "everything on, heaviest, 8 mod slots", -1, true));
     check(runCase(lib, seconds, "looper rolling, fader sweeping", -1, false, kPerform));
     check(runCase(lib, seconds, "all that, everything on heaviest", -1, true, kPerform));
+    check(runCase(lib, seconds, "scene holding 14 locks still", -1, false, kHeld));
     check(runCase(lib, seconds, "scene moving 14 locks, every chunk", -1, false, kMoves));
     check(runCase(lib, seconds, "that, everything on heaviest", -1, true, kMoves));
     dlclose(lib);

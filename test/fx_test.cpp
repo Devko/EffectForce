@@ -194,7 +194,7 @@ void movesStayFinite() {
                 e.setParams(knobs);
             }
             std::copy(in.begin() + (b % 64) * kBlock, in.begin() + (b % 64 + 1) * kBlock, L.begin());
-            R = L;
+            std::copy(L.begin(), L.end(), R.begin());
             e.render(L.data(), R.data(), kBlock, t);
             t.beats += kBlock / 44100.0 * t.bpm / 60.0;
             for (int i = 0; i < kBlock; ++i) {

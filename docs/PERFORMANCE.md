@@ -19,6 +19,29 @@ plugin's own entry points and times every block with the thread's CPU clock.
 
 ## Device measurements
 
+2026-10-06, the Force, the ten modules and the performance layer, the profile-guided build (GCC 13,
+local; glibc 2.38), percent of the 2902 µs block:
+
+| Case | avg | p99 | max |
+|---|---|---|---|
+| Everything off | 0.27 | 0.58 | 0.87 |
+| Drive / Filter / EQ / Comp alone | 1.37 / 0.76 / 0.68 / 0.58 | 1.79 / 1.08 / 1.08 / 0.89 | 2.13 / 1.42 / 1.31 / 1.20 |
+| Chorus / Phaser / Pulse alone | 0.89 / 0.86 / 0.42 | 1.30 / 1.21 / 0.77 | 1.66 / 1.79 / 1.00 |
+| Grain / Delay / Reverb alone | 2.09 / 0.94 / 2.42 | 2.73 / 1.42 / 3.20 | 2.94 / 1.68 / 3.60 |
+| **Everything on, heaviest**, 8 mod slots | **11.97** | **14.90** | 16.37 |
+| Looper rolling, fader sweeping (scene 2: four sends, a dozen locks) | 6.01 | 7.70 | 8.27 |
+| That, everything on heaviest | 13.40 | 16.94 (WARN) | 18.98 |
+| A scene holding 14 locks still (six modules on) | 4.50 | 5.78 | 6.64 |
+| **The same scene moving all 14 every chunk** (a 1-beat Loop, 7 on a log curve) | **5.43** | **7.08** | 8.30 |
+| That, everything on heaviest | 13.32 | 16.56 (WARN) | 18.63 |
+
+Everything on at its heaviest passes with nothing to spare (p99 14.9 of 15; the first eight modules
+had 11.3, below), and the performance layer on top of it goes past (16.6-16.9): a warning, not a
+failure, and the worst a patch can reach, not what Perform presets do (6-8). A scene move costs what
+any moving parameter costs, mostly the modules working out their coefficients again: 14 locks moving
+every chunk add 0.9 points on average and 1.3 at p99 to the same scene held still. An effect of the
+FX library moves one to three over bars. Run to run, the device's p99 moves by about 0.5.
+
 2026-10-05, the Force (Cortex-A17), a local build (GCC 13, not profile-guided), percent of the
 2902 µs block. "Alone" includes the plugin's own overhead (the first row).
 

@@ -28,13 +28,13 @@ matrix across all of them. It is built on the same groundwork as its siblings
   8-slot matrix reaching 54 parameters across the chain
 - **A performance mixer, the Octatrack way:** the Force's crossfader between a clean scene and one
   of 64 named effects (filter sweeps, echo throws, washes, rolls, tape stops, gates, crush), picked from
-  tiles; effects fade in with the fader and their tails ring out when it comes back. A looper that
+  tiles; effects fade in with the fader and their tails ring out when it comes back, and the sweeps
+  and risers move by themselves from the next bar line (an 8-bar filter sweep, a build roll). A looper that
   records the next 4 or 8 bars on the grid (or keeps the bar just played), and plays, layers, rolls
   (1/2 to 1/32), slows, stops or reverses it. On the master it turns the whole mix into a performance
   ([how](docs/USER_GUIDE.md#performance-scenes-and-the-looper))
-- **Light on the CPU:** everything on at its heaviest, p99 11.3% of a block on the Force with the first
-  eight modules; all ten measured in ARM instructions until the next device run
-  ([Performance](docs/PERFORMANCE.md))
+- **Light on the CPU:** all ten modules on at their heaviest, p99 14.9% of a block on the Force (the
+  budget is 15%); a Perform preset 6-8% ([Performance](docs/PERFORMANCE.md))
 - **Built for MPC:** zero latency, tails that ring on through Stop, every getter cheap (MPC polls them
   hundreds of times a second), all measured on the device first ([the probe](docs/PROBE.md))
 - **62 factory presets** in 11 categories (Perform: ten ready-made performance mixers),
