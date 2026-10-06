@@ -698,8 +698,14 @@ uint64_t goldenRun(int mode) {
 }
 
 // Shimmer 0 is the reverb as it was before shimmer, bit for bit: the fingerprints it had then (the
-// x86 test build and the device's differ: GCC fuses multiply-adds for NEON).
+// x86 test build and the device's differ: GCC fuses multiply-adds for NEON). The plain builds only
+// (make test, test-arm, GCC 13): against profile-guided objects (make test-arm-pgo, CI's GCC 11) the
+// profile and the compiler move the fusing, so no fingerprint stays (as the Delay's Tape hash).
 void golden() {
+#if EF_PGO_OBJECTS
+    std::printf("  (the reverb's fingerprints are checked in the plain builds, not against profile-guided objects)\n");
+    return;
+#endif
 #if EF_NEON
     const uint64_t before[Reverb::kModes] = {0xdd8cbf74d06f96c3ull, 0x39827f258658b59cull, 0xc476a1cf2992a1aeull, 0xb88c6356e4a4538eull};
 #else

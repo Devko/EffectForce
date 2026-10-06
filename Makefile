@@ -200,8 +200,9 @@ endif
 
 # The suite against the objects the shipped .so is linked from (profile-guided), under qemu. Here, below
 # PGO_ON: make reads ifeq when it reads the line, so above its definition it was always the plain branch.
-# EF_PGO_OBJECTS: the checks that pin exact output bits to one compilation (the Delay's Tape hash) say so
-# and skip; the profile moves the compiler's fusing of float operations with every change of the code.
+# EF_PGO_OBJECTS: the checks that pin exact output bits to one compilation (the Delay's Tape hash, the
+# Reverb's fingerprints) say so and skip; the profile moves the compiler's fusing of float operations with
+# every change of the code, and CI's GCC 11 fuses differently from GCC 13 anyway.
 test-arm-pgo: $(ARM_SO)
 ifeq ($(PGO_ON),1)
 	$(ARM_CXX) -std=c++17 $(ARM_OPT) -Wno-psabi -pthread -DEF_PGO_OBJECTS=1 $(INC) $(TESTS) $(PGO_OBJ)/*.o -o $(BUILD)/arm/plugin_test_pgo
