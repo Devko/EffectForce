@@ -45,6 +45,9 @@ public:
 
     // --- UI thread -----------------------------------------------------------------------------
     void lock(int scene, int param, float norm);   // only lockable parameters; a plain lock: no start
+    // A lock and its start (kNone: a plain lock) as one change, so the engine never sees one without the
+    // other (a state or an effect loading); a start starts the scene's move over.
+    void lock(int scene, int param, float norm, float start);
     void unlock(int scene, int param);
     void clear(int scene);                         // its locks, starts and timing
     void clearAll();
@@ -76,7 +79,8 @@ public:
 
 private:
     void changed() { gen_.fetch_add(1, std::memory_order_acq_rel); }
-    void restart(int scene) { epoch_[scene].fetch_add(1, std::memory_order_relaxed); }
+    // Release: the engine that sees the new epoch sees the timing and starts written before it.
+    void restart(int scene) { epoch_[scene].fetch_add(1, std::memory_order_release); }
 
     std::atomic<float> v_[kNumScenes][P_COUNT];
     std::atomic<float> from_[kNumScenes][P_COUNT];   // the starts

@@ -546,18 +546,16 @@ std::string Surface::sceneInfo() const {
         std::snprintf(b, sizeof b, "EDIT %c: SCENE %d%s, %d LOCKS. WHAT YOU MOVE IS LOCKED", 'A' + editSide_,
                       editScene_ + 1, name.c_str(), scenes_.count(editScene_));
     } else {
-        const int a = sceneOf(0), c = sceneOf(1);
-        // A scene by its name (the effect it came from), or by how many settings it locks; then where its
-        // move is.
-        const auto said = [this](int sc, int side) {
-            std::string t = "SCENE " + std::to_string(sc + 1);
-            if (!sceneName_[sc].empty()) t += " " + upper(sceneName_[sc]);
-            else t += scenes_.count(sc) ? ", " + std::to_string(scenes_.count(sc)) + " LOCKS" : ", CLEAN";
-            return t + moveText(side);
-        };
-        return "A: " + said(a, 0) + "     B: " + said(c, 1);
+        return "A: " + sceneSaid(sceneOf(0)) + moveText(0) + "     B: " + sceneSaid(sceneOf(1)) + moveText(1);
     }
     return b;
+}
+
+// A scene by its name (the effect it came from), or by how many settings it locks.
+std::string Surface::sceneSaid(int sc) const {
+    std::string t = "SCENE " + std::to_string(sc + 1);
+    if (!sceneName_[sc].empty()) return t + " " + upper(sceneName_[sc]);
+    return t + (scenes_.count(sc) ? ", " + std::to_string(scenes_.count(sc)) + " LOCKS" : ", CLEAN");
 }
 
 int Surface::moveTarget() const { return editSide_ >= 0 ? editScene_ : sceneOf(1); }
@@ -628,7 +626,11 @@ void Surface::savePreset() {
 std::string Surface::display(int i) const {
     if (i < 0 || i >= P_COUNT) return {};
     if (i == P_XF_BAR) return faderBar();   // follows the fader without a refresh
-    if (i == P_SCN_INFO) return sceneInfo();   // and the scenes' line its moves
+    if (i == P_SCN_INFO) {   // the scenes' line follows the moves (atomics) without a refresh
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (sceneEditing_) return texts_[static_cast<size_t>(i)];
+        return "A: " + sceneSaid_[0] + moveText(0) + "     B: " + sceneSaid_[1] + moveText(1);
+    }
     switch (PARAM_INFO[i].kind) {
         case Kind::Synth:
         case Kind::Chain:
@@ -734,6 +736,9 @@ void Surface::refresh() {
     put(P_EDIT_A, editSide_ == 0 ? 1.0f : 0.0f);
     put(P_EDIT_B, editSide_ == 1 ? 1.0f : 0.0f);
     t[P_SCN_INFO] = sceneInfo();
+    sceneEditing_ = editSide_ >= 0;
+    sceneSaid_[0] = sceneSaid(sceneOf(0));
+    sceneSaid_[1] = sceneSaid(sceneOf(1));
     // LENGTH and PLAY: the move of the scene at B, or the edited one.
     const int moving = moveTarget();
     put(P_MV_LEN, static_cast<float>(scenes_.moveLength(moving)) / static_cast<float>(kNumMoveLengths - 1));

@@ -25,6 +25,15 @@ void Scenes::lock(int scene, int param, float norm) {
     changed();
 }
 
+void Scenes::lock(int scene, int param, float norm, float start) {
+    if (!validScene(scene) || !lockable(param)) return;
+    const bool moves = start >= 0.0f && kSceneMorph[param] == SceneMorph::Line;
+    from_[scene][param].store(moves ? unit(start) : kNone, std::memory_order_relaxed);
+    v_[scene][param].store(unit(norm), std::memory_order_relaxed);
+    if (moves) restart(scene);
+    changed();
+}
+
 void Scenes::unlock(int scene, int param) {
     if (!validScene(scene) || !validParam(param)) return;
     from_[scene][param].store(kNone, std::memory_order_relaxed);
@@ -98,7 +107,7 @@ int Scenes::movePlay(int scene) const {
 }
 
 uint32_t Scenes::moveEpoch(int scene) const {
-    return validScene(scene) ? epoch_[scene].load(std::memory_order_relaxed) : 0;
+    return validScene(scene) ? epoch_[scene].load(std::memory_order_acquire) : 0;
 }
 
 int Scenes::count(int scene) const {

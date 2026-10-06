@@ -198,10 +198,7 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
         }
         if (sceneKey(key, scene, param)) {
             float start = 0.0f, end = 0.0f;
-            if (lockOf(param, val, start, end)) {
-                s.scenes().lock(scene, param, end);
-                if (start >= 0.0f) s.scenes().setStart(scene, param, start);
-            }
+            if (lockOf(param, val, start, end)) s.scenes().lock(scene, param, end, start);
             continue;
         }
         const int i = savedParam(key);
@@ -270,8 +267,7 @@ std::string loadSceneText(Scenes& sc, int scene, const std::string& text, bool* 
         if (i < 0 || !Scenes::lockable(i)) continue;
         float from = 0.0f, to = 0.0f;
         if (!lockOf(i, val, from, to)) continue;
-        sc.lock(scene, i, to);
-        if (from >= 0.0f) sc.setStart(scene, i, from);
+        sc.lock(scene, i, to, from);
         named[i] = true;
         if (looper && key.compare(0, 3, "lp_") == 0) *looper = true;
     }

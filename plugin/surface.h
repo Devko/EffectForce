@@ -167,6 +167,10 @@ private:
     int                      fxBank_ = 0;           // the FX library's bank on the tiles
     std::atomic<uint32_t>    moveShown_[2] = {};    // MoveShown, packed (state, at, of, bars)
     std::string moveText(int side) const;           // ", BAR 3 OF 8" and the like; "" if nothing moves
+    std::string sceneSaid(int scene) const;         // "SCENE 2 LP SWEEP", "SCENE 3, CLEAN"
+    // The scenes' line as refresh() last made it (under mtx_), so display() adds only the moves (atomics).
+    std::string              sceneSaid_[2];
+    bool                     sceneEditing_ = false;
     int  moveTarget() const;                        // the scene LENGTH and PLAY set: B's, or the edited one
 
     // Every write of a value MPC should see goes through here.

@@ -4,7 +4,9 @@
 // the fader, and the looper's REC (Capture Next on the grid, the loop kept, its line on the page).
 #include "host.h"
 #include "fx_library.h"
+#include "../plugin/engine.h"
 #include "../plugin/scenes.h"
+#include "../plugin/state.h"
 
 #include <cstdio>
 #include <string>
@@ -140,7 +142,7 @@ void everyEffectPlays() {
         CHECK(h.finite && pk <= 8.0f);
         if (!h.finite || pk > 8.0f) std::printf("  %s: finite %d peak %.2f\n", kFxLibrary[k].name, h.finite, pk);
     }
-    CHECK(quiet <= 1);   // a tape stop ends in silence; the rest all sound at B
+    CHECK(quiet <= 1);   // Tape Stop may be winding down to silence by then; the rest all sound at B
 }
 
 // An effect's move: its LENGTH in beats (0: none) and PLAY, from its text.
@@ -156,6 +158,53 @@ double moveBeats(const char* text, std::string* play = nullptr) {
     for (int o = 0; o < PARAM_INFO[P_MV_LEN].nopts; ++o)
         if (len == PARAM_INFO[P_MV_LEN].opts[o]) return kMoveBeats[o];
     return -1.0;
+}
+
+// Every effect that moves through the engine itself: the plugin's output guard (NaN to 0, a ceiling at
+// +-8) would hide anything going wrong, so this looks before it. Two bars at A, then the whole move at B.
+void movesStayFinite() {
+    std::printf("== fx: every move through the engine (before the output guard): finite, bounded\n");
+    for (int k = 0; k < kNumFx; ++k) {
+        const double len = moveBeats(kFxLibrary[k].text);
+        if (len <= 0.0) continue;
+        Scenes sc;
+        bool looper = false;
+        loadSceneText(sc, 1, kFxLibrary[k].text, &looper);
+        Engine e;
+        float knobs[P_COUNT];
+        for (int i = 0; i < P_COUNT; ++i) knobs[i] = PARAM_INFO[i].def;
+        if (looper) {   // as the plugin does when an effect of the looper is picked
+            CHECK(e.armLooper());
+            knobs[P_LP_ON] = 1.0f;
+        }
+        e.attachScenes(&sc);
+        e.setParams(knobs);
+        Transport t;
+        t.bpm = 240.0;
+        t.valid = t.playing = true;
+        const Buf in = whiteNoise(kBlock * 64, 0.25f, 51 + k);
+        Buf L(kBlock), R(kBlock);
+        const int atA = static_cast<int>(8.0 * 11025.0 / kBlock);
+        const int all = atA + static_cast<int>((4.0 + len + 1.0) * 11025.0 / kBlock);
+        bool finite = true;
+        float pk = 0.0f;
+        for (int b = 0; b < all; ++b) {
+            if (b == atA) {
+                knobs[P_XFADE] = 1.0f;
+                e.setParams(knobs);
+            }
+            std::copy(in.begin() + (b % 64) * kBlock, in.begin() + (b % 64 + 1) * kBlock, L.begin());
+            R = L;
+            e.render(L.data(), R.data(), kBlock, t);
+            t.beats += kBlock / 44100.0 * t.bpm / 60.0;
+            for (int i = 0; i < kBlock; ++i) {
+                finite = finite && std::isfinite(L[static_cast<size_t>(i)]) && std::isfinite(R[static_cast<size_t>(i)]);
+                pk = std::max({pk, std::fabs(L[static_cast<size_t>(i)]), std::fabs(R[static_cast<size_t>(i)])});
+            }
+        }
+        CHECK(finite && pk < 4.0f && e.moveStatus(1).state != kMoveNone);
+        if (!finite || pk >= 4.0f) std::printf("  %s: finite %d, peak %.2f\n", kFxLibrary[k].name, finite, pk);
+    }
 }
 
 void everyMoveRunsWhole() {
@@ -184,11 +233,11 @@ void everyMoveRunsWhole() {
         run(8.0, &pk);   // two bars at A: the looper has them
         h.set(P_XFADE, 1.0f);
         run(4.0 + len + 1.0, &pk);   // up to a bar's wait, the move, a beat more
+        // (Finite and bounded: movesStayFinite, before the plugin's output guard.)
         const std::string line = h.display(P_SCN_INFO);
         const bool where = play == "Once" ? line.find(", HELD") != std::string::npos : line.find(" OF ") != std::string::npos;
-        CHECK(h.finite && pk <= 8.0f && where);
-        if (!h.finite || pk > 8.0f || !where)
-            std::printf("  %s: finite %d peak %.2f, line \"%s\"\n", kFxLibrary[k].name, h.finite, pk, line.c_str());
+        CHECK(where);
+        if (!where) std::printf("  %s: peak %.2f, line \"%s\"\n", kFxLibrary[k].name, pk, line.c_str());
     }
     std::printf("  %d effects move\n", moving);
     CHECK(moving == 11);
@@ -256,6 +305,7 @@ void eft::fxTests() {
     editMarksAndEditTarget();
     looperEffectsArm();
     everyEffectPlays();
+    movesStayFinite();
     everyMoveRunsWhole();
     recThroughThePlugin();
 }

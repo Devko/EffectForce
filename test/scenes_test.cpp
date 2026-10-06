@@ -747,11 +747,14 @@ void movesThroughThePlugin() {
     h.play(true);
     CHECK(h.load("effectforce 1\nscene_b=2\nscene2.name=Sweep\nscene2.move=1 bar\nscene2.play=Ping-pong\nscene2.flt_on=On\n"
                  "scene2.flt_cut=18000>150\nscene2.flt_type=LP 24>BP\nscene3.move=7 bars\nscene3.flt_res=0.1>0.2>0.3\n"
-                 "scene4.flt_res=x>0.5\n") == 1);
+                 "scene3.flt_cut=100>200\nscene4.flt_res=x>0.5\n") == 1);
     std::string s = h.chunk();
     CHECK(s.find("\nscene2.move=1 bar\nscene2.play=Ping-pong\n") != std::string::npos);
     CHECK(s.find("\nscene2.flt_cut=18000>150\n") != std::string::npos && s.find("scene2.flt_type") == std::string::npos);
-    CHECK(s.find("scene3.") == std::string::npos && s.find("scene4.") == std::string::npos);   // nothing valid there
+    // Scene 3: no such LENGTH (the default stays), no lock from a double arrow; its good lock moves.
+    CHECK(s.find("\nscene3.move=4 bars\nscene3.play=Once\nscene3.flt_cut=100>200\n") != std::string::npos &&
+          s.find("scene3.flt_res") == std::string::npos);
+    CHECK(s.find("scene4.") == std::string::npos);   // nothing valid there
     CHECK(s.find("mv_len") == std::string::npos);   // the surface's own, not a knob
     Host b;
     CHECK(b.load(s) == 1 && b.chunk() == s);
