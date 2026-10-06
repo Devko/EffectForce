@@ -115,6 +115,7 @@ private:
     bool toggleBounce(int i, bool on);
     void browserAction(int i);
     void chainAction(int i);   // a slot tile, MOVE < / >, ON / OFF
+    void lockEdited(int i);    // editing a scene: parameter i's value is locked in it (its name marked)
     void sceneAction(int i);   // EDIT A / B, a scene tile, CLEAR
     void fxAction(int i);      // an FX tile (into scene B, or the scene being edited), the bank arrows
     void startEdit(int side);
@@ -154,6 +155,7 @@ private:
     std::string              presetKey_;
     std::vector<std::string> tileKeys_;        // what each preset tile holds now
     std::vector<int>         catTiles_;        // which category each category tile holds
+    std::vector<std::string> catTileNames_;    // and its name (a rescan may renumber the categories)
     uint32_t                 rng_ = 0x2545F491u;
 
     // The scenes; the edit (UI thread): which end, which scene, the knobs as they were before it.

@@ -84,7 +84,10 @@ public:
 
     static constexpr int kRingFrames = 1 << 21;   // 47.5 s
     static constexpr int kMaxLoop = 882000;       // 20 s
-    static constexpr int kGuard = 512;            // frames kept before and after the cell
+    // Frames kept before and after the cell: a wrap waits for a crossfade under way to end (one jump at a
+    // time: a second one would drop the head still fading out), so the head may run kFade x 2 past an edge
+    // and the old head as far again.
+    static constexpr int kGuard = 1024;
     static constexpr int kFade = 220;             // a jump's crossfade, 5 ms
     static constexpr int kCopyRate = 8;           // the copy into the loop buffer, x real time
     static constexpr int kDrift = 32;             // frames off the grid before speed 1 snaps back
@@ -172,7 +175,8 @@ private:
 
     float mix_ = 0.0f, mixTarget_ = 0.0f;
     float speed_ = 1.0f, speedTarget_ = 1.0f;
-    bool layer_ = false;
+    bool layer_ = false, hold_ = false;
+    float layerMix_ = 0.0f;   // Swap (0) to Layer (1), glided like the mix: a switch doesn't step the live input
     bool fresh_ = true;
 };
 

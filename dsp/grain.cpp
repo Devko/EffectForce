@@ -695,8 +695,9 @@ void Grain::mosaic(int k, double phase) {
     const double speed = speedOf(fold(semis));
     const bool back = u4 < reverse_;
     const double rate = back ? -speed : speed, life = s - phase + fade + kSafeFade;
-    // Held, ages count from the newest frame, which lies holdLag_ - 1 after the grid line.
-    const double shift = (back ? phase * (1.0 + speed) - speed * s : phase * (1.0 - speed)) + (hold_ ? holdLag_ - 1.0 : 0.0);
+    // Held, ages count from the newest frame, which lies holdLag_ - 1 after the grid line and, unlike a
+    // recording's, stays there through the slice: the phase into it doesn't add to the age.
+    const double shift = (back ? phase * (1.0 + speed) - speed * s : phase * (1.0 - speed)) + (hold_ ? holdLag_ - 1.0 - phase : 0.0);
     double lo, hi;
     if (!room(rate, life, k, lo, hi)) return;
     const int first = std::max(1, static_cast<int>(ceilFast((lo - shift) / s - 1e-9)));

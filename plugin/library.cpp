@@ -69,8 +69,10 @@ void walk(const Root& root, const std::vector<std::string>& exts, std::vector<Fo
         if (!e.is_regular_file(fe)) continue;
         const std::string ext = lower(e.path().extension().string());
         if (std::find(exts.begin(), exts.end(), ext) == exts.end()) continue;
-        const std::string rel = fs::relative(e.path(), root.dir, fe).generic_string();
-        if (fe || rel.empty()) continue;
+        // The walk builds every path from root.dir: relative by the names alone (fs::relative would
+        // resolve both paths on the disk, a dozen system calls per file).
+        const std::string rel = e.path().lexically_relative(root.dir).generic_string();
+        if (rel.empty() || rel.compare(0, 2, "..") == 0) continue;
         if (rel[0] == '.' || rel.find("/.") != std::string::npos) continue;   // hidden files, "._" macOS junk
         // A control character (a newline) would break the one-key-per-line lists and state
         // text, and resolveKey refuses such keys anyway.

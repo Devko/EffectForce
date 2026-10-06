@@ -76,7 +76,8 @@ std::string nextUserPreset(std::string* key) {
         const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);   // claimed: no overwrite
         if (fd < 0) continue;
         ::close(fd);
-        writeFileAtomic(dir + "/.last", std::to_string(n) + "\n");
+        // A hint only (the files themselves set the numbering): no fsync, SAVE waits on the preset's alone.
+        writeFileAtomic(dir + "/.last", std::to_string(n) + "\n", false);
         if (key) *key = r.label + ":User/" + name;
         return path;
     }

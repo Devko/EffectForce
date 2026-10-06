@@ -135,9 +135,7 @@ void Surface::set(int i, float n) {
     // A sound parameter's text is computed when MPC asks; a module's on / off also lights its chain tile.
     bool texts = k != Kind::Synth || isModuleOn(i);
     if (editSide_ >= 0 && Scenes::lockable(i)) {   // editing a scene: what MPC sets is locked in it
-        scenes_.lock(editScene_, i, want_[i].load());
-        std::string& name = sceneName_[editScene_];
-        if (!name.empty() && name.back() != '*') name += '*';   // no longer the effect as it came
+        lockEdited(i);
         texts = true;
     }
     if (i == P_SCENE_A || i == P_SCENE_B) {   // another scene at an end (a Q-Link): the edit follows it
@@ -166,6 +164,7 @@ void Surface::set(int i, float n) {
 
 void Surface::beginBatch() {
     if (batchDepth_.fetch_add(1) == 0) {
+        scenes_.hold(true);   // the scenes' locks wait with the knobs
         batchSeq_.fetch_add(1, std::memory_order_relaxed);   // odd: writing
         std::atomic_thread_fence(std::memory_order_release);
     }
@@ -174,6 +173,7 @@ void Surface::beginBatch() {
 void Surface::endBatch() {
     if (batchDepth_.fetch_sub(1) == 1) {
         batchSeq_.fetch_add(1, std::memory_order_release);   // even: done
+        scenes_.hold(false);
         // Many values at once (a preset, a move in the chain): MPC only re-reads texts when told.
         textGen_.fetch_add(1, std::memory_order_release);
     }
@@ -238,6 +238,7 @@ void Surface::apply(int i, float n) {
             if (i == P_FX_PREV || i == P_FX_NEXT) fxAction(i);
             if (i == P_LP_REC) {   // a loop to keep: Hold on, and the engine captures on the count's change
                 put(P_LP_HOLD, 1.0f);
+                if (editSide_ >= 0) editBase_[P_LP_HOLD] = 1.0f;   // a performance switch: it outlasts an edit
                 loopRecs_.fetch_add(1, std::memory_order_acq_rel);
             }
             break;
@@ -348,7 +349,15 @@ void Surface::browserAction(int i) {
         const std::string cur = presetKey_;
         for (int t = 0; t < kBrowserCats; ++t)
             if (i == kCatTiles[t] && t < static_cast<int>(catTiles_.size()) && catTiles_[static_cast<size_t>(t)] >= 0) {
-                brCat_ = catTiles_[static_cast<size_t>(t)];
+                // The tile's category by name: the rescan above may have added or removed one before it.
+                const std::string& name = catTileNames_[static_cast<size_t>(t)];
+                int c = catTiles_[static_cast<size_t>(t)];
+                for (int k = 0; k < ncat; ++k)
+                    if (cats[static_cast<size_t>(k)].name == name) {
+                        c = k;
+                        break;
+                    }
+                brCat_ = clampi(c, 0, std::max(ncat - 1, 0));
                 itemPage_ = 0;
                 followed_ = cur;   // the next refresh must not jump back to its category
             }
@@ -407,7 +416,15 @@ void Surface::chainAction(int i) {
     if (i == P_SEL_ON) {
         const int on = kModuleOnParam[optionOf(want_[P_ORDER_1 + sel].load(), P_ORDER_1 + sel)];
         put(on, want_[on].load() > 0.5f ? 0.0f : 1.0f);
+        lockEdited(on);   // while a scene is edited, as the module's own ON switch would be
     }
+}
+
+void Surface::lockEdited(int i) {
+    if (editSide_ < 0 || !Scenes::lockable(i)) return;
+    scenes_.lock(editScene_, i, want_[i].load());
+    std::string& name = sceneName_[editScene_];
+    if (!name.empty() && name.back() != '*') name += '*';   // no longer the effect as it came
 }
 
 // --- the scenes -----------------------------------------------------------------------------
@@ -531,11 +548,14 @@ void Surface::fxAction(int i) {
     }
     const int k = fxAt(fxBank_, i - P_FX_1);
     if (k < 0) return;
-    // Into the scene being edited, or else the one at the fader's B end.
+    // Into the scene being edited, or else the one at the fader's B end; the engine takes it whole.
     const int target = editSide_ >= 0 ? editScene_ : sceneOf(1);
-    bool looper = false;
-    sceneName_[target] = loadSceneText(scenes_, target, kFxLibrary[k].text, &looper);
-    if (looper) put(P_LP_ON, 1.0f);   // an effect of the looper arms it (the plugin makes its buffers)
+    {
+        Batch batch(*this);
+        bool looper = false;
+        sceneName_[target] = loadSceneText(scenes_, target, kFxLibrary[k].text, &looper);
+        if (looper) put(P_LP_ON, 1.0f);   // an effect of the looper arms it (the plugin makes its buffers)
+    }
     if (editSide_ >= 0) loadEdited();   // the knobs show the scene as it is now
 }
 
@@ -690,10 +710,12 @@ void Surface::refresh() {
     const int catPages = std::max(1, (ncat + kBrowserCats - 1) / kBrowserCats);
     catPage_ = clampi(catPage_, 0, catPages - 1);
     catTiles_.assign(kBrowserCats, -1);
+    catTileNames_.assign(kBrowserCats, std::string());
     for (int k = 0; k < kBrowserCats; ++k) {
         const int c = catPage_ * kBrowserCats + k;
         const bool has = c < ncat;
         catTiles_[static_cast<size_t>(k)] = has ? c : -1;
+        if (has) catTileNames_[static_cast<size_t>(k)] = cats[static_cast<size_t>(c)].name;
         put(kCatTiles[k], has && c == brCat_ ? 1.0f : 0.0f);
         t[static_cast<size_t>(kCatTiles[k])] = has ? upper(cats[static_cast<size_t>(c)].name) : "";
     }

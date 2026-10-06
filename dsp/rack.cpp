@@ -110,6 +110,10 @@ void Rack::runModule(int m, const RackPatch& p, const Transport& t, float* L, fl
             if (rest_[m] > moduleTail(m)) return;
             rest_[m] += n;
         } else {
+            // Waking from a rest: its tail rang out long ago, but its state is as it stopped (a
+            // compressor's gain reduction, a synced phaser's phase behind the song): from cleared
+            // state, as a module switched on by its knob.
+            if (rest_[m] > moduleTail(m)) resetModule(m);
             rest_[m] = 0;
         }
     }

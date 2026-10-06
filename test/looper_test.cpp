@@ -173,6 +173,10 @@ void letsGoAndGrabsAgain() {
         }
         std::printf("  hold %d: worst %.3f\n", hold, worst);
         CHECK(worst < 0.5);
+        // Let go once more: Hold keeps it (LOOP KEPT on the line); without Hold, Loop grabs anew (LISTENING).
+        Buf X = ramp(20000, n), Y = X;
+        drive(*lp, X, Y, playing(120.0, n / 22050.0), [&](int) { return params(0.0f, 4.0, 0.0, 1.0f, hold); });
+        CHECK(lp->status().state == (hold ? Looper::kKept : Looper::kListening));
     }
 }
 
@@ -446,6 +450,56 @@ void recReplacesWhilePlaying() {
     CHECK(maxStep(L, static_cast<size_t>(up + 2000)) < 0.0315f * 1.05f);
 }
 
+// One jump at a time: a capture landing on the line where the playing loop wraps (a loop of the
+// same length, in phase with the grid) waits for the wrap's crossfade; a Repeat change near a slice's
+// end waits too. A sine that doesn't fit the bar has a seam at every wrap: a crossfade dropped halfway
+// shows as a step, one played out stays as smooth as the seamless loop's.
+void oneJumpAtATime() {
+    std::printf("== looper: a capture on the playing loop's wrap, a roll near a slice's end: no click\n");
+    // 310.3 Hz: 620.6 cycles a bar, so every bar starts at another phase (and every wrap is a seam).
+    const int n = 400000, up = static_cast<int>(5.5 * 22050) / kChunk * kChunk;
+    {
+        // The bar loop wraps on the line at beat 12; REC Last a chunk or two after it, in its crossfade.
+        auto lp = armed();
+        const int press = (12 * 22050 + 40) / kChunk * kChunk;
+        Buf L = sine(310.3, n, 0.5f), R = L;
+        drive(*lp, L, R, playing(120.0), [&](int s) {
+            return recParams(s >= up ? 1.0f : 0.0f, 4.0, Looper::kLast, s >= press ? 1u : 0u);
+        });
+        const float step = maxStep(L, static_cast<size_t>(up + 2000));
+        std::printf("  REC Last in the wrap's crossfade: largest step %.4f\n", step);
+        CHECK(step < 0.05f);
+    }
+    {
+        // Repeat 1/16 from beat 6; at beat 9 (a slice's line, its wrap's crossfade under way) 1/8.
+        auto lp = armed();
+        const int change = 9 * 22050 / kChunk * kChunk + kChunk;
+        Buf L = sine(310.3, n, 0.5f), R = L;
+        drive(*lp, L, R, playing(120.0), [&](int s) {
+            return params(s >= up ? 1.0f : 0.0f, 4.0, s < 6 * 22050 ? 0.0 : s < change ? 0.25 : 0.5);
+        });
+        const float step = maxStep(L, static_cast<size_t>(up + 2000));
+        std::printf("  a roll changed in its wrap's crossfade: largest step %.4f\n", step);
+        CHECK(step < 0.05f);
+    }
+}
+
+// Blend switched while the loop plays at 100%: the live input glides in (Layer) and out (Swap).
+void blendGlides() {
+    std::printf("== looper: switching Blend glides the live input in and out\n");
+    auto lp = armed();
+    const int n = 300000, e = 110016, flip = 200000 / kChunk * kChunk;
+    Buf L = sine(441.0, n, 0.5f), R = L;   // whole cycles per bar: the loop is the live sine itself
+    drive(*lp, L, R, playing(120.0), [&](int s) {
+        P p = params(s >= e ? 1.0f : 0.0f);
+        p.layer = s >= flip && s < flip + 30000;
+        return p;
+    });
+    const float step = maxStep(L, static_cast<size_t>(e + 2000));
+    std::printf("  largest step %.4f (the sine's 0.0314, doubled while layered)\n", step);
+    CHECK(step < 0.07f);
+}
+
 void layerKeepsLive() {
     std::printf("== looper: Layer keeps the live input under the loop\n");
     auto lp = armed();
@@ -601,6 +655,8 @@ void looperTests() {
     recNext();
     recCancelAndUnarmed();
     recReplacesWhilePlaying();
+    oneJumpAtATime();
+    blendGlides();
     layerKeepsLive();
     recSurvivesASequenceLoop();
     locateBackOnTheGrid();

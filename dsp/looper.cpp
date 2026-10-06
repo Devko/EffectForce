@@ -1,6 +1,7 @@
 #include "looper.h"
 
 #include <cstring>
+#include <memory>
 #include <new>
 
 namespace ef {
@@ -19,10 +20,12 @@ Looper::~Looper() { delete store_.load(std::memory_order_acquire); }
 bool Looper::allocate() {
     if (store_.load(std::memory_order_acquire)) return true;
     try {
-        Store* s = new Store;
+        // Owned until handed over: a failed second buffer frees the first; two callers at once keep one.
+        auto s = std::make_unique<Store>();
         s->ring.assign(2 * static_cast<size_t>(kRingFrames), 0.0f);
         s->loop.assign(2 * static_cast<size_t>(kMaxLoop + 2 * kGuard), 0.0f);
-        store_.store(s, std::memory_order_release);
+        Store* none = nullptr;
+        if (store_.compare_exchange_strong(none, s.get(), std::memory_order_acq_rel)) s.release();
         return true;
     } catch (const std::bad_alloc&) {
         return false;
@@ -156,12 +159,17 @@ void Looper::set(const Params& p, const Transport& t) {
     const double lb = fitLength(p.lengthBeats);
     speedTarget_ = std::clamp(finiteOr(p.speed, 1.0f), -1.0f, 2.0f);
     layer_ = p.layer;
+    hold_ = p.hold;
     const float loop = armed_ ? std::clamp(finiteOr(p.loop, 0.0f), 0.0f, 1.0f) : 0.0f;
     if (fresh_) {
         fresh_ = false;
         speed_ = speedTarget_;
         mix_ = 0.0f;
+        layerMix_ = layer_ ? 1.0f : 0.0f;
     }
+    // One jump at a time (a wrap, a new slice, a captured loop): a second one inside a crossfade would
+    // drop the head still fading out (a click). What can wait waits for it, at most kFade frames.
+    const bool fading = engaged_ && fade_ > 0;
     // The region a loop of `beats` plays: a Repeat, or a Length shorter than the loop, is a slice of it.
     const double rb = p.repeatBeats > 0.0 && std::isfinite(p.repeatBeats) ? p.repeatBeats : 0.0;
     const auto sliceFor = [lb, rb](double beats) {
@@ -175,11 +183,13 @@ void Looper::set(const Params& p, const Transport& t) {
         recFresh_ = false;
         recSeen_ = p.rec;
     }
-    if (p.rec != recSeen_) {
+    if (p.rec != recSeen_ && !fading) {   // a press during a crossfade is taken when it ends
         recSeen_ = p.rec;
         if (armed_) rec(p, lb, sliceFor(lb));
     }
-    if (pendingEnd_ >= 0 && abs_ >= pendingEnd_) {   // Capture Next: its cell has ended
+    // Capture Next: its cell has ended (a loop of the same length wraps on the same line: its
+    // crossfade first; the head lands where the grid is, so the wait doesn't show).
+    if (pendingEnd_ >= 0 && abs_ >= pendingEnd_ && !fading) {
         const int64_t end = pendingEnd_;
         pendingEnd_ = -1;
         take(end - pendingLen_, pendingLen_, pendingBeats_, static_cast<double>((abs_ - end) % pendingLen_),
@@ -208,7 +218,7 @@ void Looper::set(const Params& p, const Transport& t) {
 
     const double slice = sliceFor(lenBeats_);
     if (slice != slice_) {
-        setSlice(slice);
+        if (fade_ == 0) setSlice(slice);   // else on a chunk after the crossfade
         return;
     }
     // At speed 1, back onto the grid if the head has left it.
@@ -224,7 +234,8 @@ void Looper::set(const Params& p, const Transport& t) {
 Looper::Status Looper::status() const {
     Status s;
     s.speed = speedTarget_;
-    s.state = !armed_ ? kOff : engaged_ ? kPlaying : have_ ? kKept : kListening;
+    // Kept only while Hold keeps it: with Hold off, Loop grabs a new cell.
+    s.state = !armed_ ? kOff : engaged_ ? kPlaying : have_ && hold_ ? kKept : kListening;
     s.lengthBeats = have_ ? lenBeats_ : 0.0;
     s.sliceBeats = engaged_ && slice_ > 0.0 ? slice_ : 0.0;
     if (pendingEnd_ >= 0) {
@@ -337,27 +348,30 @@ void Looper::process(float* L, float* R, int n) {
             if (--fade_ == 0) oldPrev_ = false;
         }
         pos_ += speed;
-        if (pos_ >= end) {   // the edge: wrap, the old head playing on past it
+        // The edge: wrap, the old head playing on past it. Not inside a crossfade (one jump at a time):
+        // the head plays on past the edge until it ends (kGuard covers it).
+        if (pos_ >= end && fade_ == 0) {
             old_ = pos_;
             oldPrev_ = false;
             pos_ -= regLen_;
             fade_ = kFade;
-        } else if (pos_ < regStart_) {
+        } else if (pos_ < regStart_ && fade_ == 0) {
             old_ = pos_;
             oldPrev_ = false;
             pos_ += regLen_;
             fade_ = kFade;
         }
         const float g = std::min(std::fabs(speed) * 8.0f, 1.0f) * mix_;   // a tape stop fades out
-        if (layer_) {   // the live input stays; the loop on top
-            L[i] += l * g;
-            R[i] += r * g;
-        } else if (mix_ >= 1.0f) {   // the loop alone (whatever the live input holds, a NaN too)
+        // Swap: live (1 - mix) + loop; Layer: live + loop. A switch glides as the mix does.
+        layerMix_ += ((layer_ ? 1.0f : 0.0f) - layerMix_) * kMixCoef;
+        if (std::fabs((layer_ ? 1.0f : 0.0f) - layerMix_) < 1e-5f) layerMix_ = layer_ ? 1.0f : 0.0f;
+        const float live = 1.0f - mix_ * (1.0f - layerMix_);
+        if (live <= 0.0f) {   // the loop alone (whatever the live input holds, a NaN too)
             L[i] = l * g;
             R[i] = r * g;
         } else {
-            L[i] = L[i] * (1.0f - mix_) + l * g;
-            R[i] = R[i] * (1.0f - mix_) + r * g;
+            L[i] = L[i] * live + l * g;
+            R[i] = R[i] * live + r * g;
         }
     }
     speed_ = speedTarget_;

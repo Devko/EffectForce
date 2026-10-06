@@ -326,7 +326,9 @@ public:
     void reset();
     void set(const Params& p, const Transport& t);
     void process(float* L, float* R, int n);
-    int tailSamples() const { return 0; }
+    // OTT's crossovers ring: the 88 Hz Linkwitz-Riley's allpass takes about 770 samples to -60 dB. The
+    // compressor itself holds nothing a send needs to ring out.
+    int tailSamples() const { return mode_ == 1 || from_ == 1 ? 1024 : 0; }
 
 private:
     using Svf2 = cmp::Svf<cmp::f2>;

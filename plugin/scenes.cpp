@@ -60,6 +60,11 @@ void Scenes::setEditing(bool on) {
     changed();
 }
 
+void Scenes::hold(bool on) {
+    held_.store(on, std::memory_order_release);
+    if (!on) changed();   // the load is in: the engine takes it as one change
+}
+
 void Scenes::setStart(int scene, int param, float norm) {
     if (!validScene(scene) || !validParam(param) || kSceneMorph[param] != SceneMorph::Line) return;
     if (!locked(scene, param)) return;   // a start belongs to a lock

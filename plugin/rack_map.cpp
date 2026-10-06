@@ -63,7 +63,9 @@ float paramNorm(int id, float v) {
         case Curve::Int: n = s.hi > s.lo ? (v - s.lo) / (s.hi - s.lo) : 0.0f; break;
         default: break;
     }
-    return std::isfinite(n) ? std::clamp(n, 0.0f, 1.0f) : 0.0f;
+    // A value too big for float's arithmetic (a hand-edited 1e38) is the top of the range, not the
+    // bottom; only a NaN falls back to 0.
+    return std::isnan(n) ? 0.0f : std::clamp(n, 0.0f, 1.0f);
 }
 
 std::string paramDisplay(int id, float norm, const float* all) {

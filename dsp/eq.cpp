@@ -53,7 +53,9 @@ void Eq::set(const Params& in, const Transport&) {
     last_ = p;
 
     f2 t[kBands][kValues];
-    const bool lowCut = p.lowCutHz > 20.0f, highCut = p.highCutHz < 20000.0f;
+    // Off at the ends of their ranges, with a little room: a value worked out by the fast exp2 (the
+    // modulation, a scene's move) may land a hair inside them.
+    const bool lowCut = p.lowCutHz > 20.01f, highCut = p.highCutHz < 19990.0f;
     put(t[LOW_CUT], svfG(p.lowCutHz), kSqrt2, 1.0f, lowCut ? -kSqrt2 : 0.0f, lowCut ? -1.0f : 0.0f);
     const float al = shelfA(p.lowGainDb);
     put(t[LOW_SHELF], svfG(p.lowFreq) / std::sqrt(al), kSqrt2, 1.0f, kSqrt2 * (al - 1.0f), al * al - 1.0f);

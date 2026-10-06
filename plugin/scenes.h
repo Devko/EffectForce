@@ -52,6 +52,9 @@ public:
     void clear(int scene);                         // its locks, starts and timing
     void clearAll();
     void setEditing(bool on);
+    // Held while a preset, a project or an effect loads (the surface's batch): the engine keeps the
+    // scenes as they were until the whole load is in. Letting go counts as a change.
+    void hold(bool on);
     // A lock's start (a Line parameter the scene locks; kNone: it doesn't move), and a scene's timing.
     void setStart(int scene, int param, float norm);
     void setMove(int scene, int length, int play);
@@ -65,6 +68,7 @@ public:
     int movePlay(int scene) const;             // MovePlay
     int count(int scene) const;                 // how many parameters the scene locks
     bool editing() const { return editing_.load(std::memory_order_acquire); }
+    bool held() const { return held_.load(std::memory_order_acquire); }
     uint32_t generation() const { return gen_.load(std::memory_order_acquire); }
     uint32_t moveEpoch(int scene) const;
 
@@ -88,6 +92,7 @@ private:
     std::atomic<uint32_t> epoch_[kNumScenes];
     std::atomic<uint32_t> gen_{0};
     std::atomic<bool> editing_{false};
+    std::atomic<bool> held_{false};
 };
 
 } // namespace ef

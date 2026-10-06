@@ -273,7 +273,8 @@ Engine::MoveStatus Engine::moveStatus(int side) const {
 }
 
 void Engine::render(float* L, float* R, int n, Transport t) {
-    if (scenes_ && scenes_->generation() != sceneGen_ && haveRaw_) rebuild();   // a lock changed (UI thread)
+    // A lock changed (UI thread); not halfway through a load (held), which counts as one change at its end.
+    if (scenes_ && scenes_->generation() != sceneGen_ && haveRaw_ && !scenes_->held()) rebuild();
     xFresh_ = false;
     for (int pos = 0; pos < n; pos += kChunk) {
         const int m = std::min(kChunk, n - pos);

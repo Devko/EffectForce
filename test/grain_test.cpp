@@ -569,6 +569,40 @@ void heldOnTheGrid() {
         CHECK(count > 10 && off == 0);
         if (!(count > 10 && off == 0)) std::printf("  held %d samples into a slice: %d clicks, %d off the grid\n", holdAt - 20 * beat, count, off);
     }
+    // Held in Stutter, then Mosaic from the middle of a slice: its first slice starts partway in, and
+    // its source is where the grid has it (the held newest frame doesn't move on with the phase). A
+    // click in every slice, 1000 samples in: entered past it, the first slice plays none; a source a
+    // phase too old would play it the phase off the grid.
+    for (const int e : {1500, 3000}) {
+        P p = params(Grain::kStutter);
+        p.sync = true;
+        p.sizeBeats = 0.25;
+        p.spread = 1.0f;
+        p.density = 0.0f;
+        Buf L = silence(n);
+        for (int i = 1000; i < n; i += s) L[static_cast<size_t>(i)] = 1.0f;
+        Buf R = L;
+        const int holdAt = 20 * beat / kCh * kCh, modeAt = (22 * beat + e) / kCh * kCh;
+        Grain g;
+        for (int c = 0; c * kCh < n; ++c) {
+            Transport t;
+            t.bpm = 125.0;
+            t.playing = t.valid = true;
+            t.beats = c * kCh / (kSr * 60.0 / 125.0);
+            p.hold = c * kCh >= holdAt;
+            p.mode = c * kCh >= modeAt ? Grain::kMosaic : Grain::kStutter;
+            g.set(p, t);
+            g.process(&L[static_cast<size_t>(c * kCh)], &R[static_cast<size_t>(c * kCh)], kCh);
+        }
+        int count = 0, off = 0;
+        for (int i = modeAt + 300; i < n; ++i)   // past the Stutter's release
+            if (std::fabs(L[static_cast<size_t>(i)]) > 0.25f) {
+                ++count;
+                off += (i - 1000) % s != 0;
+            }
+        CHECK(count > 10 && off == 0);
+        if (!(count > 10 && off == 0)) std::printf("  Mosaic %d samples into a held slice: %d clicks, %d off the grid\n", e, count, off);
+    }
 }
 
 // A mode change and Hold in the same chunk: the mode change fades every grain out from the

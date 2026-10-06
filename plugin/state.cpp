@@ -164,9 +164,9 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
     if (!isStateText(textIn)) return false;
     const std::string text = textIn.compare(0, 3, "\xEF\xBB\xBF") == 0 ? textIn.substr(3) : textIn;
     s.endEdit();               // a scene being edited: its knobs go back first
+    Surface::Batch batch(s);   // the audio thread never plays a half-loaded sound (knobs and scenes)
     s.scenes().clearAll();     // the state's scenes replace the ones there were (none listed: none)
     for (int sc = 0; sc < kNumScenes; ++sc) s.setSceneName(sc, "");
-    Surface::Batch batch(s);   // the audio thread never plays a half-loaded sound
     if (asPreset)
         for (int i = 0; i < P_COUNT; ++i)
             if (saved(i)) s.setValue(i, PARAM_INFO[i].def);
@@ -208,7 +208,7 @@ bool loadState(Surface& s, const std::string& textIn, bool asPreset) {
         s.setValue(i, n);
         if (i >= P_ORDER_1 && i < P_ORDER_1 + kNumModules) named[i - P_ORDER_1] = true;
     }
-    // The order must name every module once. One saved before modules were added (0.0.1 had eight
+    // The order must name every module once. One saved before modules were added (the builds before Pulse and Grain had eight
     // slots) names some of them: the slots it doesn't name get the modules it doesn't, in the
     // default order (they were off in it: it sounds the same). Anything else (a module twice, a
     // hand-edited state) is the default.
