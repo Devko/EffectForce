@@ -4,6 +4,24 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### Full review (2026-10-07, branch `review-fixes`)
+
+Six reviews in parallel (the plugin glue and threads; state, presets, files and the engine; Drive,
+Filter, EQ, Comp; Chorus, Phaser, Pulse and the rack; Grain and the looper; Delay and Reverb). No crash,
+memory-safety, audio-thread or NaN bug. Every finding below was checked against the code and has a
+check that fails without its fix.
+
+| Item | State |
+|---|---|
+| Looper: a jump inside a running crossfade dropped the head fading out (REC Last just after a bar line, a Repeat change, a Capture Next on the line where a same-length loop wraps): one jump at a time now, kGuard 1024 | ✅ |
+| Looper: Blend steps the live input in or out (now a 3 ms glide); LOOP KEPT with Hold off; `allocate()` leaked a half-made store | ✅ |
+| Grain: held Mosaic entered mid-slice read its source a phase too old (a click off the grid) | ✅ |
+| CHAIN's ON / OFF while a scene is edited wasn't locked in it (and was undone at the edit's end); REC's Hold was undone by the edit's end | ✅ |
+| A load (preset, project, FX tile) could show the engine old knobs with half the new locks for a block or two: the scenes are held for the batch | ✅ |
+| A module a scene switches in woke from a rest with its old state (a compressor's gain reduction, a synced phaser's lag): cleared on waking | ✅ |
+| Smaller: OTT's tail (its crossovers ring), EQ cuts off with some room (fast-exp2 values), paramNorm of an overflowing value, a category tile after a rescan, `.last` without fsync, the preset scan without fs::relative | ✅ |
+| Not changed, below the bar: the reverb's size glide parks 6e-6 short and its modulation depth isn't slewed on hard jumps (both inaudible; fixing them moves the reverb's fingerprints); Drive's rest offset on a one-chunk bias jump; the looper's Pre / Post switch steps (rarely moved); Phaser and Pulse floor the tempo at 20 BPM (only a host tempo below that would show it) | – |
+
 ### 0.0.1, the first release, in the plugin catalog (2026-10-06)
 
 | Item | State |

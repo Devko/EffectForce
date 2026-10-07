@@ -129,7 +129,9 @@ parameter, also on a Q-Link and on the PERFORM page.
   knob that is Off) runs while either end has it on, and the fader moves its input level s from
   0 (the Off end) to 1 (the On end): out = in (1 - s) + module(in s). At the On end that is exactly
   the module; at the Off end the input passes and the module's **tail rings out** (a delay throw,
-  a reverb wash). Once s has been 0 for the module's tail time it stops (no CPU) until s rises.
+  a reverb wash). Once s has been 0 for the module's tail time it stops (no CPU) until s rises,
+  and then starts from cleared state, as a module switched on by its knob (a compressor without
+  the gain reduction it stopped with, a synced phaser on the song's phase).
   A module that no scene switches keeps send 1: today's rack, bit for bit.
 - **Not lockable:** the fader and the scene picks, the edit switches, Looper On (it arms the
   recorder, which must run before a loop can be grabbed), the chain's order, and everything the
@@ -199,8 +201,8 @@ motion is the scene's.
 written by `tools/make_fx.py`, checked by `surface.py` like the presets and embedded
 (`build/fx_library.h`). An effect is a scene's text: `name=` and the locks, nothing else. A tap on an
 FX tile (PERFORM page) loads it into the scene at B, or the scene being edited: the new locks go in
-first, then what the scene locked and the effect doesn't is unlocked, so the engine never plays it
-half empty. Scenes keep a name (saved as `sceneN.name=`), marked `*` once edited; the tile of the effect
+first, then what the scene locked and the effect doesn't is unlocked, all in one batch: the engine
+takes the scene whole (the scenes are held while a preset, a project or an effect loads). Scenes keep a name (saved as `sceneN.name=`), marked `*` once edited; the tile of the effect
 scene B holds as it came is lit. Effects use LFO 2 and matrix slot 8 only, so LFO 1 and slots 1-7
 stay the user's; an effect with `lp_` locks switches the looper on (the plugin then makes its buffers).
 
@@ -215,7 +217,7 @@ what the rack plays; the effects go on with the live input underneath).
 | `lp_on` Looper | Off · On | Arms the recorder: it records the stage's input all the time. Not lockable |
 | `lp_pos` Position | Pre · Post | Where the stage sits |
 | `lp_mix` Loop | 0..100% | How much loop. Plays the kept loop; without one, leaving 0 **grabs a loop** (back at 0 it lets go) |
-| `lp_blend` Blend | Swap · Layer | Swap: live (1 - m) + loop m. Layer: live + loop m (the live input stays) |
+| `lp_blend` Blend | Swap · Layer | Swap: live (1 - m) + loop m. Layer: live + loop m (the live input stays). A switch glides over 3 ms |
 | `lp_len` Length | 1/16 · 1/8 · 1/4 · 1/2 · 1 bar · 2 bars · 4 bars · 8 bars | The loop's length (ordered steps); shorter than the kept loop, a slice of it |
 | `lp_capture` Capture | Last · Next | What REC takes: the cell just played, or the coming one on the grid |
 | `lp_rec` REC | button | Captures a loop of Length and keeps it (turns Hold on); a second press while waiting cancels |
@@ -246,8 +248,10 @@ what the rack plays; the effects go on with the live input underneath).
   instead of a held DC level. At speed 1 a head that has left the grid (after another speed, a
   locate, the sequence's loop point) crossfades back onto it; with any other speed it runs free.
 - **No clicks:** every jump (the wrap at the loop's or slice's end, a new slice, a return to the
-  grid) is a 5 ms crossfade: the old head plays on past the edge (the loop buffer keeps 512 frames
-  of what came before and after the cell) while the new one fades in. The live / loop crossfade is
+  grid, a captured loop replacing the one playing) is a 5 ms crossfade: the old head plays on past
+  the edge (the loop buffer keeps 1024 frames of what came before and after the cell) while the new
+  one fades in. One at a time: a jump due while one fades (a wrap, a Repeat change, a REC press, a
+  Capture Next landing on the line where a loop of its length wraps) waits for it, at most 5 ms. The live / loop crossfade is
   smoothed over 3 ms.
 - **Memory, only where used:** a 2^21-frame stereo ring (47.5 s, 16.8 MB) records; a loop is
   copied into a 20 s loop buffer (7 MB) at 8× real time in the background (1024 frames a block),

@@ -114,7 +114,8 @@ The **output guard** (`plugin/plugin.cpp`) keeps every sample finite and within 
 - A `try`/`catch` stands between every entry point and MPC: an exception never reaches the host.
 - Denormals are flushed to zero while a block renders.
 - The surface hands the audio thread a snapshot of every sound parameter; preset loads and chain
-  moves are written as one batch (a seqlock), so the audio thread never plays half of one.
+  moves are written as one batch (a seqlock), so the audio thread never plays half of one; the
+  scenes' locks are held for the batch too (the engine rebuilds from them only once it is complete).
 
 ## Talking to MPC
 
