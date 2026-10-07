@@ -454,6 +454,50 @@ void looperInThePlugin() {
     CHECK(passes);
 }
 
+// Everything moved while a scene is edited is locked in it, the CHAIN page's ON / OFF too; REC's Hold
+// (a performance switch, not a scene's) outlasts the edit.
+void editLocksEverywhere() {
+    std::printf("== scenes: CHAIN's ON / OFF while editing locks; REC's Hold outlasts the edit\n");
+    Host h;
+    h.on(P_LP_ON);
+    h.tap(P_EDIT_B);
+    h.tap(P_SLOT_1 + 9);   // the default order's last slot: Reverb
+    h.press(P_SEL_ON);
+    CHECK(h.value(P_REV_ON) == 1.0f);   // heard while editing
+    h.press(P_LP_REC);
+    h.tap(P_EDIT_B);
+    const std::string s = h.chunk();
+    CHECK(s.find("\nscene2.rev_on=On\n") != std::string::npos && h.value(P_REV_ON) == 0.0f);   // locked; the knob as it was
+    CHECK(h.display(P_SCB_1 + 1) == "2  (1)");
+    CHECK(h.value(P_LP_HOLD) == 1.0f && s.find("\nlp_hold=On\n") != std::string::npos && s.find("scene2.lp_hold") == std::string::npos);
+}
+
+// A load (a preset, a project, an effect) holds the scenes: the engine keeps them as they were until
+// it lets go, then takes the whole of it.
+void heldWhileLoading() {
+    std::printf("== scenes: held while a load is under way, taken whole after it\n");
+    Scenes sc;
+    sc.lock(1, P_FLT_CUT, 0.2f);
+    Engine e;
+    e.attachScenes(&sc);
+    Knobs k;
+    k.v[P_XFADE] = 1.0f;
+    e.setParams(k.v);
+    play(e, 0.01);
+    CHECK(std::fabs(e.patch().filter.cutoffHz - paramValue(P_FLT_CUT, 0.2f)) < 0.01f);
+    sc.hold(true);
+    sc.clear(1);                  // halfway through a load: the old lock gone,
+    sc.lock(1, P_FLT_RES, 0.9f);  // a new one in, another still to come
+    play(e, 0.01);
+    CHECK(std::fabs(e.patch().filter.cutoffHz - paramValue(P_FLT_CUT, 0.2f)) < 0.01f &&
+          std::fabs(e.patch().filter.res - paramValue(P_FLT_RES, PARAM_INFO[P_FLT_RES].def)) < 1e-6f);
+    sc.lock(1, P_FLT_CUT, 0.6f);
+    sc.hold(false);
+    play(e, 0.01);
+    CHECK(std::fabs(e.patch().filter.cutoffHz - paramValue(P_FLT_CUT, 0.6f)) < 0.01f &&
+          std::fabs(e.patch().filter.res - paramValue(P_FLT_RES, 0.9f)) < 1e-6f);
+}
+
 // --- scene moves (docs/DESIGN.md "Scene moves") ------------------------------------------------
 
 void moveStore() {
@@ -806,6 +850,8 @@ void eft::scenesTests() {
     soundAtEachEnd();
     faderBar();
     looperInThePlugin();
+    editLocksEverywhere();
+    heldWhileLoading();
     moveStore();
     moveClock();
     moveValues();

@@ -123,6 +123,31 @@ void reenable() {
     CHECK(peak(S) < 1e-6f);   // -120 dB: what's left is the delay's denormal guard, not an echo
 }
 
+// A module a scene switches in rests once its send has been 0 for its tail, and wakes from cleared
+// state: a compressor that squashed something loud before resting starts the next push without that
+// gain reduction, exactly as one that never compressed anything.
+void wakesFromRest() {
+    RackPatch p;
+    p.on[RM_COMP] = true;
+    p.comp.thresholdDb = -40.0f;
+    p.comp.ratio = 20.0f;
+    p.comp.releaseMs = 2000.0f;
+    auto used = std::make_unique<Rack>(), fresh = std::make_unique<Rack>();
+    Buf L = whiteNoise(44100, 0.9f, 7), R = L;   // loud: deep gain reduction, a 2 s release
+    runRack(*used, p, L, R);
+    p.send[RM_COMP] = 0.0f;   // pulled out: it rests
+    for (Rack* r : {used.get(), fresh.get()}) {
+        Buf S(22050, 0.0f), T = S;
+        runRack(*r, p, S, T);
+    }
+    CHECK(used->running() == 0 && fresh->running() == 0);
+    p.send[RM_COMP] = 1.0f;   // pushed in again, a quiet sine
+    Buf A = sine(200.0, 22050, 0.05f), B = A, A0 = A, B0 = A;
+    runRack(*used, p, A, B);
+    runRack(*fresh, p, A0, B0);
+    CHECK(A == A0 && B == B0);
+}
+
 void reorder() {
     // A new order dips the output over 3 ms and comes back: no click, and the level returns.
     auto r = std::make_unique<Rack>();
@@ -163,5 +188,6 @@ void eft::rackTests() {
     levels();
     switching();
     reenable();
+    wakesFromRest();
     reorder();
 }

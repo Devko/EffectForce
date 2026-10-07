@@ -471,9 +471,11 @@ void oneJumpAtATime() {
         CHECK(step < 0.05f);
     }
     {
-        // Repeat 1/16 from beat 6; at beat 9 (a slice's line, its wrap's crossfade under way) 1/8.
+        // Repeat 1/16 from beat 6 (it rolls the slice at 2 beats into the bar, the first half of an
+        // eighth); just after beat 9.25 (a sixteenth's line: its wrap's crossfade under way) 1/8, which
+        // the grid has in the second half there: a jump of a sixteenth, inside the wrap's crossfade.
         auto lp = armed();
-        const int change = 9 * 22050 / kChunk * kChunk + kChunk;
+        const int change = static_cast<int>(9.25 * 22050) / kChunk * kChunk + kChunk;
         Buf L = sine(310.3, n, 0.5f), R = L;
         drive(*lp, L, R, playing(120.0), [&](int s) {
             return params(s >= up ? 1.0f : 0.0f, 4.0, s < 6 * 22050 ? 0.0 : s < change ? 0.25 : 0.5);

@@ -509,7 +509,8 @@ void resetClears() {
         run(used, p, A, B);
         run(fresh, p, A0, B0);
         CHECK(same(A, A0) && same(B, B0));
-        CHECK(used.tailSamples() == 0);
+        // The compressor holds nothing to ring out; OTT's crossovers do (the 88 Hz allpass, ~770 samples).
+        CHECK(used.tailSamples() == (p.mode == 1 ? 1024 : 0) && used.tailSamples() == fresh.tailSamples());
     }
 }
 
