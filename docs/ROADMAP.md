@@ -4,7 +4,7 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
-### Full review (2026-10-07, branch `review-fixes`)
+### Full review (2026-10-07), released as [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2)
 
 Six reviews in parallel (the plugin glue and threads; state, presets, files and the engine; Drive,
 Filter, EQ, Comp; Chorus, Phaser, Pulse and the rack; Grain and the looper; Delay and Reverb). No crash,

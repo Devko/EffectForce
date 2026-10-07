@@ -141,6 +141,7 @@ from v0.1 it is append-only.
 | Release build in CI (glibc 2.31, profile-guided, catalog-checked) | ✅ |
 | On the device: installs, plays, benches (`make bench-device`), the suite on its CPU | ✅ |
 | [0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) — the first release (regular, catalog-checked) | ✅ |
+| [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2) — the full review's fixes | ✅ |
 | In the plugin catalog (the registry entry's PR) | 🔜 |
 | v0.1 — parameter list frozen (append-only from then on) | ⬜ |
 
