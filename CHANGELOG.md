@@ -4,6 +4,26 @@ Releases are built by CI from a `vX.Y.Z` tag (see [Releases](README.md#releases)
 tag's version becomes the release's notes. While the version is 0.x the parameter list may still change
 between releases.
 
+## 0.0.2
+
+Fixes from a full review of the code (no crash, memory or audio-thread problem was found; each fix
+below has a test that fails without it).
+
+- **Looper, no more clicks on a re-capture:** a REC press, a Repeat change or a capture landing while
+  a 5 ms crossfade was still under way cut it short. Most audibly: REC (Last) just after a bar line,
+  or a Capture Next of the same length as the loop playing. Jumps now wait for the crossfade
+  (at most 5 ms).
+- **Looper:** switching Blend (Swap / Layer) glides instead of stepping; the looper's line says LOOP
+  KEPT only while Hold keeps it.
+- **Grain:** a held Mosaic started mid-slice played off the beat grid.
+- **Scenes:** CHAIN's ON / OFF while editing a scene is locked in it (it was undone when the edit
+  ended); REC's Hold stays on after an edit; loading a preset or an FX tile never plays half of it.
+- **Effects a scene fades in** wake from cleared state after a rest: a compressor without its old
+  gain reduction, a synced phaser without a stutter.
+- **Smaller:** OTT lets its crossovers ring out; the EQ's cuts switch fully off at the ends of their
+  ranges; a hand-edited value too big for its range reads as the maximum; a category tile tapped after
+  a rescan opens its own category; SAVE and the preset scan wait less on the SD card.
+
 ## 0.0.1
 
 The first public preview: an effect rack and an Octatrack-style performance mixer in one insert slot.
