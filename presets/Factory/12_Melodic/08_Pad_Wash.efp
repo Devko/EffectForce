@@ -1,0 +1,21 @@
+effectforce 1
+eq_on=On
+eq_lc=120
+chr_on=On
+chr_mode=Ensemble
+chr_rate=0.3
+chr_depth=0.6
+chr_mix=0.7
+pls_on=On
+pls_mode=Auto-Pan
+pls_div=1 bar
+pls_depth=0.4
+rev_on=On
+rev_mode=Hall
+rev_size=0.9
+rev_decay=8
+rev_pre=0
+rev_mod=0.5
+rev_lc=200
+rev_mix=0.35
+out_gain=5.3

@@ -1,0 +1,20 @@
+effectforce 1
+eq_on=On
+eq_lc=150
+dly_on=On
+dly_mode=Ping-Pong
+dly_div=1/4.
+dly_fb=0.55
+dly_lc=300
+dly_hc=3500
+dly_duck=0.55
+dly_wow=0.1
+dly_mix=0.35
+rev_on=On
+rev_mode=Hall
+rev_size=0.8
+rev_decay=5
+rev_pre=0
+rev_lc=250
+rev_mix=0.22
+out_gain=9.0

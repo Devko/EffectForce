@@ -333,8 +333,26 @@ looper's memory is only taken where it is armed.
 
 ## Presets
 
-- **Factory presets** in eleven categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative,
-  Texture (Grain), Rhythm (Pulse), Perform (scenes and the looper).
+- **Factory presets** in twelve categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative,
+  Texture (Grain), Rhythm (Pulse), Perform (scenes and the looper), Melodic.
+- **Melodic** holds chains for melodic techno and house, made for
+  [SubForce](https://github.com/Devko/SubForce)'s melodic set but fine after any synth. They follow what
+  that genre's synth presets do with their effects, measured over several hundred of them: the delay
+  before the reverb, its repeats darkened and fed back moderately, plates and halls with no pre-delay
+  at low mixes, a low cut on everything but the bass, a slow chorus and an auto-pan on pads.
+
+  | Preset | For |
+  |---|---|
+  | **Melodic Bass** | Basslines: glue compression, a short 1/8 ping-pong and a small plate, both low |
+  | **Lead Delay Plate** | Leads: a dotted 1/8 delay into a long plate |
+  | **Lead Throw** | Leads with space between phrases: a ducked dotted 1/4 ping-pong (the echoes rise when you stop), a hall |
+  | **Pluck Space** | Plucks: a dotted 1/8 ping-pong, then a hall at a low mix |
+  | **Arp Dotted** | Arpeggios: more delay, a wobble on the repeats, a plate |
+  | **Stab Echo** | Stabs: light compression, a 1/4 echo, a short plate |
+  | **Sequence Pump** | Sequences: a sidechain-like pump on every beat, a 1/16. ping-pong, a short plate |
+  | **Pad Wash** | Pads: ensemble chorus, an auto-pan over a bar, a long hall |
+  | **Drone Space** | Drones: slow chorus, a dark dotted 1/4 delay, a 15 s space |
+  | **Riser Wash** | Risers and transitions: a long ping-pong into a 10 s space |
   Each is level-matched on reference material at a track's usual level (chords for Synth, Pads,
   Texture and Rhythm, a bass line for Bass, drums for Drums, all of it for the rest): it comes out about as loud as it went
   in, so you compare sounds, not levels. Delay and reverb presets make up for the dry signal their Mix

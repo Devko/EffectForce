@@ -207,7 +207,44 @@ preset("Perform", "Space Mixer", scene_b="2",
 preset("Perform", "Crush Mixer", scene_b="2",
        s=scenes("Bit Crush", "Lo-Fi Radio", "Overdrive", "Fold", "OTT Squash", "Crush Filter", "Telephone"))
 
-CATS = ["Utility", "Synth", "Pads", "Bass", "Drums", "Lo-Fi", "Space", "Creative", "Texture", "Rhythm", "Perform"]
+# --- Melodic: chains for melodic techno and house, made for SubForce's melodic set (and any synth). From
+# what that genre's synth presets do with their effects, measured over several hundred of them: the
+# delay before the reverb, repeats darkened and fed back moderately, plates and halls with no pre-delay
+# at low mixes, a low cut on everything but the bass, slow chorus and an auto-pan on pads.
+preset("Melodic", "Melodic Bass", eq_on="On", eq_lc=30, cmp_on="On", cmp_thr=-16, cmp_ratio=3, cmp_att=0.01,
+       cmp_rel=0.12, cmp_makeup=2, dly_on="On", dly_mode="Ping-Pong", dly_div="1/8", dly_fb=0.25, dly_lc=300,
+       dly_hc=3000, dly_mix=0.1, rev_on="On", rev_mode="Plate", rev_decay=1.2, rev_pre=0, rev_lc=300, rev_mix=0.08)
+preset("Melodic", "Lead Delay Plate", eq_on="On", eq_lc=150, dly_on="On", dly_mode="Stereo", dly_div="1/8.",
+       dly_fb=0.4, dly_lc=250, dly_hc=4000, dly_mix=0.22, rev_on="On", rev_mode="Plate", rev_decay=4, rev_pre=0,
+       rev_lc=200, rev_mix=0.2)
+preset("Melodic", "Lead Throw", eq_on="On", eq_lc=150, dly_on="On", dly_mode="Ping-Pong", dly_div="1/4.",
+       dly_fb=0.55, dly_lc=300, dly_hc=3500, dly_duck=0.55, dly_wow=0.1, dly_mix=0.35, rev_on="On", rev_mode="Hall",
+       rev_size=0.8, rev_decay=5, rev_pre=0, rev_lc=250, rev_mix=0.22)
+preset("Melodic", "Pluck Space", eq_on="On", eq_lc=150, dly_on="On", dly_mode="Ping-Pong", dly_div="1/8.",
+       dly_fb=0.35, dly_lc=300, dly_hc=5000, dly_mix=0.25, rev_on="On", rev_mode="Hall", rev_size=0.8, rev_decay=5,
+       rev_pre=0, rev_lc=250, rev_mix=0.15)
+preset("Melodic", "Arp Dotted", eq_on="On", eq_lc=180, dly_on="On", dly_mode="Ping-Pong", dly_div="1/8.",
+       dly_fb=0.45, dly_lc=300, dly_hc=4500, dly_wow=0.1, dly_mix=0.3, rev_on="On", rev_mode="Plate", rev_decay=3,
+       rev_pre=0, rev_lc=250, rev_mix=0.15)
+preset("Melodic", "Stab Echo", eq_on="On", eq_lc=150, cmp_on="On", cmp_thr=-14, cmp_ratio=2.5, cmp_att=0.005,
+       cmp_rel=0.1, dly_on="On", dly_mode="Stereo", dly_div="1/4", dly_fb=0.4, dly_lc=300, dly_hc=4000, dly_mix=0.25,
+       rev_on="On", rev_mode="Plate", rev_decay=1.5, rev_pre=0, rev_lc=250, rev_mix=0.2)
+preset("Melodic", "Sequence Pump", eq_on="On", eq_lc=120, pls_on="On", pls_mode="Gate", pls_div="1/16",
+       pls_pattern="Pump", pls_depth=0.5, pls_length=1, pls_smooth=0.03, dly_on="On", dly_mode="Ping-Pong",
+       dly_div="1/16.", dly_fb=0.3, dly_hc=4500, dly_mix=0.15, rev_on="On", rev_mode="Plate", rev_decay=1.5,
+       rev_pre=0, rev_mix=0.12)
+preset("Melodic", "Pad Wash", eq_on="On", eq_lc=120, chr_on="On", chr_mode="Ensemble", chr_rate=0.3,
+       chr_depth=0.6, chr_mix=0.7, pls_on="On", pls_mode="Auto-Pan", pls_div="1 bar", pls_depth=0.4, rev_on="On",
+       rev_mode="Hall", rev_size=0.9, rev_decay=8, rev_pre=0, rev_mod=0.5, rev_lc=200, rev_mix=0.35)
+preset("Melodic", "Drone Space", eq_on="On", eq_lc=100, chr_on="On", chr_mode="Chorus", chr_rate=0.15,
+       chr_depth=0.7, chr_mix=0.5, dly_on="On", dly_div="1/4.", dly_fb=0.5, dly_hc=3000, dly_mix=0.15, rev_on="On",
+       rev_mode="Space", rev_size=0.95, rev_decay=15, rev_pre=0, rev_mod=0.6, rev_mix=0.45)
+preset("Melodic", "Riser Wash", eq_on="On", eq_lc=200, dly_on="On", dly_mode="Ping-Pong", dly_div="1/8.",
+       dly_fb=0.6, dly_hc=5000, dly_mix=0.25, rev_on="On", rev_mode="Space", rev_size=0.9, rev_decay=10, rev_pre=0,
+       rev_mod=0.5, rev_mix=0.4)
+
+CATS = ["Utility", "Synth", "Pads", "Bass", "Drums", "Lo-Fi", "Space", "Creative", "Texture", "Rhythm", "Perform",
+        "Melodic"]
 
 
 def fmt(v):

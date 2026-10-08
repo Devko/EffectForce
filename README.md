@@ -44,7 +44,8 @@ matrix across all of them. It is built on the same groundwork as its siblings
   budget is 15%); a Perform preset 6-8% ([Performance](docs/PERFORMANCE.md))
 - **Built for MPC:** zero latency, tails that ring on through Stop, every getter cheap (MPC polls them
   hundreds of times a second), all measured on the device first ([the probe](docs/PROBE.md))
-- **62 factory presets** in 11 categories (Perform: ten ready-made performance mixers),
+- **72 factory presets** in 12 categories (Perform: ten ready-made performance mixers; Melodic: chains
+  for melodic techno),
   level-matched on reference material so a preset changes the sound more than the level; user presets,
   favorites, a browser
 
@@ -142,6 +143,7 @@ from v0.1 it is append-only.
 | On the device: installs, plays, benches (`make bench-device`), the suite on its CPU | ✅ |
 | [0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) — the first release (regular, catalog-checked) | ✅ |
 | [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2) — the full review's fixes | ✅ |
+| 0.0.3 — Melodic: ten chains for melodic techno (72 presets) | ✅ |
 | In the plugin catalog (the registry entry's PR) | 🔜 |
 | v0.1 — parameter list frozen (append-only from then on) | ⬜ |
 

@@ -1,0 +1,17 @@
+effectforce 1
+eq_on=On
+eq_lc=150
+dly_on=On
+dly_mode=Stereo
+dly_div=1/8.
+dly_fb=0.4
+dly_lc=250
+dly_hc=4000
+dly_mix=0.22
+rev_on=On
+rev_mode=Plate
+rev_decay=4
+rev_pre=0
+rev_lc=200
+rev_mix=0.2
+out_gain=7.5

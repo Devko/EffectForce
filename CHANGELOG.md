@@ -4,6 +4,15 @@ Releases are built by CI from a `vX.Y.Z` tag (see [Releases](README.md#releases)
 tag's version becomes the release's notes. While the version is 0.x the parameter list may still change
 between releases.
 
+## 0.0.3
+
+**Melodic**, a new preset category (72 presets in all): ten chains for melodic techno and house, made for
+SubForce's melodic set and fine after any synth — Melodic Bass, Lead Delay Plate, Lead Throw, Pluck
+Space, Arp Dotted, Stab Echo, Sequence Pump, Pad Wash, Drone Space, Riser Wash. They follow what that
+genre's synth presets do with their effects, measured over several hundred of them: the delay before
+the reverb, darkened repeats, plates and halls with no pre-delay at low mixes, a low cut on everything
+but the bass. Level-matched like the rest.
+
 ## 0.0.2
 
 Fixes from a full review of the code (no crash, memory or audio-thread problem was found; each fix
