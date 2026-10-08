@@ -75,11 +75,11 @@ public:
 
 private:
     // How the delay time follows a new target (a tempo or division change), one sample at a time.
-    // Placeholder: a 60 ms one-pole glide, as a tape delay's motor would: echoes already in
-    // flight bend in pitch while the time moves, more the further it has to go.
+    // A 60 ms one-pole glide, as a tape delay's motor would: echoes already in flight bend in
+    // pitch while the time moves, more the further it has to go.
     // In double: in float the step drops under the precision of a time near 22050 samples and the
-    // glide stalls ~2.6 samples short of its target, for good.
-    // TODO(EffectForce): pick the behaviour the real delay keeps (see docs/PROBE.md, "Your part").
+    // glide stalls ~2.6 samples short of its target, for good. (docs/PROBE.md, "Your part": the
+    // real Delay keeps both, as Delay Glide: this one is its Tape, Fade crossfades.)
     double glideTime(double current, double target) const {
         return current + (target - current) * glide_;
     }

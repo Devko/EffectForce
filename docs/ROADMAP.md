@@ -33,7 +33,7 @@ check that fails without its fix.
 | README: requirements, installation, releases, status, credits; page images (docs/img, rendered offline from the skin) | ✅ |
 | CI's first real run of the suite against GCC 11's profile-guided objects: the Reverb's fingerprints (pinned to GCC 13's plain build) moved; they skip there now, as the Tape hash. 13413 checks pass | ✅ |
 | [v0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) published (2026-10-06): a regular release, notes from the changelog, the zip catalog-checked again as published | ✅ |
-| The catalog entry's PR to sd88me/mpc-vst-plugins (`catalog/plugins/effectforce.json`, checked with its registry check) | 🔜 |
+| The catalog entry's PR to sd88me/mpc-vst-plugins (`catalog/plugins/effectforce.json`, checked with its registry check): [merged](https://github.com/sd88me/mpc-vst-plugins/pull/209) (2026-10-06) | ✅ |
 | The release zip installed and played on the Force, then `tested.json` | 🔜 |
 
 ### Scene moves (2026-10-06, branch `scene-moves`)
