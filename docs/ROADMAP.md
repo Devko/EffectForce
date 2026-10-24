@@ -16,7 +16,7 @@ link their wrapper, and never asked on a sound parameter's write; what we took o
 | At most one UpdateDisplay per 50 ms (was every 4 blocks, ~12 ms); the status line's CPU figures through the same gate (they called MPC directly) | ✅ |
 | `surface/params.lock`: a parameter that changes its index stops `surface.py` (their format, `GEN_VST_RELOCK=1`) | ✅ |
 | Test: 32 Q-Link detents on sound parameters ask for no redraw; a fader sweep of 4096 frames asks at most twice, and its end is told | ✅ |
-| On the Force: Q-Links on track edit → automation (a knob, a choice, the fader), and the status line, the fader's bar and the scenes' line still follow | 🔜 |
+| On the Force: Q-Links on track edit → automation (a knob, a choice, the fader), and the status line, the fader's bar and the scenes' line still follow | ✅ 2026-10-24 |
 
 ### Full review (2026-10-07), released as [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2)
 
