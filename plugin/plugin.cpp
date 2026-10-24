@@ -330,7 +330,7 @@ void meter(Plugin* p, double us, int n) {
         p->lastAvg = avg;
         p->lastPeak = peak;
         p->lastRunning = running;
-        if (p->master) p->master(&p->fx, vst::audioMasterUpdateDisplay, 0, 0, nullptr, 0.0f);
+        p->surface.textsChanged();   // told by the next block's notify, within its 50 ms gap
     }
 }
 
@@ -366,7 +366,7 @@ void processReplacing(AEffect* e, float** in, float** out, int32_t n) {
         std::memset(out[0], 0, bytes);
         std::memset(out[1], 0, bytes);
     }
-    p->surface.notify(hostAutomate, hostUpdate, p);
+    p->surface.notify(hostAutomate, hostUpdate, p, n);
     meter(p, threadCpuUs() - t0, n);
 }
 

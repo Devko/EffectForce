@@ -20,7 +20,6 @@ long long (*Surface::clock)() = nullptr;
 namespace {
 
 constexpr int kMaxAutomatePerBlock = 48;   // spread big refreshes over a few blocks
-constexpr int kTextEveryBlocks     = 4;    // at most one UpdateDisplay per ~12 ms
 constexpr float kQuant             = 0.0015f;   // MPC rounds values to 1/1000
 constexpr long long kGestureMs     = 300;   // sends closer than this belong to one gesture
 constexpr float kFirstMoveMax      = 0.16f; // a gesture's first event is a turn, not a jump
@@ -835,7 +834,7 @@ bool Surface::snapshot(float* out) const {
     return true;
 }
 
-void Surface::notify(AutomateFn automate, UpdateFn update, void* ctx) {
+void Surface::notify(AutomateFn automate, UpdateFn update, void* ctx, int frames) {
     // Nothing changed since the last full pass: no need to look at every value every block.
     const uint32_t changes = changes_.load(std::memory_order_acquire);
     if (changes != scanned_ || scanPending_) {
@@ -862,8 +861,8 @@ void Surface::notify(AutomateFn automate, UpdateFn update, void* ctx) {
         scanPending_ = n < P_COUNT;   // stopped at the per-block cap: go on next block
         if (!scanPending_) scanned_ = changes;
     }
-    if (sinceText_ < kTextEveryBlocks) ++sinceText_;   // saturates: no overflow in a long session
-    if (sinceText_ >= kTextEveryBlocks) {
+    if (sinceText_ < kTextGap) sinceText_ += frames;   // saturates: no overflow in a long session
+    if (sinceText_ >= kTextGap) {
         const uint32_t g = textGen_.load(std::memory_order_acquire);
         if (g != textSeen_) {
             textSeen_ = g;

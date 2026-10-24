@@ -4,6 +4,20 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### Q-Links on track edit → automation (2026-10-23), for 0.0.3
+
+sd88me/mpc-vst-plugins found (2026-10-21, [#486](https://github.com/sd88me/mpc-vst-plugins/pull/486)–[#489](https://github.com/sd88me/mpc-vst-plugins/pull/489))
+that every `audioMasterUpdateDisplay` makes MPC rebuild its parameter screen, and that a Q-Link turned on
+track edit → automation loses its value to it. Their wrapper asked for one on every host write. We don't
+link their wrapper, and never asked on a sound parameter's write; what we took over is below.
+
+| Item | State |
+|---|---|
+| At most one UpdateDisplay per 50 ms (was every 4 blocks, ~12 ms); the status line's CPU figures through the same gate (they called MPC directly) | ✅ |
+| `surface/params.lock`: a parameter that changes its index stops `surface.py` (their format, `GEN_VST_RELOCK=1`) | ✅ |
+| Test: 32 Q-Link detents on sound parameters ask for no redraw; a fader sweep of 4096 frames asks at most twice, and its end is told | ✅ |
+| On the Force: Q-Links on track edit → automation (a knob, a choice, the fader), and the status line, the fader's bar and the scenes' line still follow | 🔜 |
+
 ### Full review (2026-10-07), released as [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2)
 
 Six reviews in parallel (the plugin glue and threads; state, presets, files and the engine; Drive,

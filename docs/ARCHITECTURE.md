@@ -24,7 +24,8 @@ flowchart LR
 
 - **`surface/surface.py`** is the single source of the parameter list, the pages and the factory
   presets' checks. It writes `params.json`, `layout.conf`, `vst.json`, `build/param_ids.h` and
-  `build/factory_presets.h`, after checking the layout (PolyForce's checker) and every preset.
+  `build/factory_presets.h`, after checking the layout (PolyForce's checker) and every preset, and
+  the parameters' order against `params.lock`.
 - **`dsp/`** is the sound: ten modules with one contract (docs/DESIGN.md "Modules"), the rack that
   chains them, the LFOs and the envelope follower. No VST, no files, no threads.
 - **`plugin/`** is everything between the sound and MPC: VST2 entry points, parameters, the
@@ -129,6 +130,11 @@ What MPC does with an insert effect was measured on the device first ([the probe
   zero-latency.
 - It polls names, categories and parameter texts hundreds of times a second while the screen is
   open: every getter reads caches.
+- It rebuilds its parameter screen on every `audioMasterUpdateDisplay`, and a Q-Link turned on track
+  edit → automation meanwhile loses its value (sd88me/mpc-vst-plugins, NOTES.md 2026-10-21). So a
+  sound parameter's change asks for none (its text is made when MPC asks); the texts that change on
+  their own or follow another parameter (the status line, the fader's bar, the scenes' and the
+  looper's lines) ask through one gate, at most once per 50 ms (`Surface::kTextGap`).
 - The Force's input rules (a tap is a lone 1, a Q-Link detent is the read-back plus 1/128, a tile's
   release echo ~0.7 s later) are SubForce's surface, unchanged; see PolyForce's
   [Milestone 1 design](https://github.com/Devko/PolyForce/blob/main/docs/M1_DESIGN.md), §6.
@@ -139,7 +145,8 @@ What MPC does with an insert effect was measured on the device first ([the probe
   index. Append-only covers option lists too: MPC stores an option as its 0..1 value, which moves
   for every option when one is added (`order_*` grew from 8 to 10 options, `m*_dst` from 49 to 55
   before v0.1), so a list that may grow gets a new parameter, or a fixed number of options from
-  v0.1 on.
+  v0.1 on. `surface/params.lock` (sd88me's format) keeps a change deliberate: a parameter that moves
+  stops `surface.py`; `GEN_VST_RELOCK=1` accepts the break.
 - **Kinds** (`surface.py`): sound parameters (saved, automatable), the chain's order (saved, moved
   only by MOVE, not automatable), the surface's own values (the selected slot, the browser), readouts,
   buttons, tiles, toggles, popup flags.

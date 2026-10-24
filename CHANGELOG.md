@@ -13,6 +13,13 @@ genre's synth presets do with their effects, measured over several hundred of th
 the reverb, darkened repeats, plates and halls with no pre-delay at low mixes, a low cut on everything
 but the bass. Level-matched like the rest.
 
+**Q-Links on track edit → automation:** MPC rebuilds its parameter screen whenever a plugin asks it to
+redraw its texts, and a Q-Link turned meanwhile can lose its value (found by a port author on the
+plugin catalog's wrapper, 2026-10-21). EffectForce never asked when a sound parameter changed; the
+texts that do change (the status line's CPU figures, the fader's bar, the scenes' and the looper's
+lines) now ask at most once per 50 ms, instead of up to every 12 ms. And the build stops if a parameter
+ever changes its index (`surface/params.lock`): projects, automation and Q-Link maps store them by index.
+
 ## 0.0.2
 
 Fixes from a full review of the code (no crash, memory or audio-thread problem was found; each fix

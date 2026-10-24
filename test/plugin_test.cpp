@@ -190,6 +190,44 @@ void testStatus() {
     CHECK(h.log.updates > 0);
 }
 
+// MPC rebuilds its parameter screen on every UpdateDisplay, and a Q-Link turned on track edit ->
+// automation loses its value to the rebuild (sd88me/mpc-vst-plugins NOTES 2026-10-21). So a sound
+// parameter's write asks for none; a text that changed asks at most once per 50 ms, and a change
+// inside the gap is told at its end, not dropped. The first meter report is ~172 blocks away.
+void testRedraws() {
+    std::printf("== redraws: none for a sound parameter, at most one per 50 ms\n");
+    Host h;
+    h.on(P_DLY_ON);
+    h.blocks(Surface::kTextGap / kBlock + 1);   // the first texts told, the gap over
+    const int settled = h.log.updates;
+    const float fb = h.get(P_DLY_FB), div = h.get(P_DLY_DIV);
+    {
+        Turn turn;
+        for (int k = 0; k < 16; ++k) {   // two Q-Links turned, a detent per block: a knob and a choice
+            h.detent(P_DLY_FB, +1);
+            h.detent(P_DLY_DIV, +1);
+            h.blocks(1);
+        }
+    }
+    CHECK(h.get(P_DLY_FB) > fb && h.get(P_DLY_DIV) > div);
+    CHECK(h.log.automated[P_DLY_DIV] == h.get(P_DLY_DIV));   // the snapped step pushed back, without a redraw
+    CHECK(h.log.updates == settled);
+    // The fader's bar is a text that follows the fader: a sweep of 4096 frames asks at most twice...
+    const int before = h.log.updates;
+    {
+        Turn turn;
+        for (int k = 0; k < 4096 / kBlock; ++k) {
+            h.detent(P_XFADE, +1);
+            h.blocks(1);
+        }
+    }
+    CHECK(h.log.updates - before >= 1 && h.log.updates - before <= 2);
+    // ...and where it stopped is told once the gap is over.
+    const int swept = h.log.updates;
+    h.blocks(Surface::kTextGap / kBlock + 1);
+    CHECK(h.log.updates == swept + 1);
+}
+
 void testStress() {
     std::printf("== random settings, loud input\n");
     uint32_t seed = 7;
@@ -253,6 +291,7 @@ int main() {
     testEveryModule();
     testSuspend();
     testStatus();
+    testRedraws();
     testLists();
     chainTests();
     scenesTests();

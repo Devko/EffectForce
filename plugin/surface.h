@@ -62,7 +62,8 @@ public:
     };
 
     // --- audio thread ------------------------------------------------------------
-    void        notify(AutomateFn automate, UpdateFn update, void* ctx);
+    // frames: the block just rendered. Texts that changed are told at most once per kTextGap frames.
+    void        notify(AutomateFn automate, UpdateFn update, void* ctx, int frames);
     // Every parameter's current 0..1 value. False (and `out` untouched) while a batch is
     // being written: keep using the previous snapshot.
     bool        snapshot(float* out) const;
@@ -100,6 +101,10 @@ public:
     void        textsChanged() { textGen_.fetch_add(1, std::memory_order_release); }
 
     static int  kFine;   // ranges with this many steps or more follow MPC's value
+    // At most one audioMasterUpdateDisplay per 50 ms, as sd88me's wrapper since 2026-10-21 (their #487):
+    // MPC rebuilds its parameter screen on each one, and a Q-Link turned on track edit -> automation
+    // meanwhile loses its value. A change inside the gap waits for its end; it is never dropped.
+    static constexpr int kTextGap = 2205;
     // Milliseconds for telling gestures apart (null: the steady clock). Tests set one that only
     // moves when they say, so stepping doesn't depend on how fast the machine is.
     static long long (*clock)();
@@ -186,7 +191,7 @@ private:
     bool     scanPending_ = true;
     uint32_t textSeen_ = 0;
     int      cursor_ = 0;
-    int      sinceText_ = 0;
+    int      sinceText_ = kTextGap;   // frames since the last UpdateDisplay (the first goes out at once)
 };
 
 } // namespace ef

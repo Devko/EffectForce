@@ -5,6 +5,7 @@
 // fader's bar, and the looper armed, played and moved by a scene.
 #include "host.h"
 #include "../plugin/engine.h"
+#include "../plugin/surface.h"
 
 #include <cstdio>
 #include <memory>
@@ -391,11 +392,11 @@ void faderBar() {
     CHECK(h.display(P_XF_BAR) == "A  ============|------------  B");
     h.set(P_XFADE, 1.0f);
     CHECK(h.display(P_XF_BAR) == "A  ========================|  B");
-    // A move of the fader asks MPC to redraw the texts.
+    // A move of the fader asks MPC to redraw the texts (at most once per 50 ms: plugin_test.cpp).
     h.blocks(8);
     const int before = h.log.updates;
     h.set(P_XFADE, 0.3f);
-    h.blocks(8);
+    h.blocks(ef::Surface::kTextGap / kBlock + 1);
     CHECK(h.log.updates > before);
 }
 
