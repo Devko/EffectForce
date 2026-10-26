@@ -107,6 +107,7 @@ make skin preview          # the skin, and every page as surface/build/page_*.pn
 make plugin-package        # dist/EffectForce-<version>-mpc-armv7.zip
 make plugin-install        # onto the Force (FORCE=root@<ip> in local.mk); restarts MPC
 make bench-device          # CPU per module and all at once, on the Force
+make bench-count           # the same cases' exact ARM instructions per block, under qemu
 make levels                # the factory presets' levels (make preset-levels sets them)
 ```
 

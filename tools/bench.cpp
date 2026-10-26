@@ -3,7 +3,12 @@
 // Same verdict rule as sd88me's tools/bench.sh (percent of the 2902 us block): PASS p99 <= 15% and
 // max <= 50%, WARN p99 <= 35% and max <= 80%, else FAIL.
 //
-//   efbench <plugin.so> [-s seconds] [-c cpu]
+//   efbench <plugin.so> [-s seconds] [-c cpu] [-m]
+//
+// -m (make bench-count): no timing; marks where each measured processReplacing call starts and ends
+// for tools/efcount.c, a qemu plugin that counts the ARM instructions in between, and hashes every
+// case's output (FNV-1a over the samples' bits): a change meant to keep the sound bit for bit keeps
+// every hash. EF_CASES=11,17 runs only those cases (numbered from 0, in the order below).
 //
 // Cases: everything off; each module alone with busy settings (compare them with the budgets in
 // docs/DESIGN.md; the verdict is the block's, below); then every module on at its heaviest (Drive 2x oversampled, OTT,
@@ -28,6 +33,8 @@
 #include <dlfcn.h>
 #include <sched.h>
 #include <string>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <vector>
 
 namespace {
@@ -38,6 +45,21 @@ constexpr int kBlock = 128;
 constexpr double kBudgetUs = kBlock * 1e6 / 44100.0;   // 2902 us
 
 VstTimeInfo g_time{};
+bool g_count = false;   // -m
+int g_case = 0;
+
+// -m: the events tools/efcount.c counts by. 4000 is no system call: without the plugin it does nothing.
+enum Mark { kBlockStart, kBlockEnd, kCaseEnd, kProfileOn, kProfileOff };
+void mark(Mark op, long arg = 0) {
+    if (g_count) syscall(4000, static_cast<long>(op), arg);
+}
+
+bool wanted(int c) {
+    const char* e = std::getenv("EF_CASES");
+    if (!e || !*e) return true;
+    const std::string s = std::string(",") + e + ",";
+    return s.find("," + std::to_string(c) + ",") != std::string::npos;
+}
 
 intptr_t master(AEffect*, int32_t op, int32_t, intptr_t, void*, float) {
     if (op == vst::audioMasterVersion) return 2400;
@@ -195,6 +217,13 @@ const char* kMovesState =
 enum Mode { kPlain, kPerform, kMoves, kHeld, kAutomate, kPerformAutomate };
 
 Result runCase(void* lib, int seconds, const char* name, int module, bool all, int mode = kPlain) {
+    const int me = g_case++;
+    if (!wanted(me)) return Result{0, 0, 0};
+    if (g_count) {
+        std::printf("case %d: %s\n", me, name);
+        std::fflush(stdout);   // before efcount's line (qemu's stderr)
+    }
+    g_time.ppqPos = 0.0;   // every case from the song's start: one on its own runs as in the whole run
     const bool perform = mode == kPerform || mode == kPerformAutomate;
     const bool automate = mode == kAutomate || mode == kPerformAutomate;
     auto entry = reinterpret_cast<AEffect* (*)(audioMasterCallback)>(dlsym(lib, "VSTPluginMain"));
@@ -229,13 +258,25 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
     };
     // Performing: the looper records a bar first. Moving: the move is under way (it starts on a beat).
     const int warm = perform ? 3 * 44100 / kBlock : mode >= kMoves ? 44100 / kBlock : 64;
+    uint64_t hash = 1469598103934665603ull;   // FNV-1a over every output sample's bits
+    const auto digest = [&] {
+        for (int i = 0; i < kBlock; ++i)
+            for (const float v : {L[static_cast<size_t>(i)], R[static_cast<size_t>(i)]}) {
+                uint32_t u;
+                std::memcpy(&u, &v, 4);
+                hash = (hash ^ u) * 1099511628211ull;
+            }
+    };
     for (int b = 0; b < warm; ++b) {   // the patch settles, buffers warm up
         fill();
         e->processReplacing(e, io, io, kBlock);
+        digest();
         g_time.ppqPos += kBlock / 44100.0 * g_time.tempo / 60.0;
     }
+    const uint64_t hashWarm = hash;
     const int blocks = seconds * 44100 / kBlock;
     std::vector<double> t(static_cast<size_t>(blocks));
+    mark(kProfileOn);
     for (int b = 0; b < blocks; ++b) {
         fill();
         if (perform) {   // the fader: a triangle, A -> B -> A every 2 s (689 blocks)
@@ -249,11 +290,22 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
             e->setParameter(e, P_DLY_FB, std::round((0.3f + 0.4f * tri) * 1000.0f) / 1000.0f);
         }
         const double t0 = cpuUs();
+        mark(kBlockStart);
         e->processReplacing(e, io, io, kBlock);
+        mark(kBlockEnd);
         t[static_cast<size_t>(b)] = cpuUs() - t0;
+        digest();
         g_time.ppqPos += kBlock / 44100.0 * g_time.tempo / 60.0;
     }
+    mark(kProfileOff);
     e->dispatcher(e, vst::effClose, 0, 0, nullptr, 0.0f);
+    if (g_count) {   // the counts are efcount's; the hashes, of the warm-up and of the whole case
+        mark(kCaseEnd, me);
+        std::printf("HASH case=%d warm=%016llx all=%016llx\n", me, static_cast<unsigned long long>(hashWarm),
+                    static_cast<unsigned long long>(hash));
+        std::fflush(stdout);
+        return Result{0, 0, 0};
+    }
     std::vector<double> s = t;
     std::sort(s.begin(), s.end());
     double sum = 0.0;
@@ -269,13 +321,14 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: %s <plugin.so> [-s seconds] [-c cpu]\n", argv[0]);
+        std::fprintf(stderr, "usage: %s <plugin.so> [-s seconds] [-c cpu] [-m]\n", argv[0]);
         return 2;
     }
     int seconds = 3, cpu = 1;
-    for (int i = 2; i + 1 < argc; i += 2) {
-        if (!std::strcmp(argv[i], "-s")) seconds = std::max(1, std::atoi(argv[i + 1]));
-        else if (!std::strcmp(argv[i], "-c")) cpu = std::atoi(argv[i + 1]);
+    for (int i = 2; i < argc; ++i) {
+        if (!std::strcmp(argv[i], "-m")) g_count = true;
+        else if (!std::strcmp(argv[i], "-s") && i + 1 < argc) seconds = std::max(1, std::atoi(argv[++i]));
+        else if (!std::strcmp(argv[i], "-c") && i + 1 < argc) cpu = std::atoi(argv[++i]);
     }
     if (cpu >= 0) {   // -c -1: don't pin (x86 runs, CI)
         cpu_set_t set;
@@ -283,9 +336,10 @@ int main(int argc, char** argv) {
         CPU_SET(cpu, &set);
         if (sched_setaffinity(0, sizeof set, &set) != 0) std::printf("(could not pin to cpu %d)\n", cpu);
     }
-    // Hermetic: no user folders, nothing saved.
+    // Hermetic: no user folders, nothing saved, the same random numbers every run.
     setenv("EF_PRESET_ROOTS", "/nonexistent-efbench", 1);
     setenv("EF_DATA_DIR", "", 1);
+    setenv("EF_FIXED_SEED", "1", 1);
     g_time.sampleRate = 44100.0;
     g_time.tempo = 120.0;
     g_time.timeSigNumerator = g_time.timeSigDenominator = 4;
@@ -297,6 +351,16 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::printf("%s, %d s per case\n", argv[1], seconds);
+    if (g_count) {   // where the .so and the libraries lie, for a profile's addresses (efcount's prof=)
+        Dl_info di;
+        if (dladdr(dlsym(lib, "VSTPluginMain"), &di)) std::printf("BASE %p\n", di.dli_fbase);
+        if (FILE* m = std::fopen("/proc/self/maps", "r")) {   // MAP <start>-<end> <perms> <offset> ... <path>
+            char line[512];
+            while (std::fgets(line, sizeof line, m)) std::printf("MAP %s", line);
+            std::fclose(m);
+        }
+        std::fflush(stdout);
+    }
     bool fail = false;
     const auto check = [&fail](const Result& r) { fail = fail || !(r.p99 <= 35.0 && r.max <= 80.0); };
     check(runCase(lib, seconds, "everything off", -1, false));

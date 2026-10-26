@@ -74,6 +74,18 @@ instructions were 9.1% of the block on the Force, Hall alone 98k net for 2.25%: 
 instructions to a point of the block. They miss what the Force adds (cache misses, VFP divisions and
 flag transfers that stall), which the device's p99 over its average (1.24) shows.
 
+`make bench-count` counts them: it builds the plain `.so` (unstripped, with `-g`), the ARM bench and
+tools/efcount.c, a qemu plugin, and runs the bench with `-m` under a qemu-arm built with plugins
+(`QEMU_PLUGINS`, and `QEMU_PLUGIN_INCLUDE` for the folder with its `qemu-plugin.h`, the 8.2 API; both
+can go in local.mk). Every case prints its thousands of instructions per block (average, p99 and max
+over 2 s, 689 blocks) and two hashes of its output, the warm-up's and the whole case's: a change meant
+to keep the sound bit for bit keeps every hash, built with the same compiler. The counts move by up to
+0.1k from run to run: the plugin times itself for its CPU meter, under qemu on the host's clock, so a
+few blocks update the meter's text in one run and not in the next. `CASES=11,17` runs only those,
+numbered as it lists them. `PROF=<file>` also writes every translated block that ran in the
+measured calls (`vaddr insns execs`); the log, build/arm/count/log.txt, has the bench's memory map:
+an address less `BASE` is the `.so`'s, for `arm-linux-gnueabihf-addr2line`.
+
 2026-10-05, the ten modules, thousands of instructions per block:
 
 | Case | At the hand-off (avg / p99) | Now (avg / p99) |
@@ -95,11 +107,11 @@ read segments aligned to time since reset (-100 dB) and the modulation of log-cu
 fast exp2 (1e-7 of the value).
 
 2026-10-26, round three (a full review's performance findings), thousands of instructions per
-block. Counted exactly: a qemu TCG plugin counts every instruction executed between two marker
-syscalls the bench makes around each `processReplacing` call (the plain `.so`, GCC 13, the device
-flags), and every case's output is hashed, so a change that should leave the sound bit for bit is
-checked to. Two new cases: automation playing (two knobs written every block; a Q-Link turned is
-the same), which the bench didn't cover and which cost the most:
+block. Counted exactly (`make bench-count`): a qemu TCG plugin counts every instruction executed
+between two marker syscalls the bench makes around each `processReplacing` call (the plain `.so`, GCC
+13, the device flags), and every case's output is hashed, so a change that should leave the sound
+bit for bit is checked to. Two new cases: automation playing (two knobs written every block; a
+Q-Link turned is the same), which the bench didn't cover and which cost the most:
 
 | Case | Before (avg / p99) | Now (avg / p99) |
 |---|---|---|

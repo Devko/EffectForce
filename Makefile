@@ -51,7 +51,7 @@ ARM_SO   := $(BUILD)/arm/effectforce.so
 ARM_BENCH := $(BUILD)/arm/efbench
 
 .PHONY: all surface skin preview test test-arm test-arm-pgo test-module test-module-arm bench levels preset-levels arm-plugin arm-bench \
-        bench-device rebuild-check \
+        bench-device bench-count rebuild-check \
         plugin-package plugin-install plugin-uninstall clean
 # A recipe that fails leaves no half-written target behind for the next make to trust.
 .DELETE_ON_ERROR:
@@ -224,6 +224,35 @@ bench-device: $(ARM_SO) $(ARM_BENCH)
 	scp -q $(SSH_OPTS) $(ARM_SO) $(ARM_BENCH) $(FORCE):/tmp/
 	$(SSH) $(FORCE) 'r=0; /tmp/efbench /tmp/effectforce.so $(BENCH_ARGS) -c 1 || r=1; \
 		rm -f /tmp/efbench /tmp/effectforce.so; exit $$r'
+
+# Exact ARM instructions per processReplacing call, without the Force (docs/PERFORMANCE.md "Instruction
+# counts"): the bench with its markers (-m) runs the plain .so (no profile; unstripped, -g, so a
+# profile's addresses have names and lines) under a qemu-arm built with plugins, and tools/efcount.c
+# counts every instruction between the marks. Prints every case's thousands of instructions per block
+# and its output's hashes; the whole log, with the bench's memory map, is build/arm/count/log.txt.
+#   make bench-count [CASES=11,17] [PROF=<file>]
+# QEMU_PLUGINS: that qemu-arm; QEMU_PLUGIN_INCLUDE: the folder with its qemu-plugin.h (the 8.2 API).
+QEMU_PLUGINS        ?= $(HOME)/qemu-icount/qemu-arm-plugins
+QEMU_PLUGIN_INCLUDE ?= $(HOME)/qemu-icount-src/qemu-8.2.2+ds/include/qemu
+COUNT_ARGS ?= -s 2
+CASES      ?=
+PROF       ?=
+COUNT_DIR  := $(BUILD)/arm/count
+COUNT_SO   := $(COUNT_DIR)/effectforce.so
+EFCOUNT    := $(BUILD)/libefcount.so
+comma      := ,
+bench-count: $(COUNT_SO) $(ARM_BENCH) $(EFCOUNT)
+	@[ -x "$(QEMU_PLUGINS)" ] || { echo "no qemu-arm with plugins at QEMU_PLUGINS=$(QEMU_PLUGINS) (set it in local.mk)"; exit 1; }
+	EF_CASES=$(CASES) $(QEMU_PLUGINS) -L /usr/arm-linux-gnueabihf -plugin $(abspath $(EFCOUNT))$(if $(PROF),$(comma)prof=$(abspath $(PROF))) \
+		-d plugin $(ARM_BENCH) $(COUNT_SO) -m $(COUNT_ARGS) -c -1 > $(COUNT_DIR)/log.txt 2>&1 || { cat $(COUNT_DIR)/log.txt; exit 1; }
+	@grep -Ev '^(BASE|MAP) ' $(COUNT_DIR)/log.txt
+
+$(COUNT_SO): $(SRC) $(HDR) $(GEN) plugin/exports.map $(ARM_SO_STAMP)
+	mkdir -p $(COUNT_DIR)
+	$(ARM_SO_CMD) -g $(SRC) -o $@
+
+$(EFCOUNT): tools/efcount.c | $(BUILD)
+	gcc -O2 -Wall -Wextra -shared -fPIC $$(pkg-config --cflags glib-2.0) -I$(QEMU_PLUGIN_INCLUDE) $< -o $@
 
 # Release zip: plugin + skin + sd88me's installer (stops MPC, backs up and edits MPC.settings,
 # restarts MPC). The plugin-list entry says Effect with 2 inputs: MPC lists it under insert effects.
