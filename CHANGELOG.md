@@ -4,6 +4,26 @@ Releases are built by CI from a `vX.Y.Z` tag (see [Releases](README.md#releases)
 tag's version becomes the release's notes. While the version is 0.x the parameter list may still change
 between releases.
 
+## 0.0.4
+
+A third full review of the code, and a lighter audio thread (no crash, memory or audio-thread problem
+was found; each fix below has a test that fails without it).
+
+- **Q-Links and automation cost a fraction of the CPU they did:** every knob MPC wrote (a Q-Link
+  turned, automation playing back) made EffectForce work out every parameter again, and every write,
+  the crossfader's too, made it look through all of them for values to show MPC; with every module
+  on, automation playing cost 12% more than the same sound standing still. Now a knob costs about what it changes: with every
+  module on at its heaviest and automation playing, 11% less; the looper rolling under the fader, 12%
+  less (15% at its peaks); the reverb, OTT, the compressor and Drive are a little lighter too. The
+  sound is the same, bit for bit, but for the looper's float rounding (-116 dB).
+- **Grain:** after a jump to shorter or denser grains (a preset, a scene, a Q-Link) the cloud could
+  fall silent for up to 1.3 s, waiting out the old grain interval.
+- **Presets:** a preset file that won't load (empty, or half-copied onto the card) no longer stops
+  PREV / NEXT and the stepper at it: they step over it.
+- **Filter:** its tail was reckoned far too short at very high cutoffs, so a resonant filter a scene
+  switches out could be stopped while it still rang.
+- **The crossfader's bar** is redrawn when the fader goes back to where a loaded project had left it.
+
 ## 0.0.3
 
 **Melodic**, a new preset category (72 presets in all): ten chains for melodic techno and house, made for

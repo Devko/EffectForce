@@ -256,7 +256,7 @@ $(EFCOUNT): tools/efcount.c | $(BUILD)
 
 # Release zip: plugin + skin + sd88me's installer (stops MPC, backs up and edits MPC.settings,
 # restarts MPC). The plugin-list entry says Effect with 2 inputs: MPC lists it under insert effects.
-PLUGIN_VERSION ?= 0.0.3
+PLUGIN_VERSION ?= 0.0.4
 PKG      := EffectForce-$(PLUGIN_VERSION)
 plugin-package: $(ARM_SO) $(SKIN)
 	@# Everything shipped runs under BusyBox on the device: a CR in a script breaks it there.

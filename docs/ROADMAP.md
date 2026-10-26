@@ -4,7 +4,7 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
-### Full review and performance, round three (2026-10-26)
+### Full review and performance, round three (2026-10-26), released as [0.0.4](https://github.com/Devko/EffectForce/releases/tag/v0.0.4)
 
 Six reviews in parallel, as for 0.0.2 (the plugin glue and the engine; the surface, presets and files;
 Drive, Filter, EQ, Comp; Chorus, Phaser, Pulse, the rack and the looper; Grain; Delay and Reverb),
