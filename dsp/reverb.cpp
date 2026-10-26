@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace ef {
 
@@ -138,6 +139,23 @@ EF_INLINE f4 sums4(f4 a, f4 b, f4 c, f4 d) {
     return vcombine_f32(ab, cd);
 #else
     return f4{a[0] + a[1] + a[2] + a[3], b[0] + b[1] + b[2] + b[3], c[0] + c[1] + c[2] + c[3], d[0] + d[1] + d[2] + d[3]};
+#endif
+}
+
+// *p in every lane, loaded so.
+EF_INLINE f4 load4dup(const float* p) {
+#if EF_NEON
+    return vld1q_dup_f32(p);
+#else
+    return splat(*p);
+#endif
+}
+
+EF_INLINE void store4i(int32_t* p, i4 v) {
+#if EF_NEON
+    vst1q_s32(p, v);
+#else
+    std::memcpy(p, &v, sizeof v);
 #endif
 }
 
@@ -323,8 +341,8 @@ int Reverb::tailSamples() const {
     // Shimmer: of the eighth of the network's energy row 3 holds, the pitched share s (sin^2 of
     // its angle) waits in the shifter, D samples on average (its head's delay), before it comes
     // back. Per mean loop T the network keeps g of its energy, so the slowest decay u a pass
-    // solves u = g (1 - s / 8 + s / 8 u^(-D / T)): longer than Decay, at short ones. (Cached: a
-    // bisection, when the settings change.)
+    // solves u = g (1 - s / 8 + s / 8 u^(-D / T)): longer than Decay, at short ones. (Cached, and
+    // solved again when the settings change: every block while a scene moves Shimmer.)
     if (p_.shimmer > 0.0f) {
         const float key[5] = {p_.decayS, p_.size, p_.shimmer, static_cast<float>(p_.shimmerInterval), static_cast<float>(p_.mode)};
         if (!std::equal(key, key + 5, tailKey_)) {
@@ -336,12 +354,19 @@ int Reverb::tailSamples() const {
             for (int k = 0; k < kLines; ++k) loop += (d.line[k] * (0.5 + p_.size) + d.ap[k]) / kLines;
             const double g = std::pow(10.0, -6.0 * loop / (kRate * static_cast<double>(p_.decayS))), sn = std::sin(p_.shimmer * 1.5707963);
             const double share = sn * sn / 8.0, r = delay / loop;
-            double lo = 0.0, hi = 1.0;
-            for (int i = 0; i < 40; ++i) {
-                const double u = 0.5 * (lo + hi);
-                (g * (1.0 - share + share * std::pow(u, -r)) > u ? lo : hi) = u;
+            // In logs, v = ln u: F(v) = ln(a + b e^(-r v)) - v = 0, a = g (1 - share), b = g share (u^-r
+            // itself overflows at short decays). F falls and is convex, and F(ln g) >= 0, so Newton from
+            // ln g climbs to the root without passing it: four or five steps (a bisection took 40 pows).
+            const double la = std::log(g * (1.0 - share)), lb = std::log(g * share);
+            double v = std::log(g);
+            for (int i = 0; i < 64; ++i) {
+                const double x = lb - r * v, m = std::max(la, x);
+                const double s = m + std::log1p(std::exp(std::min(la, x) - m));   // ln(a + b e^(-r v))
+                const double next = v + (s - v) / (r * std::exp(x - s) + 1.0);    // F' = -(r w + 1), w = b e^(-r v) / e^s
+                if (!(next > v)) break;   // there, to rounding
+                v = next;
             }
-            tailShim_ = kTailDb / (-10.0 * std::log10(hi)) * loop;
+            tailShim_ = kTailDb * std::log(10.0) / (-10.0 * v) * loop;
         }
         ring = std::max(ring, tailShim_);
     }
@@ -723,21 +748,30 @@ void Reverb::runNetwork(float* L, float* R, int n) {
             // The lines, read with 8-point Lagrange at their (modulated, gliding) positions.
             pos0 += step0;
             pos1 += step1;
+            // Each line's whole delay, its table row and the fraction between rows, four lines a vector
+            // (the same truncations and float operations as one by one, without a VFP conversion and a
+            // transfer to the core per line).
+            int32_t dis[kLines], phs[kLines];
+            float frs[kLines];
+            for (int h = 0; h < 2; ++h) {
+                const f4 pos = h ? pos1 : pos0;
+                const i4 di = __builtin_convertvector(pos, i4);
+                const f4 tp = (pos - __builtin_convertvector(di, f4)) * splat(static_cast<float>(kPhases));
+                const i4 ph = __builtin_convertvector(tp, i4);
+                store4i(dis + 4 * h, di);
+                store4i(phs + 4 * h, ph);
+                store4(frs + 4 * h, tp - __builtin_convertvector(ph, f4));
+            }
             // A loop GCC mustn't unroll: unrolled, it hoists every line's addresses and loads ahead
             // and spills them (ARM has 13 registers for them); rolled, it runs 10% fewer instructions.
-            float d[kLines];
-            store4(d, pos0);
-            store4(d + 4, pos1);
             f4 part[kLines];
 #pragma GCC unroll 1
             for (int k = 0; k < kLines; ++k) {
-                const int32_t di = static_cast<int32_t>(d[k]);
-                const float tp = (d[k] - static_cast<float>(di)) * kPhases;
-                const int32_t ph = static_cast<int32_t>(tp);
+                const int32_t di = dis[k];
                 // Young: a window wholly before the fresh start reads zeros (one straddling it finds
                 // the zeros forget() left behind the write position).
                 if (Young && di >= static_cast<int32_t>(t) + 4) part[k] = splat(0.0f);
-                else part[k] = lagrangeRead(lines[k], masks[k], w, di, ph, splat(tp - static_cast<float>(ph)));
+                else part[k] = lagrangeRead(lines[k], masks[k], w, di, phs[k], load4dup(frs + k));
             }
             const f4 r0 = sums4(part[0], part[1], part[2], part[3]), r1 = sums4(part[4], part[5], part[6], part[7]);
 

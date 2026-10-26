@@ -13,6 +13,19 @@ constexpr float kSilentMix = 1e-5f;          // under this, a loop that is let g
 constexpr double kEps = 1e-9;
 
 float finiteOr(float v, float fallback) { return std::isfinite(v) ? v : fallback; }
+
+// A jump's raised cosine, the old head's weight at each step of the crossfade (fade_ = kFade .. 1):
+// worked out once, as the play loop would (a cosf and a division per sample otherwise).
+struct FadeWeights {
+    float w[Looper::kFade + 1];
+    FadeWeights() {
+        for (int f = 0; f <= Looper::kFade; ++f) {
+            const float u = static_cast<float>(f) / Looper::kFade;   // 1 -> 0 across the fade
+            w[f] = 0.5f - 0.5f * std::cos(3.14159265f * u);
+        }
+    }
+};
+const FadeWeights kFadeWeights;
 }
 
 Looper::~Looper() { delete store_.load(std::memory_order_acquire); }
@@ -270,9 +283,16 @@ void Looper::frame(const Cell& c, int k, float& l, float& r) const {
 }
 
 void Looper::read(const Cell& c, double pos, float& l, float& r) const {
-    const double fl = std::floor(pos);
+    const double fl = floorFast(pos);   // no libm per sample
     const int k = static_cast<int>(fl);
     const float t = static_cast<float>(pos - fl);
+    const int b = k - 1 + kGuard;   // the window's first frame in the loop buffer
+    if (b >= 0 && b + 4 <= c.copied) {   // all four copied (the common case): one run of frames
+        const float* f = st_->loop.data() + 2 * static_cast<size_t>(b);
+        l = hermite(f[0], f[2], f[4], f[6], t);
+        r = hermite(f[1], f[3], f[5], f[7], t);
+        return;
+    }
     float l0, r0, l1, r1, l2, r2, l3, r3;
     frame(c, k - 1, l0, r0);
     frame(c, k, l1, r1);
@@ -340,8 +360,7 @@ void Looper::process(float* L, float* R, int n) {
         if (fade_ > 0) {
             float ol, orr;
             read(oldPrev_ ? prev_ : cur_, old_, ol, orr);
-            const float u = static_cast<float>(fade_) / kFade;   // 1 -> 0 across the fade
-            const float wOld = 0.5f - 0.5f * std::cos(3.14159265f * u);
+            const float wOld = kFadeWeights.w[fade_];
             l += (ol - l) * wOld;
             r += (orr - r) * wOld;
             old_ += speed;

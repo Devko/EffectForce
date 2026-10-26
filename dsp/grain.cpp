@@ -644,6 +644,9 @@ void Grain::grains(int n) {
     }
 
     if (nextSpawn_ < now - interval) nextSpawn_ = now;
+    // No later than the interval's jitter puts a grain (steady, it never is): after a jump to shorter
+    // or denser grains the cloud would otherwise wait out the old interval, up to 1.3 s, in silence.
+    nextSpawn_ = std::min(nextSpawn_, now + interval * (stretch ? 1.15 : 1.3));
     while (nextSpawn_ < now + n) {
         const int k = nextSpawn_ <= now ? 0 : static_cast<int>(ceilFast(nextSpawn_ - now));
         if (k >= n) break;

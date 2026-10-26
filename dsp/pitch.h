@@ -147,10 +147,12 @@ private:
     // The jump for this splice: the nominal one, moved to where the kWindow samples behind the
     // new head look most like those behind the old (correlation, every 4th lag and sample first,
     // then every lag nearby). Going down the new head must stay kMinDelay behind the writes.
-    // The ring is unwrapped first (x behind the old head, y what the new heads' windows read), so
-    // that sixteen lags' sums run as four vectors: each in the same order as on its own (the same
-    // sums, the same choice) and four chains of multiply-adds instead of one. Out of line: the hot
-    // loop calling tick() keeps its registers.
+    // What the passes read is gathered out of the ring first (x behind the old head, every 2nd
+    // sample: the coarse pass takes every 4th; p every 4th of what the new heads' windows read, y
+    // the fine pass's stretch of it once the coarse peak is known), so that sixteen lags' sums run
+    // as four vectors: each in the same order as on its own (the same sums, the same choice) and
+    // four chains of multiply-adds instead of one. Out of line: the hot loop calling tick() keeps
+    // its registers.
     __attribute__((noinline)) int lag() const {
         const int dNow = static_cast<int>(d);
         int lo = jump - kSearch, hi = jump + kSearch;
@@ -159,23 +161,23 @@ private:
         // going up never past what was written since, which would read silence.
         if (lo < 1 || hi <= lo || age < static_cast<uint32_t>(dNow + hi + kWindow + 8))
             return std::max(1, std::min(up ? std::min(jump, static_cast<int>(age) - dNow - 3) : jump, hi));
-        // x[k] = at(dNow + k), y[j] = at(base + j): lag l compares x with y from o(l) on, o = l - lo
-        // going up, hi - l going down.
+        // x2[m] = at(dNow + 2 m); lag l compares it with what the new head reads, at(base + j), from
+        // j = o(l) on: o = l - lo going up, hi - l going down (zeros past the windows' reach).
         const int range = hi - lo;   // <= 2 kSearch
-        alignas(16) float x[kWindow], y[2 * kSearch + kWindow + 64];
-        for (int k = 0; k < kWindow; ++k) x[k] = at(static_cast<uint32_t>(dNow + k));
+        const int reach = range + kWindow;
         const uint32_t base = static_cast<uint32_t>(up ? dNow + lo : dNow - hi);
-        for (int j = 0; j < range + kWindow; ++j) y[j] = at(base + static_cast<uint32_t>(j));
-        for (int j = range + kWindow; j < range + kWindow + 64; ++j) y[j] = 0.0f;
-        // Coarse: every 4th lag and sample. o = r + 4 c with p[i] = y[r + 4 i]: the sum for c is
-        // x[4 m] p[c + m] over m, sixteen c a pass.
+        const auto from = [&](int j) { return j < reach ? at(base + static_cast<uint32_t>(j)) : 0.0f; };
+        alignas(16) float x2[kWindow / 2];
+        for (int m = 0; m < kWindow / 2; ++m) x2[m] = at(static_cast<uint32_t>(dNow + 2 * m));
+        // Coarse: every 4th lag and sample. o = r + 4 c with p[i] = from(r + 4 i): the sum for c is
+        // x2[2 m] p[c + m] over m, sixteen c a pass.
         const int q = range / 4, r = up ? 0 : range - 4 * q;
         alignas(16) float p[(2 * kSearch) / 4 + kWindow / 4 + 20], sums[(2 * kSearch) / 4 + 20];
-        for (int i = 0; i < q + 16 + kWindow / 4; ++i) p[i] = y[r + 4 * i];
+        for (int i = 0; i < q + 16 + kWindow / 4; ++i) p[i] = from(r + 4 * i);
         for (int c = 0; c <= q; c += 16) {
             f4 a0 = splat(0.0f), a1 = a0, a2 = a0, a3 = a0;
             for (int m = 0; m < kWindow / 4; ++m) {
-                const f4 xm = splat(x[4 * m]);
+                const f4 xm = splat(x2[2 * m]);
                 a0 = a0 + xm * load4(p + c + m);
                 a1 = a1 + xm * load4(p + c + m + 4);
                 a2 = a2 + xm * load4(p + c + m + 8);
@@ -196,19 +198,21 @@ private:
             }
         }
         // Fine: every lag within 3 of it, every 2nd sample, eight offsets as two vectors.
-        const int from = std::max(lo, best - 3), to = std::min(hi, best + 3);
-        const int omin = up ? from - lo : hi - to;
+        const int first = std::max(lo, best - 3), to = std::min(hi, best + 3);
+        const int omin = up ? first - lo : hi - to;
+        alignas(16) float y[kWindow + 8];   // from(omin + j)
+        for (int j = 0; j < kWindow + 6; ++j) y[j] = from(omin + j);
         f4 b0 = splat(0.0f), b1 = b0;
         for (int m = 0; m < kWindow / 2; ++m) {
-            const f4 xm = splat(x[2 * m]);
-            b0 = b0 + xm * load4(y + omin + 2 * m);
-            b1 = b1 + xm * load4(y + omin + 2 * m + 4);
+            const f4 xm = splat(x2[m]);
+            b0 = b0 + xm * load4(y + 2 * m);
+            b1 = b1 + xm * load4(y + 2 * m + 4);
         }
         alignas(16) float near[8];
         store4(near, b0);
         store4(near + 4, b1);
         top = -1e30f;
-        for (int l = from; l <= to; ++l) {
+        for (int l = first; l <= to; ++l) {
             const float v = near[(up ? l - lo : hi - l) - omin];
             if (v > top) {
                 top = v;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace ef {
 
@@ -81,22 +82,56 @@ void Engine::setParams(const float* norm) {
     xTarget_ = unit(norm[P_XFADE]);
     const bool jumped = xFresh_ && x_ != xTarget_;
     if (xFresh_) x_ = xTarget_;   // nothing played yet (a project loading): no glide from 0
-    bool onlyFader = haveRaw_;
-    for (int i = 0; i < P_COUNT && onlyFader; ++i) onlyFader = i == P_XFADE || norm[i] == raw_[i];
+    // A few knobs no scene locks (a Q-Link turned, automation playing) go straight into the patch, as a
+    // rebuild would set them: a rebuild works out every parameter (~40k instructions, a point of the
+    // block). Anything else (the order, a scene, the matrix, a locked knob, many at once) rebuilds.
+    // Compared as bits: the surface's values are 0..1, never NaN or -0.
+    int quick[kQuickParams];
+    int nQuick = 0;
+    bool full = !haveRaw_;
+    if (!full && (std::memcmp(norm, raw_, sizeof(float) * P_XFADE) != 0 ||
+                  std::memcmp(norm + P_XFADE + 1, raw_ + P_XFADE + 1, sizeof(float) * (P_COUNT - P_XFADE - 1)) != 0)) {
+        for (int i = 0; i < P_COUNT && !full; ++i) {
+            if (i == P_XFADE || std::memcmp(norm + i, raw_ + i, sizeof(float)) == 0) continue;
+            if (nQuick == kQuickParams || !plain(i)) full = true;
+            else quick[nQuick++] = i;
+        }
+    }
     std::copy(norm, norm + P_COUNT, raw_);
     haveRaw_ = true;
-    if (!onlyFader) rebuild();
-    else if (jumped) morph();   // no glide will follow it: the scenes' parameters there at once
+    if (full) {
+        rebuild();
+        return;
+    }
+    for (int k = 0; k < nQuick; ++k) {
+        const int i = quick[k];
+        norm_[i] = raw_[i];
+        const float v = paramValue(i, norm_[i]);
+        setField(base_, i, v);
+        setField(patch_, i, v);   // the matrix rewrites its own targets from norm_ every chunk
+    }
+    if (jumped) morph();   // no glide will follow it: the scenes' parameters there at once
+}
+
+bool Engine::plain(int i) const {
+    if (PARAM_INFO[i].kind != Kind::Synth || i == P_SCENE_A || i == P_SCENE_B) return false;
+    if ((i >= P_M1_SRC && i <= P_M8_AMT) || i == P_ENV_ATT || i == P_ENV_REL || i == P_ENV_GAIN) return false;   // routes()
+    // Locked at either end (whether it moves or not: a knob against an equal lock starts to): rebuild.
+    return !lockScan_ || (scenes_->value(sceneA_, i) < 0.0f && scenes_->value(sceneB_, i) < 0.0f);
 }
 
 void Engine::rebuild() {
     std::copy(raw_, raw_ + P_COUNT, norm_);
     nLocks_ = 0;
+    lockScan_ = false;
     if (scenes_) {
         sceneGen_ = scenes_->generation();   // before the values: a change after it rebuilds again
         if (!scenes_->editing()) {           // while editing, the knobs already show the scene
             const int sa = static_cast<int>(paramValue(P_SCENE_A, raw_[P_SCENE_A]));
             const int sb = static_cast<int>(paramValue(P_SCENE_B, raw_[P_SCENE_B]));
+            lockScan_ = true;
+            sceneA_ = sa;
+            sceneB_ = sb;
             // Each end's clock: another scene there, or its move changed, starts it over.
             const int sides[2] = {sa, sb};
             for (int side = 0; side < 2; ++side) {

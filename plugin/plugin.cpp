@@ -100,7 +100,6 @@ struct Plugin {
     std::atomic<int32_t> tail{0};              // effGetTailSize's answer, kept by the audio thread
 
     // audio thread only
-    float    snapshot[P_COUNT] = {};
     bool     havePatch = false;
     uint32_t seenWrites = 0;
     float    scratch[2][kScratch] = {};
@@ -295,11 +294,8 @@ void runBlock(Plugin* p, float* L, float* R, int n, const Transport& tr) {
         float fresh[P_COUNT];
         if (p->surface.snapshot(fresh)) {   // mid-preset: false, look again next block
             p->seenWrites = writes;
-            if (!p->havePatch || std::memcmp(fresh, p->snapshot, sizeof fresh) != 0) {
-                std::memcpy(p->snapshot, fresh, sizeof fresh);
-                p->engine.setParams(p->snapshot);
-                p->havePatch = true;
-            }
+            p->engine.setParams(fresh);     // it works out what changed (often nothing: a tile, a text)
+            p->havePatch = true;
         }
     }
     if (p->clear.exchange(false)) p->engine.reset();

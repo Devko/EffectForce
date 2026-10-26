@@ -131,7 +131,10 @@ private:
     int  selected() const;     // the selected chain slot
     // FAVORITES, RECENT, then the library's categories (from L, the listing in use).
     std::vector<Category> categories(const Listing& L) const;
-    void loadPreset(const std::string& key);
+    bool loadPreset(const std::string& key);   // false: it didn't load (gone, or not a preset)
+    // Item `at` of L, or the first after it in direction dir (+1, -1) that loads: a file that won't
+    // (empty, half-copied) is stepped over rather than standing in the way of every step after it.
+    void stepPresets(const Listing& L, int at, int dir);
     void savePreset();
     int  stepperCur(int i, const Listing& L, const std::string& key) const;   // where a stepper stands
 
@@ -147,8 +150,16 @@ private:
     std::atomic<bool>     release_[P_COUNT];
     std::atomic<uint32_t> textGen_{0};
     std::atomic<uint32_t> batchSeq_{0};    // odd while a batch is being written (a seqlock)
-    std::atomic<uint32_t> changes_{0};     // bumped by every write to want_ / shown_ (notify's cue)
+    std::atomic<uint32_t> changes_{0};     // bumped by every write to want_ / shown_ (the snapshot's cue)
     std::atomic<int>      batchDepth_{0};
+    // Notify's cue: a bit per parameter written since it last looked (set after the write, so notify
+    // sees the value), so a fader sweep costs it one parameter a block, not all of them.
+    static constexpr int  kDirtyWords = (P_COUNT + 31) / 32;
+    std::atomic<uint32_t> dirty_[kDirtyWords];
+    void touch(int i) {
+        dirty_[i >> 5].fetch_or(1u << (i & 31), std::memory_order_release);
+        changes_.fetch_add(1, std::memory_order_release);
+    }
 
     // Browser state + text cache (refresh writes, the UI thread reads).
     mutable std::mutex       mtx_;
@@ -183,14 +194,14 @@ private:
     // Every write of a value MPC should see goes through here.
     void put(int i, float v) {
         want_[i].store(v, std::memory_order_relaxed);
-        changes_.fetch_add(1, std::memory_order_release);
+        touch(i);
     }
 
     // Audio-thread state.
-    uint32_t scanned_ = 0xffffffffu;   // changes_ at the last complete notify pass
-    bool     scanPending_ = true;
+    uint32_t looked_ = 0xffffffffu;   // changes_ at notify's last look
+    bool     capped_ = true;          // that look stopped at the per-block cap (or none happened yet)
     uint32_t textSeen_ = 0;
-    int      cursor_ = 0;
+    int      cursor_ = 0;   // the dirty word notify starts at (a capped pass goes on from there)
     int      sinceText_ = kTextGap;   // frames since the last UpdateDisplay (the first goes out at once)
 };
 

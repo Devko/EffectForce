@@ -87,7 +87,8 @@ Everything runs in **32-sample chunks** (four per MPC block). Per chunk:
    parameter scene A or B locks is set to its morph at that position (each end's value along its move,
    then a line in the knob's 0..1 space, a switch at the middle, or a module's send), worked out only
    while the fader glides or a move runs. The list of locked parameters is rebuilt only when a
-   parameter or a lock changes.
+   parameter or a lock changes; a knob no scene locks (a Q-Link turned, automation playing) is
+   written into the patch on its own, without a rebuild of every parameter.
 1. **Modulation** (`plugin/engine.cpp`): every matrix slot adds amount × source to its target's 0..1
    value, clamped, through the knob's own curve, into a copy of the patch. Sources are the ones of
    the chunk before (0.7 ms: inaudible).
@@ -117,6 +118,9 @@ The **output guard** (`plugin/plugin.cpp`) keeps every sample finite and within 
 - The surface hands the audio thread a snapshot of every sound parameter; preset loads and chain
   moves are written as one batch (a seqlock), so the audio thread never plays half of one; the
   scenes' locks are held for the batch too (the engine rebuilds from them only once it is complete).
+- What MPC should read back is pushed from the audio thread (`Surface::notify`): every write marks
+  its parameter in a bitmap, and notify looks only at the marked ones (a fader sweep costs it one
+  parameter a block, not all 318).
 
 ## Talking to MPC
 

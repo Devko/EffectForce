@@ -97,6 +97,23 @@ void testPresets() {
     std::ofstream(root + "/Mine/Wide.efp") << "effectforce 1\nchr_on=On\n";
     Host fresh;
     CHECK(presetLibrary().listing()->find("plugin:Mine/Wide.efp") >= 0);
+    // A file that won't load (an empty or half-copied one) is stepped over: it doesn't stand in the
+    // way of every step after it.
+    std::filesystem::create_directories(root + "/Broken");
+    std::ofstream(root + "/Broken/A.efp") << "effectforce 1\nchr_on=On\n";
+    std::ofstream(root + "/Broken/B.efp");   // empty
+    std::ofstream(root + "/Broken/C.efp") << "effectforce 1\nphs_on=On\n";
+    Host b;
+    const auto LB = presetLibrary().listing();
+    const int a = LB->find("plugin:Broken/A.efp");
+    CHECK(a >= 0 && LB->find("plugin:Broken/B.efp") == a + 1 && LB->find("plugin:Broken/C.efp") == a + 2);
+    CHECK(b.load("effectforce 1\npreset=plugin:Broken/A.efp\n") == 1);
+    b.press(P_PRESET_NEXT);
+    CHECK(b.display(P_PRESET) == "PRESET  Broken / C" && b.value(P_PHS_ON) == 1.0f);
+    b.press(P_PRESET_PREV);
+    CHECK(b.display(P_PRESET) == "PRESET  Broken / A" && b.value(P_CHR_ON) == 1.0f);
+    b.setN(P_PRESET, b.get(P_PRESET) + 1.0f / 128.0f);   // a Q-Link detent goes past it too
+    CHECK(b.display(P_PRESET) == "PRESET  Broken / C");
 }
 
 void testBrowser() {

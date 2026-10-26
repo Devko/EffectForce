@@ -94,6 +94,45 @@ differently: the shimmer's shifter reads and its path after the network loop (-1
 read segments aligned to time since reset (-100 dB) and the modulation of log-curve targets by the
 fast exp2 (1e-7 of the value).
 
+2026-10-26, round three (a full review's performance findings), thousands of instructions per
+block. Counted exactly: a qemu TCG plugin counts every instruction executed between two marker
+syscalls the bench makes around each `processReplacing` call (the plain `.so`, GCC 13, the device
+flags), and every case's output is hashed, so a change that should leave the sound bit for bit is
+checked to. Two new cases: automation playing (two knobs written every block; a Q-Link turned is
+the same), which the bench didn't cover and which cost the most:
+
+| Case | Before (avg / p99) | Now (avg / p99) |
+|---|---|---|
+| Drive alone (Tube) | 47.4 / 47.5 | 45.8 / 45.9 |
+| Comp alone | 21.4 / 21.4 | 20.2 / 20.2 |
+| Reverb alone (Hall, full modulation) | 106.3 / 113.8 | 101.1 / 109.1 |
+| **Everything on, heaviest**, 8 mod slots | **407.2 / 435.1** | **399.8 / 425.0** |
+| Looper rolling, fader sweeping | 269.3 / 296.2 | 237.2 / 252.1 |
+| That, everything on heaviest | 483.3 / 516.1 | 447.7 / 478.7 |
+| Scene moving 14 locks, everything on heaviest | 450.0 / 479.5 | 436.7 / 463.3 |
+| **Automation: 2 knobs every block, everything on** | **455.8 / 482.4** | **406.8 / 430.1** |
+| That, with the looper and the fader | 515.2 / 548.0 | 486.0 / 517.6 |
+
+- **A knob written cost a rebuild of every parameter** (~45k instructions, a point of the block, in
+  every block a Q-Link turns or automation plays): one no scene locks now goes straight into the patch,
+  as a rebuild would set it (test/scenes_test.cpp: sample for sample the rebuilt engine's).
+- **Every write made the surface look at all 318 parameters** for values to push back to MPC (12.7k
+  a block while the fader moves), and the plugin compared and copied the whole snapshot twice: a
+  bitmap of what was written, one compare.
+- **The looper** called libm's `floor` and `cos` per sample and read its four Hermite frames through
+  four bounds-checked calls: the fast floor, a table for the jump's crossfade, one run of frames when
+  all four are copied.
+- **The reverb** converted each line's position to an index and a fraction one line at a time (VFP,
+  and a transfer to the core per line): eight at once in NEON; the shimmer's splice search gathered
+  three times the samples it reads (its spike sets the p99); the tail length with shimmer, solved again
+  whenever Shimmer, Decay or Size move (a scene moving Shimmer: every block), takes Newton's four or
+  five steps in logs instead of a 40-step bisection.
+- **OTT and the compressor** stepped ramps that stood still, every sample; **Drive** worked out its
+  controls (two `exp2` and the compensation) every chunk whether they changed or not.
+
+All of it is bit for bit as before but the looper's frames, which the compiler fuses differently
+(-130 dB, -116 dB after the reverb). The device run of the new numbers is still to do.
+
 ## What keeps it cheap
 
 - **A module that is off costs nothing:** the rack skips it entirely.
@@ -114,3 +153,6 @@ fast exp2 (1e-7 of the value).
   thread; the Delay and the Reverb count what they have written since and read older samples as
   silence.
 - **Cheap getters:** MPC polls names and texts hundreds of times a second; they read caches.
+- **A write costs what it changes:** a knob turned (a Q-Link, automation) is written into the patch on
+  its own, not by rebuilding every parameter; what MPC should read back is looked at only for the
+  parameters written since the last block.

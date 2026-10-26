@@ -123,6 +123,13 @@ void Drive::set(const Params& p, const Transport&) {
     const float bias = param(p.bias, 0.0f, 1.0f);
     const float outDb = param(p.outDb, -24.0f, 12.0f);
     const float mix = param(p.mix, 0.0f, 1.0f);
+    // Nothing changed (most chunks): the targets stand, and every glide has landed (each takes a
+    // chunk), so there is nothing to work out again (two exp2 and the compensation otherwise).
+    const Params now{type, driveDb, tone, bias, outDb, mix};
+    if (!fresh_ && now.type == last_.type && now.driveDb == last_.driveDb && now.tone == last_.tone &&
+        now.bias == last_.bias && now.outDb == last_.outDb && now.mix == last_.mix)
+        return;
+    last_ = now;
 
     const bool crush = type == Crush;
     drive_ = dbToGain(driveDb);

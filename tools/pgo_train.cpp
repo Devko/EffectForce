@@ -36,11 +36,10 @@ intptr_t master(AEffect*, int32_t op, int32_t, intptr_t, void*, float) {
 std::vector<float> g_L, g_R;   // the reference mix
 size_t g_at = 0;
 
-// Plays `seconds` of the reference mix through the plugin, in place, 128 frames at a time.
-void play(AEffect* e, double seconds) {
+// Plays `blocks` blocks of the reference mix through the plugin, in place, 128 frames at a time.
+void playBlocks(AEffect* e, int blocks) {
     float L[128], R[128];
     float* io[2] = {L, R};
-    const int blocks = static_cast<int>(seconds * 44100.0 / 128.0);
     for (int b = 0; b < blocks; ++b) {
         for (int i = 0; i < 128; ++i) {
             L[i] = g_L[g_at];
@@ -51,6 +50,8 @@ void play(AEffect* e, double seconds) {
         g_time.ppqPos += 128.0 / 44100.0 * g_time.tempo / 60.0;
     }
 }
+
+void play(AEffect* e, double seconds) { playBlocks(e, static_cast<int>(seconds * 44100.0 / 128.0)); }
 
 AEffect* fresh() {
     AEffect* e = VSTPluginMain(master);
@@ -116,6 +117,13 @@ int main() {
             e->setParameter(e, P_M1_AMT + k * stride, k % 2 ? 0.7f : 0.3f);
         }
         play(e, 2.0);
+        // Automation playing (or a Q-Link turned): two knobs written every block, a second.
+        for (int b = 0; b < 344; ++b) {
+            const float u = static_cast<float>(b % 172) / 172.0f;
+            e->setParameter(e, P_FLT_CUT, 0.2f + 0.6f * u);
+            e->setParameter(e, P_DLY_FB, 0.3f + 0.4f * u);
+            playBlocks(e, 1);
+        }
         ++runs;
         close(e);
     }

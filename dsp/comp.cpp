@@ -192,14 +192,24 @@ void Comp::runComp(float* L, float* R, int n) {
     const Glide<kCompValues> g = comp_;
     const f4 len = splat(static_cast<float>(g.len)), zero4 = splat(0.0f), one = splat(1.0f), lvFloor = splat(kFloor);
     auto value = [&](int j, f4 at) { return pastEnd(at, len, splat(g.target[j]), splat(g.base[j]) + splat(g.step[j]) * at); };
-    for (int i = 0; i < n; i += 4) {
-        const f4 at = splat(static_cast<float>(g.done + i)) + f4{1.0f, 2.0f, 3.0f, 4.0f};
-        const f4 h = value(KNEE, at);
-        const f4 over = log2Fast4(max4(load4(detLevel_ + i), lvFloor)) - value(THR, at);
+    const auto gains = [&](int i, f4 h, f4 inv4h, f4 thr, f4 slope, f4 makeup, f4 mix) __attribute__((always_inline)) {
+        const f4 over = log2Fast4(max4(load4(detLevel_ + i), lvFloor)) - thr;
         const f4 u = min4(max4(over + h, zero4), h + h);
-        const f4 gr = value(SLOPE, at) * (u * u * recip4<1>(splat(4.0f) * h) + max4(over - h, zero4));
-        const f4 wet = exp2Fast4(value(MAKEUP, at) - gr);
-        store4(gain_ + i, one + value(MIX, at) * (wet - one));   // dry + mix (wet - dry); mix 0: exactly 1
+        const f4 gr = slope * (u * u * inv4h + max4(over - h, zero4));
+        const f4 wet = exp2Fast4(makeup - gr);
+        store4(gain_ + i, one + mix * (wet - one));   // dry + mix (wet - dry); mix 0: exactly 1
+    };
+    if (g.still()) {   // nothing moves (the usual chunk): the controls once
+        const f4 h = splat(g.target[KNEE]);
+        const f4 inv4h = recip4<1>(splat(4.0f) * h);
+        for (int i = 0; i < n; i += 4)
+            gains(i, h, inv4h, splat(g.target[THR]), splat(g.target[SLOPE]), splat(g.target[MAKEUP]), splat(g.target[MIX]));
+    } else {
+        for (int i = 0; i < n; i += 4) {
+            const f4 at = splat(static_cast<float>(g.done + i)) + f4{1.0f, 2.0f, 3.0f, 4.0f};
+            const f4 h = value(KNEE, at);
+            gains(i, h, recip4<1>(splat(4.0f) * h), value(THR, at), value(SLOPE, at), value(MAKEUP, at), value(MIX, at));
+        }
     }
     for (int i = 0; i < n; ++i) {
         L[i] *= gain_[i];
@@ -262,20 +272,28 @@ void Comp::runOtt(float* L, float* R, int n) {
     const f4 bandBase = f4{g.base[BAND], g.base[BAND + 1], g.base[BAND + 2], 0.0f};
     const f4 bandStep = f4{g.step[BAND], g.step[BAND + 1], g.step[BAND + 2], 0.0f};
     const f4 bandTarget = f4{g.target[BAND], g.target[BAND + 1], g.target[BAND + 2], 0.0f};
-    for (int i = 0; i < n; ++i) {
-        const int at = g.done + i + 1;
-        const f4 bands = at >= g.len ? bandTarget : bandBase + bandStep * splat(static_cast<float>(at));
+    // Sample i with the controls as they are there; makeup x (1 - depth + depth x wet): the dry here
+    // is the bands' unprocessed sum.
+    const auto band = [&](int i, f4 bands, float downSlope, float upSlope, float m, float md) __attribute__((always_inline)) {
         const f4 lvDown = log2Fast4(max4(levels_[i], lvFloor));
         const f4 lvUp = log2Fast4(max4(peaks_[i], lvFloor));
         const f4 over = lvDown - tDown;
         const f4 u = min4(max4(over + h, zero), h2);
-        const f4 down = splat(g.at(DOWN, at)) * (u * u * inv4h + max4(over - h, zero));
-        const f4 lift = max4(zero, min4(min4(splat(g.at(UP, at)) * (tUp - lvUp), cap), floorSlope * (lvUp - floorLv)));
+        const f4 down = splat(downSlope) * (u * u * inv4h + max4(over - h, zero));
+        const f4 lift = max4(zero, min4(min4(splat(upSlope) * (tUp - lvUp), cap), floorSlope * (lvUp - floorLv)));
         const f4 wet = exp2Fast4(lift - down + bands);
-        // Makeup x (1 - depth + depth x wet): the dry here is the bands' unprocessed sum.
-        const float m = g.at(OMAKEUP, at), md = m * g.at(DEPTH, at);
         const f4 gain = splat(m - md) + splat(md) * wet;
         sum2(gain * bandL_[i], gain * bandR_[i], L + i, R + i);
+    };
+    if (g.still()) {   // nothing moves (the usual chunk): the controls once, not every sample
+        const float m = g.target[OMAKEUP], md = m * g.target[DEPTH];
+        for (int i = 0; i < n; ++i) band(i, bandTarget, g.target[DOWN], g.target[UP], m, md);
+    } else {
+        for (int i = 0; i < n; ++i) {
+            const int at = g.done + i + 1;
+            const float m = g.at(OMAKEUP, at), md = m * g.at(DEPTH, at);
+            band(i, at >= g.len ? bandTarget : bandBase + bandStep * splat(static_cast<float>(at)), g.at(DOWN, at), g.at(UP, at), m, md);
+        }
     }
     ott_.advance(n);
 }

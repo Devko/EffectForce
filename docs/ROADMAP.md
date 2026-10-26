@@ -4,6 +4,26 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
+### Full review and performance, round three (2026-10-26)
+
+Six reviews in parallel, as for 0.0.2 (the plugin glue and the engine; the surface, presets and files;
+Drive, Filter, EQ, Comp; Chorus, Phaser, Pulse, the rack and the looper; Grain; Delay and Reverb),
+every finding checked against the code. No crash, memory-safety, audio-thread or NaN bug. The
+performance work measured in exact ARM instructions per block, every bench case's output hashed
+([Performance](PERFORMANCE.md#instruction-counts)).
+
+| Item | State |
+|---|---|
+| Grain: after a jump to shorter or denser grains (a preset, a scene, a Q-Link) the cloud waited out the old interval, up to 1.3 s of silence | ✅ test/grain_test.cpp |
+| A preset file that won't load (empty, half-copied) stopped PREV / NEXT and the stepper at it for good: now stepped over | ✅ test/preset_test.cpp |
+| Filter: `tailSamples()` far too short near Nyquist (a resonance at 19 kHz rings 9x as long as its analog prototype) | ✅ test/filter_test.cpp |
+| The fader's bar wasn't redrawn when the fader went back to where a project had left it | ✅ test/scenes_test.cpp |
+| Performance: a knob written no longer rebuilds every parameter (the bench never wrote one: automation with everything on cost 12% more than everything on); notify looks only at what was written; the looper, the reverb's lines, the splice search, the shimmer's tail, OTT, Drive | ✅ automation, everything on: -10.8%; the looper and the fader: -12% avg, -15% p99; everything on: -1.8% avg, -2.3% p99 (instructions). Bit for bit as before but the looper (-116 dB). 13477 checks on x86 (ASan/UBSan) and under qemu-arm, 13470 against the profile-guided objects |
+| The bench and the PGO trainer: automation, two knobs written every block | ✅ |
+| On the device: `make bench-device` with the new cases | 🔜 |
+| Not changed, below the bar: Arp entered on a chunk with a grid line in it plays that first sliver (under a millisecond, crossfaded) at the next step's interval | – |
+| Not done, for a round four (each moves the output by rounding, or wants the device first): the phaser's allpass chain as blocks of four (its loop-carried latency, not its instructions); the delay's read position in float per segment (re-pins the Tape hash); the phaser's sweep every 4th sample; Grain skipping its voices at mix 0 and a constant-fraction read at pitch 0; the Filter's set() by the fast math; settled sends and the rack's dry copy at mix 1; the LFOs and envelope only when a slot uses them; the looper's recorder in NEON | – |
+
 ### Q-Links on track edit → automation (2026-10-23), for 0.0.3
 
 sd88me/mpc-vst-plugins found (2026-10-21, [#486](https://github.com/sd88me/mpc-vst-plugins/pull/486)–[#489](https://github.com/sd88me/mpc-vst-plugins/pull/489))

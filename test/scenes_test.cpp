@@ -398,6 +398,14 @@ void faderBar() {
     h.set(P_XFADE, 0.3f);
     h.blocks(ef::Surface::kTextGap / kBlock + 1);
     CHECK(h.log.updates > before);
+    // A project that left the fader halfway, then the fader back at A: the bar it shows moved too.
+    Host p;
+    CHECK(p.load("effectforce 1\nxfade=0.5\n") == 1);
+    p.blocks(ef::Surface::kTextGap / kBlock + 1);
+    const int loaded = p.log.updates;
+    p.set(P_XFADE, 0.0f);
+    p.blocks(ef::Surface::kTextGap / kBlock + 1);
+    CHECK(p.log.updates > loaded && p.display(P_XF_BAR) == "A  |------------------------  B");
 }
 
 // The ramp's sample index (x 1e-6), as looper_test.cpp uses it.
@@ -840,6 +848,54 @@ void movesThroughThePlugin() {
     CHECK(s.find("\nscene2.flt_cut=300\n") != std::string::npos && s.find("scene2.move") == std::string::npos);
 }
 
+// A knob no scene locks (a Q-Link, automation) goes straight into the patch instead of a rebuild of
+// every parameter: what plays is what a rebuild gives, sample for sample. A modulated target, a
+// macro, an LFO, a module's On; and a knob a scene locks (that one rebuilds).
+void quickKnobs() {
+    std::printf("== scenes: a knob no scene locks, without a rebuild\n");
+    Scenes sc;
+    sc.lock(1, P_FLT_RES, 0.8f);   // scene 2 (B) locks the resonance
+    Knobs k;
+    k.v[P_FLT_ON] = k.v[P_DLY_ON] = k.v[P_CHR_ON] = 1.0f;
+    k.v[P_M1_SRC] = optionNorm(P_M1_SRC, "LFO 1");
+    k.v[P_M1_DST] = optionNorm(P_M1_DST, "Filter Cutoff");
+    k.v[P_M1_AMT] = normOf(P_M1_AMT, 0.3f);
+    k.v[P_M2_SRC] = optionNorm(P_M2_SRC, "Macro 1");
+    k.v[P_M2_DST] = optionNorm(P_M2_DST, "Delay Mix");
+    k.v[P_M2_AMT] = normOf(P_M2_AMT, 0.5f);
+    k.v[P_XFADE] = 0.4f;
+    Engine quick, rebuilt;
+    for (Engine* e : {&quick, &rebuilt}) {
+        e->attachScenes(&sc);
+        e->setParams(k.v);
+    }
+    const Buf in = whiteNoise(kBlock * 512, 0.3f);
+    size_t pos = 0;
+    bool same = true;
+    const auto run = [&](int blocks) {
+        for (int b = 0; b < blocks; ++b, pos += kBlock) {
+            Buf l[2], r[2];
+            for (int e = 0; e < 2; ++e) {
+                l[e] = r[e] = Buf(in.begin() + static_cast<long>(pos), in.begin() + static_cast<long>(pos + kBlock));
+                (e ? rebuilt : quick).render(l[e].data(), r[e].data(), kBlock, Transport{});
+            }
+            same = same && l[0] == l[1] && r[0] == r[1];
+        }
+    };
+    run(32);
+    const struct { int param; float norm; } turns[] = {{P_FLT_CUT, 0.7f}, {P_DLY_FB, 0.6f}, {P_MAC_1, 0.9f},
+                                                        {P_L1_RATE, 0.8f}, {P_REV_ON, 1.0f}, {P_FLT_RES, 0.2f}};
+    for (const auto& t : turns) {
+        k.v[t.param] = t.norm;
+        quick.setParams(k.v);
+        rebuilt.setParams(k.v);
+        rebuilt.attachScenes(&sc);   // a rebuild from the same knobs
+        run(64);
+    }
+    CHECK(same);
+    CHECK(quick.patch().filter.cutoffHz == paramValue(P_FLT_CUT, 0.7f) && quick.patch().on[RM_REVERB]);
+}
+
 } // namespace
 
 void eft::scenesTests() {
@@ -857,4 +913,5 @@ void eft::scenesTests() {
     moveClock();
     moveValues();
     movesThroughThePlugin();
+    quickKnobs();
 }

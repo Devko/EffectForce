@@ -76,9 +76,12 @@ void Filter::set(const Params& in, const Transport&) {
     a1_ = SvfUpdate::of(t[G], t[K1]);
     a2_ = SvfUpdate::of(t[G], t[K2]);
 
-    // The ring of the sharpest stage down to -60 dB: ln(1000) * 2 Q / w at the lower cutoff.
+    // The ring of the sharpest stage down to -60 dB: ln(1000) * 2 Q / sin w, at the side where that is
+    // longest (a pole of the trapezoidal SVF decays by sin w / 2Q a sample, not by the analog w / 2Q:
+    // near Nyquist it rings several times longer). With g = tan(w / 2), 2 / sin w = g + 1 / g.
     const float qMax = steep ? q * kK1 : q;
-    tail_ = static_cast<int>(6.9078f * qMax * kRate / (kPi * std::min(fl, fr))) + 1;
+    const float ring = std::max(t[G][0] + 1.0f / t[G][0], t[G][1] + 1.0f / t[G][1]);
+    tail_ = static_cast<int>(6.9078f * qMax * ring) + 1;
 
     if (fresh_) {
         gl_.jump(t);

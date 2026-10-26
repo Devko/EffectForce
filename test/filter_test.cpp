@@ -410,8 +410,10 @@ void resetClears() {
 }
 
 void tail() {
-    // tailSamples() covers the ring down to -60 dB of the impulse response's peak, and not by much more.
-    const P sets[] = {params(Filter::LP24, 200, 1.0f), params(Filter::BP, 1000, 0.7f), params(Filter::HP12, 5000, 0.5f, 0.0f, 0.5f)};
+    // tailSamples() covers the ring down to -60 dB of the impulse response's peak, and not by much more;
+    // up near Nyquist too, where a resonance rings longer than its analog prototype's (by w / sin w).
+    const P sets[] = {params(Filter::LP24, 200, 1.0f), params(Filter::BP, 1000, 0.7f), params(Filter::HP12, 5000, 0.5f, 0.0f, 0.5f),
+                      params(Filter::LP12, 19000, 1.0f), params(Filter::LP24, 15000, 1.0f), params(Filter::BP, 18000, 0.8f)};
     for (const P& p : sets) {
         Filter f;
         Buf L = impulseAt(44100 * 2, 0), R = L;

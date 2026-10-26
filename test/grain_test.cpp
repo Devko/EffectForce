@@ -751,6 +751,37 @@ void changesNoClicks() {
     }
 }
 
+// A jump to short, dense grains (a preset, a scene, a Q-Link) brings them at once: the next grain
+// isn't left where the old interval put it (up to 1.3 of it on: 1.3 s at 1000 ms and density 0).
+// A 1 kHz input; the jump also pitches the grains up an octave, so only grains spawned after it
+// carry 2 kHz (an old one keeps its rate): within 50 ms, wherever between two old grains it lands.
+void denserAtOnce() {
+    bool prompt = true;
+    for (int trial = 0; trial < 6; ++trial) {
+        const int pre = (2 * kSr + trial * 7351) / kCh * kCh, post = kSr / 10 / kCh * kCh;
+        Buf L = sine(1000.0, pre + post), R = L;
+        Grain g;
+        P p = params(Grain::kCloud, 1000.0f);
+        p.density = 0.0f;
+        p.spread = 0.0f;
+        for (int i = 0; i < pre + post; i += kCh) {
+            if (i == pre) {
+                p.sizeMs = 20.0f;
+                p.density = 1.0f;
+                p.pitch = 12.0f;
+            }
+            g.set(p, Transport{});
+            g.process(&L[i], &R[i], kCh);
+        }
+        const size_t from = static_cast<size_t>(pre + post / 2), to = static_cast<size_t>(pre + post);
+        const double after = near(L, 2000.0, from, to), before = near(L, 1000.0, pre - post / 2, pre);
+        const bool ok = after > 0.3 * before;
+        prompt = prompt && ok;
+        if (!ok) std::printf("  grain: jump %d to dense grains: 2 kHz %.4f 50 ms after it, 1 kHz %.4f before\n", trial, after, before);
+    }
+    CHECK(prompt);
+}
+
 // The extremes with loud noise, a second each: finite and bounded.
 void extremes() {
     const Buf inL = whiteNoise(kSr, 1.0f, 9), inR = whiteNoise(kSr, 1.0f, 10);
@@ -963,6 +994,7 @@ void grainTests() {
     feedbackBounded();
     steadyNoClicks();
     changesNoClicks();
+    denserAtOnce();
     extremes();
     randomJumps();
     nanInput();

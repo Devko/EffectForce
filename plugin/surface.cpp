@@ -93,6 +93,7 @@ Surface::Surface() : texts_(P_COUNT) {
         release_[i].store(false);
         lastN_[i] = -1.0f;
     }
+    for (auto& d : dirty_) d.store(~0u);   // the first notify looks at every value
     presetLibrary().rescan();   // a new instance sees the preset files as they are now
     refresh();
 }
@@ -111,7 +112,7 @@ void Surface::set(int i, float n) {
     n = clamp01(n);
     auto shown = [this, i, n] {   // what MPC shows now
         shown_[i].store(n, std::memory_order_relaxed);
-        changes_.fetch_add(1, std::memory_order_release);
+        touch(i);
     };
     if (k == Kind::Button) {
         // A tap toggles the value MPC last read back, and a button always reads back 0 (it springs
@@ -121,7 +122,7 @@ void Surface::set(int i, float n) {
         // spring-back, does nothing.
         if (n > 0.5f) {
             release_[i] = true;
-            changes_.fetch_add(1, std::memory_order_release);   // after the flag: notify must see it
+            touch(i);   // after the flag: notify must see it
             apply(i, n);
             refresh();
         }
@@ -217,7 +218,7 @@ void Surface::apply(int i, float n) {
                 const int items = static_cast<int>(L->items.size());
                 const int cur = stepperCur(i, *L, presetKey());
                 const int pick = stepItem(n, stepperRange(items), items, cur);
-                if (pick != cur && pick < items) loadPreset(L->items[static_cast<size_t>(pick)].key);
+                if (pick != cur && pick < items) stepPresets(*L, pick, pick > cur ? 1 : -1);
             }
             break;
         }
@@ -226,8 +227,9 @@ void Surface::apply(int i, float n) {
                 const auto L = presetLibrary().listing();
                 const int items = static_cast<int>(L->items.size());
                 const int cur = stepperCur(P_PRESET, *L, presetKey());
-                const int pick = clampi(cur + (i == P_PRESET_NEXT ? 1 : -1), 0, std::max(items - 1, 0));
-                if (pick != cur) loadPreset(L->items[static_cast<size_t>(pick)].key);   // the ends: nothing to load
+                const int dir = i == P_PRESET_NEXT ? 1 : -1;
+                const int pick = clampi(cur + dir, 0, std::max(items - 1, 0));
+                if (pick != cur) stepPresets(*L, pick, dir);   // the ends: nothing to load
             }
             if (i == P_PRE_INIT) loadPreset("builtin:Init");
             if (i == P_PRE_SAVE) savePreset();
@@ -609,12 +611,12 @@ std::string Surface::faderBar() const {
 
 // --- presets ------------------------------------------------------------------------------
 
-void Surface::loadPreset(const std::string& key) {
+bool Surface::loadPreset(const std::string& key) {
     std::string text;
     if (!presetText(key, text)) {   // renamed or deleted since the listing: list again, so steps go past it
         presetLibrary().rescan();
         refresh();
-        return;
+        return false;
     }
     // The key first: the state's own refresh then sees the new preset, and a browser that
     // picked it (from FAVORITES, say) stays where it is instead of following the old one.
@@ -623,10 +625,16 @@ void Surface::loadPreset(const std::string& key) {
     if (!loadState(*this, text, true)) {
         setPresetKey(old);
         refresh();
-        return;
+        return false;
     }
     presetLibrary().touchRecent(key);
     refresh();
+    return true;
+}
+
+void Surface::stepPresets(const Listing& L, int at, int dir) {
+    for (const int items = static_cast<int>(L.items.size()); at >= 0 && at < items; at += dir)
+        if (loadPreset(L.items[static_cast<size_t>(at)].key)) return;
 }
 
 void Surface::savePreset() {
@@ -765,6 +773,8 @@ void Surface::refresh() {
     put(P_MV_LEN, static_cast<float>(scenes_.moveLength(moving)) / static_cast<float>(kNumMoveLengths - 1));
     put(P_MV_PLAY, static_cast<float>(scenes_.movePlay(moving)) / static_cast<float>(kNumMovePlays - 1));
     t[P_XF_BAR] = faderBar();
+    // The bar MPC is told of with these texts (a project's fader, say): a move away from it redraws.
+    shownBar_ = static_cast<int>(std::lround(want_[P_XFADE].load() * kFaderBarWidth));
     // The FX tiles: the bank's effects, lit = the one in scene B as it came.
     const int banks = fxBanks();
     fxBank_ = banks > 0 ? clampi(fxBank_, 0, banks - 1) : 0;
@@ -835,13 +845,22 @@ bool Surface::snapshot(float* out) const {
 }
 
 void Surface::notify(AutomateFn automate, UpdateFn update, void* ctx, int frames) {
-    // Nothing changed since the last full pass: no need to look at every value every block.
+    // Only the values written since the last look; at most kMaxAutomatePerBlock pushes a block, the
+    // rest (still marked) from the next block on, starting where this one stopped. No write since the
+    // last complete look (a write marks its bit before it counts): nothing to look at.
     const uint32_t changes = changes_.load(std::memory_order_acquire);
-    if (changes != scanned_ || scanPending_) {
-        int pushed = 0, n = 0;
-        for (; n < P_COUNT && pushed < kMaxAutomatePerBlock; ++n) {
-            const int i = cursor_;
-            cursor_ = (cursor_ + 1) % P_COUNT;
+    int pushed = 0;
+    for (int n = 0; n < kDirtyWords && pushed < kMaxAutomatePerBlock && (changes != looked_ || capped_); ++n) {
+        const int word = cursor_;
+        uint32_t bits = dirty_[word].exchange(0u, std::memory_order_acq_rel);
+        while (bits != 0u) {
+            if (pushed == kMaxAutomatePerBlock) {   // the cap: these wait for the next block
+                dirty_[word].fetch_or(bits, std::memory_order_relaxed);
+                break;
+            }
+            const int i = word * 32 + __builtin_ctz(bits);
+            bits &= bits - 1u;
+            if (i >= P_COUNT) continue;
             if (PARAM_INFO[i].kind == Kind::Button) {
                 if (release_[i].exchange(false, std::memory_order_acq_rel)) {
                     automate(ctx, i, 0.0f);
@@ -858,8 +877,11 @@ void Surface::notify(AutomateFn automate, UpdateFn update, void* ctx, int frames
                 ++pushed;
             }
         }
-        scanPending_ = n < P_COUNT;   // stopped at the per-block cap: go on next block
-        if (!scanPending_) scanned_ = changes;
+        if (pushed < kMaxAutomatePerBlock) cursor_ = (cursor_ + 1) % kDirtyWords;
+    }
+    if (changes != looked_ || capped_) {
+        capped_ = pushed == kMaxAutomatePerBlock;   // some may wait: look again next block
+        looked_ = changes;
     }
     if (sinceText_ < kTextGap) sinceText_ += frames;   // saturates: no overflow in a long session
     if (sinceText_ >= kTextGap) {

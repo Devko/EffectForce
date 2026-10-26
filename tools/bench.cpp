@@ -9,7 +9,9 @@
 // docs/DESIGN.md; the verdict is the block's, below); then every module on at its heaviest (Drive 2x oversampled, OTT,
 // Phaser 12, the gate, the densest pitched grain cloud, ping-pong delay with wow and ducking, the Space
 // reverb fully modulated with shimmer) with all eight
-// matrix slots moving targets from both LFOs and the envelope: the worst a preset can reach.
+// matrix slots moving targets from both LFOs and the envelope: the worst a preset can reach. Then
+// the performance layer (the looper, the fader, scene moves) and automation: two knobs written every
+// block, as automation playing back or a Q-Link turning does (a write costs the audio thread too).
 // Hermetic: the plugin reads no user folders and saves nothing.
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -188,10 +190,13 @@ const char* kMovesState =
     "scene2.rev_damp=15000>2000\nscene2.rev_decay=1>8\nscene2.rev_mix=0.1>0.6\nscene2.chr_on=On\nscene2.chr_rate=0.2>4\n"
     "scene2.phs_on=On\nscene2.phs_center=0.1>0.9\nscene2.mac_1=0>1\nscene2.in_gain=0>-6\nscene2.mix=0.6>1\n";
 
-enum Mode { kPlain, kPerform, kMoves, kHeld };   // kHeld: kMovesState with LENGTH Off, the move's reference
+// kHeld: kMovesState with LENGTH Off, the move's reference. kAutomate: automation playing (or Q-Links
+// turned), two knobs written every block; kPerformAutomate: that with the performance layer's fader.
+enum Mode { kPlain, kPerform, kMoves, kHeld, kAutomate, kPerformAutomate };
 
 Result runCase(void* lib, int seconds, const char* name, int module, bool all, int mode = kPlain) {
-    const bool perform = mode == kPerform;
+    const bool perform = mode == kPerform || mode == kPerformAutomate;
+    const bool automate = mode == kAutomate || mode == kPerformAutomate;
     auto entry = reinterpret_cast<AEffect* (*)(audioMasterCallback)>(dlsym(lib, "VSTPluginMain"));
     AEffect* e = entry ? entry(master) : nullptr;
     if (!e) {
@@ -206,7 +211,7 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
     } else if (module >= 0) {
         busy(set, module, false);
     }
-    if (mode != kPlain) {   // a project's state: it changes only what it lists
+    if (mode != kPlain && mode != kAutomate) {   // a project's state: it changes only what it lists
         std::string state = perform ? kPerformState : kMovesState;
         if (mode == kHeld) state.replace(state.find("move=1 beat"), 11, "move=Off");
         e->dispatcher(e, vst::effSetChunk, 0, static_cast<intptr_t>(state.size()), state.data(), 0.0f);
@@ -236,6 +241,12 @@ Result runCase(void* lib, int seconds, const char* name, int module, bool all, i
         if (perform) {   // the fader: a triangle, A -> B -> A every 2 s (689 blocks)
             const double ph = std::fmod(b / 689.0, 1.0);
             e->setParameter(e, P_XFADE, static_cast<float>(ph < 0.5 ? 2.0 * ph : 2.0 - 2.0 * ph));
+        }
+        if (automate) {   // a cutoff and a feedback in MPC's 1/1000 steps, up and down every 2 s
+            const double ph = std::fmod(b / 689.0, 1.0);
+            const float tri = static_cast<float>(ph < 0.5 ? 2.0 * ph : 2.0 - 2.0 * ph);
+            e->setParameter(e, P_FLT_CUT, std::round((0.2f + 0.6f * tri) * 1000.0f) / 1000.0f);
+            e->setParameter(e, P_DLY_FB, std::round((0.3f + 0.4f * tri) * 1000.0f) / 1000.0f);
         }
         const double t0 = cpuUs();
         e->processReplacing(e, io, io, kBlock);
@@ -299,6 +310,8 @@ int main(int argc, char** argv) {
     check(runCase(lib, seconds, "scene holding 14 locks still", -1, false, kHeld));
     check(runCase(lib, seconds, "scene moving 14 locks, every chunk", -1, false, kMoves));
     check(runCase(lib, seconds, "that, everything on heaviest", -1, true, kMoves));
+    check(runCase(lib, seconds, "automation: 2 knobs a block, all on", -1, true, kAutomate));
+    check(runCase(lib, seconds, "that, the looper, the fader sweeping", -1, true, kPerformAutomate));
     dlclose(lib);
     return fail ? 1 : 0;
 }

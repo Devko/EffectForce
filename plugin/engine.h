@@ -55,6 +55,7 @@ public:
 private:
     void modulate();   // patch_ = base_ moved by the matrix (routes() copies base_, this moves its targets)
     void rebuild();    // norm_, base_ and the scenes' list from raw_
+    bool plain(int param) const;   // a knob setParams() can write into the patch without a rebuild
     void morph(bool fast = false);   // the scenes' parameters at x_ and the moves into norm_, base_ and patch_
     void routes();     // the matrix's slots and the envelope follower's settings from norm_ / base_; patch_ = base_
     bool tick(double grid, double beats);   // the move clocks for a chunk of `beats` from grid beat `grid`; true: a move went on
@@ -80,6 +81,9 @@ private:
     uint32_t sceneGen_ = 0;
     Lock locks_[P_COUNT] = {};
     int nLocks_ = 0;
+    bool lockScan_ = false;          // the last rebuild looked for locks (scenes, and none being edited) ...
+    int sceneA_ = 0, sceneB_ = 0;    // ... in these scenes
+    static constexpr int kQuickParams = 8;   // knobs changed at once that setParams() writes without a rebuild
     float x_ = 0.0f, xTarget_ = 0.0f;
     bool xFresh_ = true;
     // Each end's move clock.

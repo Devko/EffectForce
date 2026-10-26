@@ -279,6 +279,13 @@ struct Glide {
 
     // Value j, k samples into the ramp.
     float at(int j, int k) const { return k >= len ? target[j] : base[j] + step[j] * static_cast<float>(k); }
+    // Every value at its target for the rest of the ramp (it ended, or nothing moves): at() is target.
+    bool still() const {
+        if (done >= len) return true;
+        for (int j = 0; j < N; ++j)
+            if (base[j] != target[j]) return false;
+        return true;
+    }
 
     void jump(const float* v) {
         for (int j = 0; j < N; ++j) {

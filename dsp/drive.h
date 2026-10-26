@@ -167,6 +167,7 @@ private:
 
     const float* table_;    // the compensation table (drive.cpp), shared by every instance
     bool fresh_ = true, fading_ = false;
+    Params last_;           // set()'s, clamped: the same again changes nothing
     int type_ = Soft, oldType_ = Soft;
     Ramp driveDb_, bias_, offset_, rest_, direct_, low_, mix_, filtered_;
     float drive_ = 1.0f, comp_ = 1.0f;          // at the targets: while drive and bias stand still
