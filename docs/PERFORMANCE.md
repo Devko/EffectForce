@@ -19,6 +19,28 @@ plugin's own entry points and times every block with the thread's CPU clock.
 
 ## Device measurements
 
+2026-10-26, the Force, 0.0.3 and 0.0.4 side by side: the same bench (with the automation cases), the
+same hour, the profile-guided local builds (GCC 13; glibc 2.38), percent of the 2902 us block:
+
+| Case | 0.0.3 (avg / p99) | 0.0.4 (avg / p99) |
+|---|---|---|
+| Everything off | 0.27 / 0.52 | 0.27 / 0.47 |
+| Reverb alone (Hall, full modulation) | 2.41 / 3.05 | 1.92 / 2.60 |
+| **Everything on, heaviest**, 8 mod slots | **12.20 / 14.54** | **11.55 / 13.67** |
+| Looper rolling, fader sweeping | 6.07 / 7.47 | 5.16 / 6.72 |
+| That, everything on heaviest | 13.64 / 16.31 (WARN) | 12.58 / 15.12 (WARN) |
+| A scene holding 14 locks still | 4.45 / 5.57 | 3.92 / 5.05 |
+| The same scene moving all 14 every chunk | 5.37 / 6.67 | 4.84 / 6.20 |
+| That, everything on heaviest | 13.48 / 15.88 (WARN) | 12.73 / 15.32 (WARN) |
+| **Automation: 2 knobs every block, everything on** | **13.39 / 15.86 (WARN)** | **11.79 / 13.90** |
+| That, the looper, the fader sweeping | 14.37 / 17.03 (WARN) | 13.41 / 16.15 (WARN) |
+
+Automation playing over everything on went past the budget in 0.0.3 (the bench never wrote a knob,
+so it never showed); 0.0.4 keeps it within, and everything on alone has 1.3 points to spare. The
+reverb gains four times on the device what its instruction count says (-20%, -5% in instructions):
+the lines' positions in NEON also took eight VFP-to-core transfers a sample out, and those stall on
+the A17. Every module alone is otherwise as it was (within the device's run-to-run 0.5 at p99).
+
 2026-10-06, the Force, the ten modules and the performance layer, the profile-guided build (GCC 13,
 local; glibc 2.38), percent of the 2902 µs block:
 
@@ -143,7 +165,7 @@ Q-Link turned is the same), which the bench didn't cover and which cost the most
   controls (two `exp2` and the compensation) every chunk whether they changed or not.
 
 All of it is bit for bit as before but the looper's frames, which the compiler fuses differently
-(-130 dB, -116 dB after the reverb). The device run of the new numbers is still to do.
+(-130 dB, -116 dB after the reverb). On the device: [Device measurements](#device-measurements).
 
 ## What keeps it cheap
 

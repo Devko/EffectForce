@@ -40,8 +40,8 @@ matrix across all of them. It is built on the same groundwork as its siblings
   records the next 4 or 8 bars on the grid (or keeps the bar just played), and plays, layers, rolls
   (1/2 to 1/32), slows, stops or reverses it. On the master it turns the whole mix into a performance
   ([how](docs/USER_GUIDE.md#performance-scenes-and-the-looper))
-- **Light on the CPU:** all ten modules on at their heaviest, p99 14.9% of a block on the Force (the
-  budget is 15%); a Perform preset 6-8% ([Performance](docs/PERFORMANCE.md))
+- **Light on the CPU:** all ten modules on at their heaviest, p99 13.7% of a block on the Force (the
+  budget is 15%), 13.9% with automation playing; a Perform preset 6-8% ([Performance](docs/PERFORMANCE.md))
 - **Built for MPC:** zero latency, tails that ring on through Stop, every getter cheap (MPC polls them
   hundreds of times a second), all measured on the device first ([the probe](docs/PROBE.md))
 - **72 factory presets** in 12 categories (Perform: ten ready-made performance mixers; Melodic: chains

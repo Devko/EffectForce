@@ -12,9 +12,10 @@ was found; each fix below has a test that fails without it).
 - **Q-Links and automation cost a fraction of the CPU they did:** every knob MPC wrote (a Q-Link
   turned, automation playing back) made EffectForce work out every parameter again, and every write,
   the crossfader's too, made it look through all of them for values to show MPC; with every module
-  on, automation playing cost 12% more than the same sound standing still. Now a knob costs about what it changes: with every
-  module on at its heaviest and automation playing, 11% less; the looper rolling under the fader, 12%
-  less (15% at its peaks); the reverb, OTT, the compressor and Drive are a little lighter too. The
+  on, automation playing cost 12% more than the same sound standing still. Now a knob costs about
+  what it changes. On the Force, every module on at its heaviest with automation playing went past the
+  CPU budget in 0.0.3 (p99 15.9% of a block) and stays within it now (13.9%); every module on alone
+  14.5% -> 13.7%, the looper rolling under the fader 7.5% -> 6.7%, the reverb a fifth lighter. The
   sound is the same, bit for bit, but for the looper's float rounding (-116 dB).
 - **Grain:** after a jump to shorter or denser grains (a preset, a scene, a Q-Link) the cloud could
   fall silent for up to 1.3 s, waiting out the old grain interval.
