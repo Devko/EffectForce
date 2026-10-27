@@ -1,7 +1,7 @@
 // dsp/delay.h: echo timing against theory (free, synced at several tempos, spread, Ping-Pong), the
 // feedback ratio and the cuts against the one-pole responses, the glide landing exactly, drive,
 // limiter, ducking, wow depth, and robustness (feedback 1 for 30 s, extremes, random jumps, NaN
-// input, block sizes, reset, the tail).
+// input, huge input, block sizes, reset, the tail).
 #include "signal.h"
 #include "../dsp/delay.h"
 
@@ -942,6 +942,26 @@ void nanInput() {
     }
 }
 
+void hugeInput() {
+    // L and R near the float's limit, with the same sign. Their mono sum overflows if the compiler adds
+    // them before it halves (on ARM, -funsafe-math-optimizations may turn 0.5 L + 0.5 R into
+    // 0.5 (L + R)), and Stereo weighs that sum by 0 (Ping-Pong, R by 0): inf x 0 is NaN, which would
+    // ring round the loop until a reset. Every mode: the output stays finite, the echoes bounded.
+    for (int mode = 0; mode < Delay::kModes; ++mode) {
+        Delay d;
+        P p = plain(10.0f);
+        p.mode = mode;
+        p.feedback = 0.9f;
+        p.mix = 0.5f;
+        Buf L = whiteNoise(kSr / 2, 0.5f, 61), R = whiteNoise(kSr / 2, 0.5f, 62);
+        L[100] = R[100] = 3e38f;
+        L[200] = R[200] = -3.4e38f;
+        run(d, p, L, R);
+        CHECK(allFinite(L) && allFinite(R));
+        CHECK(peak(L, 300) < 4.0f && peak(R, 300) < 4.0f);
+    }
+}
+
 void blockSizes() {
     // Constant parameters: chunks of 1, 7 and 32 give the same output, bit for bit.
     std::vector<P> sets;
@@ -1115,6 +1135,7 @@ void delayTests() {
     extremes();
     randomJumps();
     nanInput();
+    hugeInput();
     blockSizes();
     resetClears();
     tail();

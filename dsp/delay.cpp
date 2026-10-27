@@ -475,9 +475,12 @@ void Delay::run(float* L, float* R, int n) {
         const Lr y = lp - hp;
 
         // Into the lines: the input (or its mono sum; none into R in Ping-Pong) and the feedback
-        // (from the other side in Ping-Pong). Halves first: L + R could overflow.
-        const Lr sum = both(0.5f) * x + both(0.5f) * swapLr(x);
-        const Lr in = (x * (both(1.0f) - monoIn) + sum * monoIn) * rIn;
+        // (from the other side in Ping-Pong). The input held to +-kClamp first: the compiler is free to
+        // add L and R before halving them (ARM's does, and weighs the sum by 0 in Stereo), and two wild
+        // samples of one sign would overflow to inf, inf x 0 a NaN in the loop until a reset.
+        const Lr xc = minLr(maxLr(x, both(-kClamp)), both(kClamp));
+        const Lr sum = both(0.5f) * xc + both(0.5f) * swapLr(xc);
+        const Lr in = (xc * (both(1.0f) - monoIn) + sum * monoIn) * rIn;
         const Lr back = y * (both(1.0f) - cross) + swapLr(y) * cross;
         const Lr u = minLr(maxLr(in + fb * back + both(kTiny), both(-kClamp)), both(kClamp));
 
@@ -494,9 +497,9 @@ void Delay::run(float* L, float* R, int n) {
         if (w < kGuard) storeLr(bl + kLen + w, br + kLen + w, v);
         w = w + 1 == kLen ? 0 : w + 1;
 
-        // The duck's envelope follows the input's louder side (up to +18 dBFS: a wild sample
+        // The duck's envelope follows the input's louder side (held to +18 dBFS above: a wild sample
         // mustn't hold the wet down for long).
-        const Lr level = minLr(louderLr(absLr(x)), both(kClamp)) + both(kTiny);
+        const Lr level = louderLr(absLr(xc)) + both(kTiny);
         env += pickLr(greaterLr(level, env), attack, fall) * (level - env);
 
         storeLr(L + k, R + k, x * (both(1.0f) - mix) + y * duck * mix);   // exact at mix 0
