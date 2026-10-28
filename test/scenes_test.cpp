@@ -331,7 +331,7 @@ void editThroughThePlugin() {
 void stateLines() {
     std::printf("== scenes: saved and loaded as sceneN.key=value lines\n");
     Host a;
-    CHECK(a.load("effectforce 1\nflt_on=On\nxfade=0.25\nscene_b=5\nscene5.flt_cut=200\nscene5.dly_on=On\n"
+    CHECK(a.load("effectwerk 1\nflt_on=On\nxfade=0.25\nscene_b=5\nscene5.flt_cut=200\nscene5.dly_on=On\n"
                  "scene1.lp_len=1/4\nscene9.flt_cut=300\nscene2.xfade=1\nscene2.nonsense=4\nscene2.flt_cut=abc\n") == 1);
     CHECK(a.display(P_SCB_1 + 4) == "5  (2)" && a.display(P_SCA_1) == "1  (1)");
     CHECK(a.get(P_SCB_1 + 4) > 0.5f && std::fabs(a.value(P_XFADE) - 0.25f) < 1e-4f);
@@ -343,7 +343,7 @@ void stateLines() {
     Host b;
     CHECK(b.load(s) == 1 && b.chunk() == s);
     // A project without scene lines has none.
-    CHECK(b.load("effectforce 1\nflt_on=On\n") == 1 && b.display(P_SCB_1 + 4) == "5");
+    CHECK(b.load("effectwerk 1\nflt_on=On\n") == 1 && b.display(P_SCB_1 + 4) == "5");
 }
 
 void soundAtEachEnd() {
@@ -400,7 +400,7 @@ void faderBar() {
     CHECK(h.log.updates > before);
     // A project that left the fader halfway, then the fader back at A: the bar it shows moved too.
     Host p;
-    CHECK(p.load("effectforce 1\nxfade=0.5\n") == 1);
+    CHECK(p.load("effectwerk 1\nxfade=0.5\n") == 1);
     p.blocks(ef::Surface::kTextGap / kBlock + 1);
     const int loaded = p.log.updates;
     p.set(P_XFADE, 0.0f);
@@ -798,7 +798,7 @@ void movesThroughThePlugin() {
     std::printf("== moves: saved and loaded, LENGTH and PLAY, an edit, the scenes' line\n");
     Host h;
     h.play(true);
-    CHECK(h.load("effectforce 1\nscene_b=2\nscene2.name=Sweep\nscene2.move=1 bar\nscene2.play=Ping-pong\nscene2.flt_on=On\n"
+    CHECK(h.load("effectwerk 1\nscene_b=2\nscene2.name=Sweep\nscene2.move=1 bar\nscene2.play=Ping-pong\nscene2.flt_on=On\n"
                  "scene2.flt_cut=18000>150\nscene2.flt_type=LP 24>BP\nscene3.move=7 bars\nscene3.flt_res=0.1>0.2>0.3\n"
                  "scene3.flt_cut=100>200\nscene4.flt_res=x>0.5\n") == 1);
     std::string s = h.chunk();

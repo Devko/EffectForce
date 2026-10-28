@@ -41,7 +41,7 @@ bool tracing() {
         checked = true;
         checkedMs = now;
         struct stat st{};
-        on = ::stat((traceDir() + "/effectforce.trace").c_str(), &st) == 0;
+        on = ::stat((traceDir() + "/effectwerk.trace").c_str(), &st) == 0;
         if (!on && logFile) {
             std::fclose(logFile);
             logFile = nullptr;
@@ -53,7 +53,7 @@ bool tracing() {
 void trace(const char* fmt, ...) {
     if (!tracing()) return;
     std::lock_guard<std::mutex> lk(mtx);
-    if (!logFile) logFile = std::fopen((traceDir() + "/effectforce.log").c_str(), "a");
+    if (!logFile) logFile = std::fopen((traceDir() + "/effectwerk.log").c_str(), "a");
     if (!logFile || std::ftell(logFile) > kMaxBytes) return;
     // Wall-clock time, to line up with MPC's own log (journalctl -u acvs).
     const auto t = std::chrono::system_clock::now();

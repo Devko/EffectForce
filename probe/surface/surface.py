@@ -13,8 +13,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # A separate name and ID from the effect that follows: the probe uninstalls on its own and never
 # shares saved state with it.
-VST = {"name": "EffectForce Probe", "vendor": "Devko", "uid": "EfPb", "version": 1000,
-       "so": "effectforce_probe.so", "params": "params.json", "layout": "layout.conf", "effect": True}
+VST = {"name": "EffectWerk Probe", "vendor": "Devko", "uid": "EfPb", "version": 1000,
+       "so": "effectwerk_probe.so", "params": "params.json", "layout": "layout.conf", "effect": True}
 
 # --- parameters ------------------------------------------------------------------------------
 # kind: readout (text the plugin writes, read only), num (real value lo..hi, linear), enum (options)
@@ -69,7 +69,7 @@ def params_json():
 
 
 # --- the page --------------------------------------------------------------------------------
-# PolyForce's look (style=td3 rounded cards on one flat colour) in EffectForce's violet. Plugin area
+# PolyWerk's look (style=td3 rounded cards on one flat colour) in EffectWerk's violet. Plugin area
 # 1280x628 at y = 86..714: a header row (the status line), then cards at y=158 and y=440 (h=270).
 # Nothing sits in a card's title band (y .. y+44).
 THEME = """style=td3

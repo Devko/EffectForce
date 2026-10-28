@@ -198,7 +198,7 @@ struct Result { double avg, p99, max; };
 // switches four modules in as sends and moves a dozen parameters; the looper rolls 1/16 of a bar; the
 // fader sweeps from A to B and back every 2 s, so every chunk works the morph.
 const char* kPerformState =
-    "effectforce 1\nlp_on=On\nscene_b=2\nscene2.lp_mix=1\nscene2.lp_rep=1/16\nscene2.lp_speed=0.75\n"
+    "effectwerk 1\nlp_on=On\nscene_b=2\nscene2.lp_mix=1\nscene2.lp_rep=1/16\nscene2.lp_speed=0.75\n"
     "scene2.flt_on=On\nscene2.flt_cut=300\nscene2.flt_res=0.6\nscene2.dly_on=On\nscene2.dly_fb=0.8\n"
     "scene2.rev_on=On\nscene2.rev_mix=0.7\nscene2.rev_freeze=On\nscene2.drv_on=On\nscene2.drv_amt=30\n"
     "scene2.chr_mix=0.9\nscene2.phs_depth=1\nscene2.mac_1=1\nscene2.in_gain=-6\nscene2.mix=0.8\n";
@@ -206,7 +206,7 @@ const char* kPerformState =
 // Scene moves at their busiest (docs/DESIGN.md "Scene moves"): the fader at B, scene 2 moving 14 locks
 // (7 on a log curve) as a Loop over a beat, so every chunk works every one of them out again.
 const char* kMovesState =
-    "effectforce 1\nxfade=1\nscene_b=2\nscene2.move=1 beat\nscene2.play=Loop\n"
+    "effectwerk 1\nxfade=1\nscene_b=2\nscene2.move=1 beat\nscene2.play=Loop\n"
     "scene2.flt_on=On\nscene2.flt_cut=18000>200\nscene2.flt_res=0.1>0.7\nscene2.eq_on=On\nscene2.eq_mf=300>3000\n"
     "scene2.dly_on=On\nscene2.dly_lc=50>800\nscene2.dly_hc=12000>2000\nscene2.dly_fb=0.2>0.7\nscene2.rev_on=On\n"
     "scene2.rev_damp=15000>2000\nscene2.rev_decay=1>8\nscene2.rev_mix=0.1>0.6\nscene2.chr_on=On\nscene2.chr_rate=0.2>4\n"

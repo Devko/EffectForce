@@ -9,7 +9,7 @@
 
 namespace ef {
 namespace {
-constexpr const char* kMagic = "effectforce ";
+constexpr const char* kMagic = "effectwerk ";
 
 bool saved(int i) { return PARAM_INFO[i].kind == Kind::Synth || PARAM_INFO[i].kind == Kind::Chain; }
 

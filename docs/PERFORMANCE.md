@@ -10,7 +10,7 @@
 ## The budget
 
 MPC renders 128-frame blocks: **2902 µs per block**, per plugin instance. A plugin passes at
-**p99 ≤ 15%** of the block (warns up to 35%). EffectForce's ceiling is **every module on** at its
+**p99 ≤ 15%** of the block (warns up to 35%). EffectWerk's ceiling is **every module on** at its
 heaviest settings with every matrix slot busy: what the worst preset could reach.
 
 `make bench-device` copies the `.so` and `efbench` (tools/bench.cpp) to the Force, runs them pinned
@@ -84,7 +84,7 @@ Every case passes. Net of the overhead, every module is within (or, for Chorus a
 0.1-0.3 point above) its share of the design budget; the total, which is what MPC sees, has 3.7
 points to spare. These are the first eight modules: Pulse, Grain and the shimmer came after, and
 their device run is still to do ([Roadmap](ROADMAP.md)); until then, the instruction counts below.
-The release build is profile-guided (as PolyForce's and SubForce's: `make arm-plugin` with qemu-arm,
+The release build is profile-guided (as PolyWerk's and SubWerk's: `make arm-plugin` with qemu-arm,
 and CI), worth about 2% here: the modules are hand-tuned already.
 
 ## Instruction counts
@@ -178,7 +178,7 @@ All of it is bit for bit as before but the looper's frames, which the compiler f
   shimmer's splice search sixteen lags at a time.
 - **No VFP compares per sample where NEON lanes do:** VFP has no min or max, and moving its flags
   to the core stalls; limiters, envelope followers and gates keep their state in a NEON lane.
-- **No libm per sample:** SubForce's fast math (`dsp/fastmath.h`) and per-chunk coefficients; what
+- **No libm per sample:** SubWerk's fast math (`dsp/fastmath.h`) and per-chunk coefficients; what
   needs libm (a tail length, a pitch's speed, a loop gain) is worked out again only when what it
   depends on changes.
 - **Settled is free:** a gain or mix that isn't moving runs as a constant, four samples at a time

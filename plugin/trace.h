@@ -1,6 +1,6 @@
 #pragma once
-// Device diagnostics (PolyForce's): every value MPC sets and what the plugin made of it, appended
-// to <dir>/effectforce.log while <dir>/effectforce.trace exists (dir = /tmp, or EF_TRACE_DIR). Create
+// Device diagnostics (PolyWerk's): every value MPC sets and what the plugin made of it, appended
+// to <dir>/effectwerk.log while <dir>/effectwerk.trace exists (dir = /tmp, or EF_TRACE_DIR). Create
 // the flag file to start and remove it to stop, with MPC running: it is looked for at most once
 // a second. The log stops growing at 2 MB. File I/O: never from the audio thread.
 

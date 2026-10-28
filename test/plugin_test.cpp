@@ -52,7 +52,7 @@ void testBasics() {
     CHECK(h.op(vst::effGetPlugCategory) == vst::kPlugCategEffect);
     char b[64] = {};
     h.op(vst::effGetEffectName, 0, 0, b);
-    CHECK(std::string(b) == "EffectForce");
+    CHECK(std::string(b) == "EffectWerk");
     CHECK(h.op(vst::effCanDo, 0, 0, const_cast<char*>("plugAsChannelInsert")) == 1);
     CHECK(h.op(vst::effCanDo, 0, 0, const_cast<char*>("receiveVstMidiEvent")) == -1);
     CHECK(h.op(vst::effCanDo, 0, 0, const_cast<char*>("bypass")) == -1);

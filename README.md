@@ -1,11 +1,13 @@
-# EffectForce
+# EffectWerk
 
 **An effect rack that runs natively inside MPC on the Akai Force.**
 
-EffectForce is a VST2 insert effect for MPC OS's built-in plugin host, with its own touchscreen pages
+*Formerly EffectForce.* <!-- werk-rename: keep -->
+
+EffectWerk is a VST2 insert effect for MPC OS's built-in plugin host, with its own touchscreen pages
 and Q-Link sets: ten modules in one insert slot, in any order, with macros, LFOs and a modulation
 matrix across all of them. It is built on the same groundwork as its siblings
-[PolyForce](https://github.com/Devko/PolyForce) and [SubForce](https://github.com/Devko/SubForce).
+[PolyWerk](https://github.com/Devko/PolyWerk) and [SubWerk](https://github.com/Devko/SubWerk).
 
 > [!NOTE]
 > **Preview (0.0.x).** The rack, the performance mixer, the pages and the factory presets are
@@ -14,7 +16,7 @@ matrix across all of them. It is built on the same groundwork as its siblings
 > list may still change before v0.1: sounds and scenes are saved by name and survive that, but
 > recorded automation (stored by parameter index) could then move a different control.
 
-![EffectForce's REVERB page](docs/img/reverb.png)
+![EffectWerk's REVERB page](docs/img/reverb.png)
 
 *The REVERB page, rendered offline from the skin (on the device MPC fills in the values).*
 
@@ -72,22 +74,22 @@ matrix across all of them. It is built on the same groundwork as its siblings
 
 ## Installation
 
-Download a release package (`EffectForce-<version>-mpc-armv7.zip`) from
-[Releases](https://github.com/Devko/EffectForce/releases) (or from the
+Download a release package (`EffectWerk-<version>-mpc-armv7.zip`) from
+[Releases](https://github.com/Devko/EffectWerk/releases) (or from the
 [plugin catalog](https://sd88me.github.io/mpc-vst-plugins/)), or build one with `make plugin-package`.
 Unzip it and follow the `INSTALL.md` inside. In short:
 
 ```sh
-scp -r EffectForce-<version> root@<device-ip>:/tmp/
-ssh -t root@<device-ip> sh /tmp/EffectForce-<version>/install.sh
+scp -r EffectWerk-<version> root@<device-ip>:/tmp/
+ssh -t root@<device-ip> sh /tmp/EffectWerk-<version>/install.sh
 ```
 
 The installer asks for confirmation (`-y` skips it), **stops MPC** (save your project first), copies
-the plugin to `/sdcard/Synths/Devko - VST - EffectForce/`, backs up and edits `MPC.settings`, and
+the plugin to `/sdcard/Synths/Devko - VST - EffectWerk/`, backs up and edits `MPC.settings`, and
 starts MPC again. Running it again upgrades in place and keeps your own presets (`Presets/` in that
-folder) and favorites. Then add **EffectForce** to a track's insert (or a return, a submix, the
+folder) and favorites. Then add **EffectWerk** to a track's insert (or a return, a submix, the
 master) from MPC's effect plugins. To play the performance mixer with the Force's crossfader, learn
-it to EffectForce's Crossfader ([how](docs/USER_GUIDE.md#the-crossfader)).
+it to EffectWerk's Crossfader ([how](docs/USER_GUIDE.md#the-crossfader)).
 
 To uninstall, run the package's `uninstall.sh` the same way: it stops MPC, removes the plugin and its
 `MPC.settings` entry (after a backup) and starts MPC again; your own presets and favorites stay in the
@@ -95,16 +97,16 @@ plugin folder (delete it to remove them too).
 
 ## Building
 
-Linux or WSL, as for PolyForce ([its build docs](https://github.com/Devko/PolyForce/blob/main/docs/BUILDING.md)
+Linux or WSL, as for PolyWerk ([its build docs](https://github.com/Devko/PolyWerk/blob/main/docs/BUILDING.md)
 list the packages):
 
 ```sh
 make test                  # every module and the plugin under ASan/UBSan
 make test-arm              # the same suite built for the Force, under qemu-arm
 make test-module M=reverb  # one module's tests on their own
-make arm-plugin            # build/arm/effectforce.so
+make arm-plugin            # build/arm/effectwerk.so
 make skin preview          # the skin, and every page as surface/build/page_*.png
-make plugin-package        # dist/EffectForce-<version>-mpc-armv7.zip
+make plugin-package        # dist/EffectWerk-<version>-mpc-armv7.zip
 make plugin-install        # onto the Force (FORCE=root@<ip> in local.mk); restarts MPC
 make bench-device          # CPU per module and all at once, on the Force
 make bench-count           # the same cases' exact ARM instructions per block, under qemu
@@ -128,7 +130,7 @@ zip as an artifact. To release:
    which the catalog lists with a download; `vX.Y.Z-beta` publishes a prerelease, the catalog's beta
    channel (hidden unless a visitor asks for betas). The plugin's version is the tag without its suffix.
 3. The catalog picks the release up by itself (nightly). Once the release zip has been installed and
-   played on a Force, add it to `tested.json` (the repo's root; SubForce's has the form): the catalog
+   played on a Force, add it to `tested.json` (the repo's root; SubWerk's has the form): the catalog
    shows it as "Tested on".
 
 The version's first number is the catalog's `param_compat`: while it is 0 the parameter list may change;
@@ -142,8 +144,8 @@ from v0.1 it is append-only.
 | The performance mixer: scenes, the FX library, scene moves, the looper | ✅ |
 | Release build in CI (glibc 2.31, profile-guided, catalog-checked) | ✅ |
 | On the device: installs, plays, benches (`make bench-device`), the suite on its CPU | ✅ |
-| [0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) — the first release (regular, catalog-checked) | ✅ |
-| [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2) — the full review's fixes | ✅ |
+| [0.0.1](https://github.com/Devko/EffectWerk/releases/tag/v0.0.1) — the first release (regular, catalog-checked) | ✅ |
+| [0.0.2](https://github.com/Devko/EffectWerk/releases/tag/v0.0.2) — the full review's fixes | ✅ |
 | 0.0.3 — Melodic: ten chains for melodic techno (72 presets) | ✅ |
 | 0.0.4 — the third review: Q-Links and automation cost a knob, not the whole patch; Grain, presets, Filter fixes | ✅ |
 | In the plugin catalog (the registry entry's PR) | 🔜 |
@@ -153,13 +155,13 @@ Details in the [roadmap](docs/ROADMAP.md).
 
 ## License
 
-EffectForce is released under the [MIT License](LICENSE). Third-party components keep their own
+EffectWerk is released under the [MIT License](LICENSE). Third-party components keep their own
 licenses (below).
 
 ## Credits
 
 - Plugin groundwork (VST2 glue, touchscreen logic, preset library, build and bench tooling):
-  [PolyForce](https://github.com/Devko/PolyForce) and [SubForce](https://github.com/Devko/SubForce), MIT.
+  [PolyWerk](https://github.com/Devko/PolyWerk) and [SubWerk](https://github.com/Devko/SubWerk), MIT.
 - DSP from the literature: Andrew Simper's linear trapezoidal state-variable filter (Cytomic) and
   Vadim Zavalishin's topology-preserving transform; Laurent de Soras's HIIR halfband structure;
   Jean-Marc Jot's decay gains for the reverb's feedback delay network.
@@ -168,3 +170,8 @@ licenses (below).
   vendored in `third_party/mpc-vst-plugins` with a few small, marked patches.
 - Interface font: [Titillium Web](https://fonts.google.com/specimen/Titillium+Web), SIL Open Font
   License 1.1 (`surface/fonts/OFL.txt`).
+
+## Trademarks
+
+Not affiliated with or endorsed by inMusic Brands or Akai Professional. Akai Professional, Akai Force and MPC
+are trademarks of their respective owners.

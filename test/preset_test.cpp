@@ -27,7 +27,7 @@ void testState() {
     a.on(P_CMP_ON);
     a.option(P_M4_DST, "Reverb Mix");
     const std::string s = a.chunk();
-    CHECK(s.compare(0, 14, "effectforce 1\n") == 0);
+    CHECK(s.compare(0, 13, "effectwerk 1\n") == 0);
     CHECK(s.find("flt_cut=333\n") != std::string::npos && s.find("rev_decay=7.5\n") != std::string::npos);
     CHECK(s.find("dly_mode=Ping-Pong\n") != std::string::npos && s.find("m4_dst=Reverb Mix\n") != std::string::npos);
     Host b;
@@ -43,13 +43,13 @@ void testState() {
     Host c;
     c.set(P_FLT_RES, 0.5f);
     c.set(P_DLY_FB, 0.7f);
-    CHECK(c.load("effectforce 1\nflt_cut=100\nnot_a_param=3\ndly_fb=abc\ndly_mode=Sideways\nrev_mode=2\n") == 1);
+    CHECK(c.load("effectwerk 1\nflt_cut=100\nnot_a_param=3\ndly_fb=abc\ndly_mode=Sideways\nrev_mode=2\n") == 1);
     CHECK(std::fabs(c.value(P_FLT_CUT) - 100.0f) < 0.1f && std::fabs(c.value(P_FLT_RES) - 0.5f) < 1e-4f);
     CHECK(std::fabs(c.value(P_DLY_FB) - 0.7f) < 1e-4f && c.value(P_DLY_MODE) == 0.0f);   // left as they were
     CHECK(c.value(P_REV_MODE) == 2.0f);                                                   // an option by index
     // Out of range values clamp; BOM and CRLF are fine; other text is refused.
-    CHECK(c.load("\xEF\xBB\xBF" "effectforce 1\r\nflt_cut=99999\r\n") == 1 && std::fabs(c.value(P_FLT_CUT) - 20000.0f) < 1.0f);
-    CHECK(c.load("subforce 1\nvolume=0\n") == 0 && c.load("") == 0 && c.load("effectforce x\n") == 0);
+    CHECK(c.load("\xEF\xBB\xBF" "effectwerk 1\r\nflt_cut=99999\r\n") == 1 && std::fabs(c.value(P_FLT_CUT) - 20000.0f) < 1.0f);
+    CHECK(c.load("subwerk 1\nvolume=0\n") == 0 && c.load("") == 0 && c.load("effectwerk x\n") == 0);
     CHECK(c.op(vst::effSetChunk, 0, 0, nullptr) == 0);
     // The selected chain slot and the browser are the surface's, not the sound's.
     CHECK(s.find("chain_sel") == std::string::npos && s.find("cat_") == std::string::npos);
@@ -94,20 +94,20 @@ void testPresets() {
     CHECK(std::filesystem::exists(root + "/User/User 003.efp") && !std::filesystem::exists(root + "/User/User 002.efp"));
     // A preset file added while MPC runs shows up in a new instance.
     std::filesystem::create_directories(root + "/Mine");
-    std::ofstream(root + "/Mine/Wide.efp") << "effectforce 1\nchr_on=On\n";
+    std::ofstream(root + "/Mine/Wide.efp") << "effectwerk 1\nchr_on=On\n";
     Host fresh;
     CHECK(presetLibrary().listing()->find("plugin:Mine/Wide.efp") >= 0);
     // A file that won't load (an empty or half-copied one) is stepped over: it doesn't stand in the
     // way of every step after it.
     std::filesystem::create_directories(root + "/Broken");
-    std::ofstream(root + "/Broken/A.efp") << "effectforce 1\nchr_on=On\n";
+    std::ofstream(root + "/Broken/A.efp") << "effectwerk 1\nchr_on=On\n";
     std::ofstream(root + "/Broken/B.efp");   // empty
-    std::ofstream(root + "/Broken/C.efp") << "effectforce 1\nphs_on=On\n";
+    std::ofstream(root + "/Broken/C.efp") << "effectwerk 1\nphs_on=On\n";
     Host b;
     const auto LB = presetLibrary().listing();
     const int a = LB->find("plugin:Broken/A.efp");
     CHECK(a >= 0 && LB->find("plugin:Broken/B.efp") == a + 1 && LB->find("plugin:Broken/C.efp") == a + 2);
-    CHECK(b.load("effectforce 1\npreset=plugin:Broken/A.efp\n") == 1);
+    CHECK(b.load("effectwerk 1\npreset=plugin:Broken/A.efp\n") == 1);
     b.press(P_PRESET_NEXT);
     CHECK(b.display(P_PRESET) == "PRESET  Broken / C" && b.value(P_PHS_ON) == 1.0f);
     b.press(P_PRESET_PREV);

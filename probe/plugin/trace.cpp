@@ -25,7 +25,7 @@ std::string traceDir() {
 
 void trace(const char* fmt, ...) {
     std::lock_guard<std::mutex> lk(mtx);
-    const std::string path = traceDir() + "/effectforce.log";
+    const std::string path = traceDir() + "/effectwerk.log";
     if (!logFile) logFile = std::fopen(path.c_str(), "a");
     if (logFile && std::ftell(logFile) > kMaxBytes) {
         std::fclose(logFile);

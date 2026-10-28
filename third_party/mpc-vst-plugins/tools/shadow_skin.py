@@ -41,7 +41,7 @@ Layout file:
                                                         a when= art line per option, so mode images do the switching)
     meter   cx= cy= w= h= key=<param> strip=meter.png [frames=N]
                                                        (a display-only filmstrip following a parameter the engine sets;
-                                                        experimental: see docs/SKIN_STUDIO.md. PolyForce local patch:
+                                                        experimental: see docs/SKIN_STUDIO.md. PolyWerk local patch:
                                                         without strip= and with the C renderer, the strip is drawn as
                                                         a slider's, sh_meter_<w>x<h>.png, for a post-step to redraw)
     meter   cx= cy= w= h= key=<param> look=native ...  (NOT USABLE: a real native Meter component breaks the
@@ -79,7 +79,7 @@ W, H, Y_OFF = 1280, 628, 86
 PLATE, INK, INK_DIM, ACCENT, ACCENT_HI = "131211", "efe9d8", "8f8878", "c1552f", "e2793f"
 SEG_ON, SEG_OFF, SEG_ON_TX = "f2f1ee", "050403", "1c1a17"
 LCD, LINE, BTN_BG, BTN_TEXT, BOX = "1a120d", "2a2823", "", "fdf3ea", "1f1f1f"
-TITLE_INK, TILE_ON, TITLE_PX = "", "", 26   # PolyForce local patch: "" = ACCENT_HI / LCD
+TITLE_INK, TILE_ON, TITLE_PX = "", "", 26   # PolyWerk local patch: "" = ACCENT_HI / LCD
 DISPLAY_INK = "cdeb63"   # theme_display_ink: live-text colour over a dotreadout/dotstepper (see readout/stepper below)
 TD3 = False   # style=td3: frames are filled boxes, so widget crops sit on BOX, not the page bg
 LABEL_SCALE = 1.0   # label_scale=<n>: scales knob/toggle/pill name+value live-text size and their boxes
@@ -98,7 +98,7 @@ THEME_KEYS = {"bg": "PLATE", "ink": "INK", "ink_dim": "INK_DIM", "accent": "ACCE
               "seg_active": "SEG_ON", "seg_inactive": "SEG_OFF", "seg_active_tx": "SEG_ON_TX",
               "lcd": "LCD", "line": "LINE", "btn_bg": "BTN_BG", "btn_text": "BTN_TEXT", "box": "BOX",
               "display_ink": "DISPLAY_INK",
-              "title": "TITLE_INK", "tile_on": "TILE_ON"}   # PolyForce local patch (see README)
+              "title": "TITLE_INK", "tile_on": "TILE_ON"}   # PolyWerk local patch (see README)
 
 
 FONT_LABEL_PATH = None   # font_label=<path> (layout.conf top level) -- see apply_theme()
@@ -149,7 +149,7 @@ def parse_layout(path):
     return tabs, top
 
 
-INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "rows", "cols", "th", "gap", "cw")   # cw: PolyForce local patch
+INT_KEYS = ("x", "y", "w", "h", "cx", "cy", "r", "sw", "rows", "cols", "th", "gap", "cw")   # cw: PolyWerk local patch
 
 
 def parse_widget(line):
@@ -182,7 +182,7 @@ def apply_theme(top):
         if line.startswith("font_label="):
             g["FONT_LABEL_PATH"] = line[len("font_label="):].strip()
             continue
-        if line.startswith("title_size="):   # PolyForce local patch: frame title px
+        if line.startswith("title_size="):   # PolyWerk local patch: frame title px
             g["TITLE_PX"] = int(line[len("title_size="):].strip())
             continue
         if line.startswith("label_scale="):
@@ -580,9 +580,9 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
         tab["widgets"] = expand_pictures(tab["widgets"])
         for w in tab["widgets"]:
             lk = look_of(w, base_dir)
-            if w["kind"] == "meter" and not lk and html:   # PolyForce local patch: without a look (C renderer) a
+            if w["kind"] == "meter" and not lk and html:   # PolyWerk local patch: without a look (C renderer) a
                 raise SystemExit("layout: meter %s needs strip= (its filmstrip)" % w.get("key"))   # meter's strip is
-                # drawn as a vertical slider strip, sh_meter_<w>x<h>.png; PolyForce's skin_polish.py redraws it
+                # drawn as a vertical slider strip, sh_meter_<w>x<h>.png; PolyWerk's skin_polish.py redraws it
             if lk and skin_assets.check(w, lk):
                 raise SystemExit("layout: %s %s: %s" % (w["kind"], w.get("key") or w.get("title", ""), skin_assets.check(w, lk)))
             if w["kind"] == "art" and not os.path.isfile(os.path.join(base_dir, w["file"])):
@@ -778,7 +778,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 img = "sh_%s_%dx%d%s" % (kind, sw_, sh_, sfx)
                 sliders.add((img, sw_, sh_, vert, lid))
                 sq = max(sw_, sh_)   # filmstrip frames are square (as stock); padding is transparent
-                cw = w.get("cw", max(130, sq))   # PolyForce local patch: layout may narrow it
+                cw = w.get("cw", max(130, sq))   # PolyWerk local patch: layout may narrow it
                 name_y, name_h = (sq - sh_) // 2 + sh_ + 2, 20
                 value_y = name_y + name_h + 2
                 ch = value_y + 26 + 6
@@ -860,7 +860,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 for o, (ox, oy, ow, oh) in enumerate(orects):
                     img = "sh_popopt_%d_%s_%d" % (t, w["key"], o)
                     for state, fill, ink in (("on", SEG_ON, SEG_ON_TX), ("off", LCD, INK)):
-                        olab = " " if TITLE_FONT else w["options"][o]   # PolyForce local patch
+                        olab = " " if TITLE_FONT else w["options"][o]   # PolyWerk local patch
                         script += ["clear|" + LCD, "seg|%d|%d|%d|%d|%s|%s|%s" % (ox, oy, ow, oh, fill, ink, olab),
                                    "crop|%s|%d|%d|%d|%d" % (art("%s_%s" % (img, state)), ox, oy, ow, oh)]
                         if TITLE_FONT:
@@ -906,7 +906,7 @@ def build(layout_path, params, skin_dir, art_bin, png_from_ppm):
                 for slot, ((x, y, tw, th), sk) in enumerate(zip(list_tiles(w), list_keys(w))):
                     img = "sh_tile_%dx%d" % (tw, th)
                     for state, border in (("on", 3), ("off", 0)):
-                        tfill = (TILE_ON or LCD) if border else LCD   # PolyForce local patch
+                        tfill = (TILE_ON or LCD) if border else LCD   # PolyWerk local patch
                         script += ["clear|" + under(), "tile|%d|%d|%d|%d|%s|%s|%d" % (x, y, tw, th, tfill, SEG_ON if border else LINE, border),
                                    "crop|%s|%d|%d|%d|%d" % (art("%s_%s" % (img, state)), x, y, tw, th)]
                     key = "shRow_%dx%d" % (tw, th)

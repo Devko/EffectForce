@@ -6,7 +6,7 @@
 # tag also publishes it as a GitHub release, its notes CHANGELOG.md's section for that version. A plain tag is a
 # regular release, which the catalog lists with a download; a tag with a suffix (v0.1.0-beta) publishes a
 # prerelease: the catalog's beta channel, hidden unless a visitor asks for betas. The plugin's version is the
-# tag without the suffix (X.Y.Z only), as PolyForce's.
+# tag without the suffix (X.Y.Z only), as PolyWerk's.
 name: build
 
 on:
@@ -54,14 +54,14 @@ jobs:
       - name: Catalog check
         run: >-
           python3 third_party/mpc-vst-plugins/tools/catalog_check.py dist/*-mpc-armv7.zip
-          --catalog --expect-id effectforce --expect-repo Devko/EffectForce
+          --catalog --expect-id effectwerk --expect-repo Devko/EffectWerk
       - uses: actions/upload-artifact@v4
         with:
-          name: EffectForce-mpc-armv7
+          name: EffectWerk-mpc-armv7
           path: dist/*-mpc-armv7.zip
           if-no-files-found: error
       # The release's notes are CHANGELOG.md's section for the tag's version ("## X.Y.Z"): the catalog shows
-      # them. A tag without a section fails here, before anything is published. (SubForce's.)
+      # them. A tag without a section fails here, before anything is published. (SubWerk's.)
       - name: Release notes
         if: startsWith(github.ref, 'refs/tags/v')
         run: |

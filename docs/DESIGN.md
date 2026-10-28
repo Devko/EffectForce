@@ -1,4 +1,4 @@
-# EffectForce v0.1 design
+# EffectWerk v0.1 design
 
 The record of what v0.1 is and why, after the [probe](PROBE.md). Code follows it; where they
 disagree, fix one of them.
@@ -75,7 +75,7 @@ never gets into a feedback path. Each module's own Mix is a dry / wet blend insi
 
 | Module | Parameters (key: range, default) | DSP |
 |---|---|---|
-| **Drive** | `drv_type` Soft · Tube · Hard · Fold · Sine · Crush; `drv_amt` 0..36 dB (12); `drv_tone` -1..1 tilt (0); `drv_bias` 0..1 (0); `drv_out` -24..12 dB (0); `drv_mix` (100%) | 2× oversampled (polyphase IIR halfband up and down, SubForce's design) around the shaper; bias before, DC blocker after; tilt EQ after; gain compensation so Drive mostly adds character, not level. Crush: bit depth and sample-rate reduction, not oversampled |
+| **Drive** | `drv_type` Soft · Tube · Hard · Fold · Sine · Crush; `drv_amt` 0..36 dB (12); `drv_tone` -1..1 tilt (0); `drv_bias` 0..1 (0); `drv_out` -24..12 dB (0); `drv_mix` (100%) | 2× oversampled (polyphase IIR halfband up and down, SubWerk's design) around the shaper; bias before, DC blocker after; tilt EQ after; gain compensation so Drive mostly adds character, not level. Crush: bit depth and sample-rate reduction, not oversampled |
 | **Filter** | `flt_type` LP 12 · LP 24 · HP 12 · HP 24 · BP · Notch; `flt_cut` 20..20k Hz log (1k); `flt_res` 0..1 (0.2); `flt_drive` 0..1 (0); `flt_spread` -1..1 octave L/R (0); `flt_mix` (100%) | Simper state-variable filter (TPT), coefficients interpolated across the chunk, soft saturation before it |
 | **EQ** | `eq_lc` 20..1000 Hz (20 = off); `eq_lf` 30..500 Hz (100), `eq_lg` ±18 dB; `eq_mf` 100..10k (1k), `eq_mg` ±18 dB, `eq_mq` 0.3..8 (1); `eq_hf` 1k..16k (6k), `eq_hg` ±18 dB; `eq_hc` 1k..20k (20k = off) | Simper SVF shelves, bell, 12 dB/oct cuts; modulation-safe |
 | **Comp** | `cmp_mode` Comp · OTT; Comp: `cmp_thr` -60..0 dB (-18), `cmp_ratio` 1..20 (4), `cmp_att` 0.1..100 ms (10), `cmp_rel` 10..2000 ms (150), `cmp_knee` 0..24 dB (6), `cmp_sc` sidechain low cut 20..500 Hz (20 = off), `cmp_makeup` -12..24 dB (0, both modes), `cmp_mix` (100%); OTT: `ott_depth` (60%), `ott_time` 0.1..10× (1), `ott_up` (100%), `ott_down` (100%), `ott_low` / `ott_mid` / `ott_high` ±12 dB | Comp: feed-forward, stereo-linked, soft knee, log-domain gain computer. OTT: 3 bands (Linkwitz-Riley 4th order at 88 Hz and 2.5 kHz, summing flat), each with downward and upward compression |
@@ -258,7 +258,7 @@ what the rack plays; the effects go on with the live input underneath).
   and until a frame is copied it is read from the ring, which still holds it: the oldest frame a
   capture needs is 2 lengths back, and the ring is 2.38 longest loops long. Both are allocated on
   MPC's UI thread **the first time Looper On is switched on** in that instance (and handed to the
-  audio thread through an atomic pointer), so an EffectForce without the looper costs nothing more.
+  audio thread through an atomic pointer), so an EffectWerk without the looper costs nothing more.
   The longest loop is 20 s: a Length longer than that at the tempo is halved until it fits (8 bars
   from 96 BPM up).
 - **Tempo changes** while a loop plays: it keeps its length in samples (no resampling); the grid
@@ -313,7 +313,7 @@ everything on.
 | Path | Contents |
 |---|---|
 | `dsp/common.h` | Rate, chunk size, `Transport`, sync divisions, smoothing, fast math |
-| `dsp/simd.h`, `dsp/halfband.h` | SubForce's four-float vectors and halfband (plus the interpolator) |
+| `dsp/simd.h`, `dsp/halfband.h` | SubWerk's four-float vectors and halfband (plus the interpolator) |
 | `dsp/drive.*`, `filter.*`, `eq.*`, `comp.*`, `chorus.*`, `phaser.*`, `pulse.*`, `grain.*`, `delay.*`, `reverb.*` | The modules |
 | `dsp/pitch.h` | The shimmer's pitch shifter (splice-searching, for feedback paths) |
 | `dsp/mod.h` | LFOs, envelope follower, matrix sources |
@@ -321,8 +321,8 @@ everything on.
 | `dsp/looper.*` | The looper: recorder ring, the grab on the grid, slices, speed, crossfaded jumps |
 | `plugin/scenes.*` | The scenes' locks and moves (lock-free between the threads) and how each kind of parameter morphs |
 | `plugin/engine.*` | The morph (the fader's glide, the locked parameters per chunk) and the modulation |
-| `plugin/` | SubForce's surface (Force input handling, browser, presets, state), the effect glue from the probe, the CHAIN page's actions |
-| `surface/surface.py` | Parameters, pages (PolyForce's layout machinery and checks), factory presets |
+| `plugin/` | SubWerk's surface (Force input handling, browser, presets, state), the effect glue from the probe, the CHAIN page's actions |
+| `surface/surface.py` | Parameters, pages (PolyWerk's layout machinery and checks), factory presets |
 
 ## Tests
 

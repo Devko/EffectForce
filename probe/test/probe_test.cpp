@@ -22,7 +22,7 @@ using namespace ef;
 std::string g_dir;   // EF_TRACE_DIR for the run: the log and the latency flag live here
 
 std::string logText() {
-    std::ifstream f(g_dir + "/effectforce.log");
+    std::ifstream f(g_dir + "/effectwerk.log");
     std::stringstream ss;
     ss << f.rdbuf();
     return ss.str();
@@ -48,7 +48,7 @@ void identity() {
     CHECK(h.op(vst::effGetPlugCategory) == vst::kPlugCategEffect);
     char b[64] = {};
     h.op(vst::effGetEffectName, 0, 0, b);
-    CHECK(std::string(b) == "EffectForce Probe");
+    CHECK(std::string(b) == "EffectWerk Probe");
     CHECK(h.canDo("plugAsChannelInsert") == 1);
     CHECK(h.canDo("receiveVstTimeInfo") == 1);
     CHECK(h.canDo("receiveVstMidiEvent") == -1);
@@ -228,7 +228,7 @@ void state() {
     a.set(P_FB, 0.7f);
     a.set(P_MIX, 0.55f);
     const std::string s = a.chunk();
-    CHECK(contains(s, "effectforce-probe 1\n"));
+    CHECK(contains(s, "effectwerk-probe 1\n"));
     CHECK(contains(s, "div=1/4T\n"));
 
     Host b;
@@ -239,15 +239,15 @@ void state() {
     CHECK(b.display(P_MIX) == "55%");
 
     Host c;
-    CHECK(c.load("polyforce 4\ngain=6\n") == 0);   // not ours
+    CHECK(c.load("polywerk 4\ngain=6\n") == 0);   // not ours
     CHECK(c.real(P_GAIN) == 0.0f);
-    CHECK(c.load("effectforce-probe 1\nfuture=1\ngain=-30\nfb=x\n") == 1);   // unknown key skipped, range clamped
+    CHECK(c.load("effectwerk-probe 1\nfuture=1\ngain=-30\nfb=x\n") == 1);   // unknown key skipped, range clamped
     CHECK(c.real(P_GAIN) == -24.0f);
     CHECK(std::fabs(c.real(P_FB) - 0.4f) < 1e-4f);
 }
 
 void latencyTest() {
-    const std::string flag = g_dir + "/effectforce.latency";
+    const std::string flag = g_dir + "/effectwerk.latency";
     std::ofstream(flag).put('\n');
     {
         Host h;
@@ -294,7 +294,7 @@ void readouts() {
 }
 
 void monitorLog() {
-    std::ofstream(g_dir + "/effectforce.log", std::ios::trunc);   // only this test's lines (the log appends)
+    std::ofstream(g_dir + "/effectwerk.log", std::ios::trunc);   // only this test's lines (the log appends)
     {
         Host h;
         h.run(noise(kRate / 2));
@@ -346,7 +346,7 @@ int main() {
     readouts();
     monitorLog();
 
-    std::remove((g_dir + "/effectforce.log").c_str());
+    std::remove((g_dir + "/effectwerk.log").c_str());
     rmdir(g_dir.c_str());
     std::printf("%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;

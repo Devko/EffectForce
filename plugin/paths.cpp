@@ -61,7 +61,7 @@ std::string pluginDir() {
     return dir;
 }
 
-std::vector<Root> presetRoots() { return roots("EF_PRESET_ROOTS", "Presets", "/media/AkaiForce/EffectForce Presets"); }
+std::vector<Root> presetRoots() { return roots("EF_PRESET_ROOTS", "Presets", "/media/AkaiForce/EffectWerk Presets"); }
 
 std::string dataDir() {
     if (const char* e = std::getenv("EF_DATA_DIR")) return e;

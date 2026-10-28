@@ -69,7 +69,7 @@ void saved() {
     // An order saved by 0.0.1 (eight modules, Filter before Drive, Reverb before Delay): kept, Pulse
     // and Grain (off in it) in the slots it didn't have.
     Host o;
-    CHECK(o.load("effectforce 1\norder_1=Filter\norder_2=Drive\norder_3=EQ\norder_4=Comp\norder_5=Chorus\n"
+    CHECK(o.load("effectwerk 1\norder_1=Filter\norder_2=Drive\norder_3=EQ\norder_4=Comp\norder_5=Chorus\n"
                  "order_6=Phaser\norder_7=Reverb\norder_8=Delay\n") == 1);
     const char* const want[kNumModules] = {"FILTER", "DRIVE", "EQ", "COMP", "CHORUS", "PHASER", "REVERB", "DELAY", "PULSE", "GRAIN"};
     bool kept = true;
@@ -80,7 +80,7 @@ void saved() {
     CHECK(kept);
     // Not a permutation (a module twice): the default order.
     Host c;
-    CHECK(c.load("effectforce 1\norder_1=Reverb\norder_2=Reverb\n") == 1);
+    CHECK(c.load("effectwerk 1\norder_1=Reverb\norder_2=Reverb\n") == 1);
     for (int k = 0; k < kNumModules; ++k) CHECK(c.value(P_ORDER_1 + k) == static_cast<float>(k));
 }
 

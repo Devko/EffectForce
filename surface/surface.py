@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EffectForce touchscreen surface: the ONE place the plugin's parameters and pages are defined.
+"""EffectWerk touchscreen surface: the ONE place the plugin's parameters and pages are defined.
 
 Writes, next to this file:
   params.json        ordered VST parameter list (index = position; append-only once released:
@@ -25,7 +25,7 @@ Before writing anything the layout is checked the way shadow_skin.py would (unkn
 option counts, when=, Q-Link sets) plus geometry with shadow_skin's own sizes (inside the plugin
 area, no overlaps within a page, nothing in a card's title band, open popup lists inside the
 plugin area, bitmap-font glyphs) and the parameter names MPC shows (short, unique), so a broken
-page fails here instead of on the device. The layout machinery and its checks are PolyForce's,
+page fails here instead of on the device. The layout machinery and its checks are PolyWerk's,
 unchanged.
 
 Run: python3 surface/surface.py   (make surface does this)
@@ -44,8 +44,8 @@ BROWSER_CATS = 16           # category tiles on the browser page (2 x 8)
 BROWSER_ITEMS = 24          # preset tiles (3 x 8)
 MOD_SLOTS = 8
 
-VST = {"name": "EffectForce", "vendor": "Devko", "uid": "EfFc", "version": 1000,
-       "so": "effectforce.so", "params": "params.json", "layout": "layout.conf", "effect": True}
+VST = {"name": "EffectWerk", "vendor": "Devko", "uid": "EfFc", "version": 1000,
+       "so": "effectwerk.so", "params": "params.json", "layout": "layout.conf", "effect": True}
 
 # The modules, in their default order; the C++ Module enum (build/param_ids.h) follows this list.
 # (prefix, name on the CHAIN page and in saved state)
@@ -427,8 +427,8 @@ def params_json():
 
 
 # --- touchscreen pages -------------------------------------------------------------------------
-# PolyForce's look (style=td3 rounded cards on one flat colour; bg and box the same, so the opaque image of a
-# control never shows a box behind it), in EffectForce's violet. Plugin area 1280x628 at y = 86..714. Every
+# PolyWerk's look (style=td3 rounded cards on one flat colour; bg and box the same, so the opaque image of a
+# control never shows a box behind it), in EffectWerk's violet. Plugin area 1280x628 at y = 86..714. Every
 # page: a header row (the status line from x=24; a page's own choice or the preset stepper right-aligned to
 # x=1256), then cards at y=158 and y=440 (h=270) or one full-height card (h=552). Nothing may sit in a card's
 # title band (y .. y+44: td3 draws the title rule at y+38). skin_polish.py (run by `make skin` after the
@@ -543,7 +543,7 @@ class Layout:
     def toggle(self, cx, cy, key):
         self.add('toggle cx=%d cy=%d label="%s" key=%s' % (cx, cy, PARAMS[key]["name"], key))
 
-    def meter(self, cx, cy, w, h, key):   # display only: shadow_skin's filmstrip meter, no look (PolyForce patch)
+    def meter(self, cx, cy, w, h, key):   # display only: shadow_skin's filmstrip meter, no look (PolyWerk patch)
         self.add('meter cx=%d cy=%d w=%d h=%d key=%s' % (cx, cy, w, h, key))
 
     def tiles(self, x, y, w, cols, rows, th, gap, key):
@@ -1410,8 +1410,8 @@ def factory_presets():
             where = "%s/%s" % (d, f)
             text = open(os.path.join(folder, f), encoding="utf-8").read().replace("\r\n", "\n")
             lines = text.split("\n")
-            if not lines[0].startswith("effectforce "):
-                errors.append("%s: no 'effectforce N' header" % where)
+            if not lines[0].startswith("effectwerk "):
+                errors.append("%s: no 'effectwerk N' header" % where)
             order, seen_keys = {}, {}
             for n, line in enumerate(lines[1:], 2):
                 if not line.strip():
@@ -1477,7 +1477,7 @@ FX_NAME_MAX = 14   # an FX tile (1192 px / 8 columns)
 
 def fx_library():
     """[(bank, name, text)]: a folder per bank (at most FX_TILES each), in file order. A file is
-    "effectforce-fx 1", "name=<name>" and lines a scene can lock (checked like a preset's; a lock that moves is
+    "effectwerk-fx 1", "name=<name>" and lines a scene can lock (checked like a preset's; a lock that moves is
     start>end, and then move= and play= give its timing); names unique and short enough for a tile."""
     params = {p["key"]: p for p in P}
     out, errors, names = [], [], set()
@@ -1493,8 +1493,8 @@ def fx_library():
             where = "%s/%s" % (d, f)
             text = open(os.path.join(folder, f), encoding="utf-8").read().replace("\r\n", "\n")
             lines = [l for l in text.split("\n") if l.strip()]
-            if not lines or lines[0] != "effectforce-fx 1":
-                errors.append("%s: no 'effectforce-fx 1' header" % where)
+            if not lines or lines[0] != "effectwerk-fx 1":
+                errors.append("%s: no 'effectwerk-fx 1' header" % where)
                 continue
             name = lines[1].partition("=")[2] if len(lines) > 1 and lines[1].startswith("name=") else ""
             if not 0 < len(name) <= FX_NAME_MAX or name in names:

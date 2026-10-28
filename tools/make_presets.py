@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes EffectForce's factory presets (presets/Factory/NN_Category/NN_Name.efp) from the lists below:
+"""Writes EffectWerk's factory presets (presets/Factory/NN_Category/NN_Name.efp) from the lists below:
 only what differs from the defaults. It rewrites the whole folder, so run `make preset-levels` after
 it: that sets every preset's out_gain (level-matching), which this file doesn't know.
 
@@ -207,7 +207,7 @@ preset("Perform", "Space Mixer", scene_b="2",
 preset("Perform", "Crush Mixer", scene_b="2",
        s=scenes("Bit Crush", "Lo-Fi Radio", "Overdrive", "Fold", "OTT Squash", "Crush Filter", "Telephone"))
 
-# --- Melodic: chains for melodic techno and house, made for SubForce's melodic set (and any synth). From
+# --- Melodic: chains for melodic techno and house, made for SubWerk's melodic set (and any synth). From
 # what that genre's synth presets do with their effects, measured over several hundred of them: the
 # delay before the reverb, repeats darkened and fed back moderately, plates and halls with no pre-delay
 # at low mixes, a low cut on everything but the bass, slow chorus and an auto-pan on pads.
@@ -276,7 +276,7 @@ for ci, cat in enumerate(CATS, 1):
     os.makedirs(folder)
     for pi, (name, d) in enumerate(P[cat], 1):
         d = order_lines(d)
-        text = "effectforce 1\n" + "".join("%s=%s\n" % (k, fmt(v)) for k, v in d.items())
+        text = "effectwerk 1\n" + "".join("%s=%s\n" % (k, fmt(v)) for k, v in d.items())
         with open(os.path.join(folder, "%02d_%s.efp" % (pi, name.replace(" ", "_"))), "w", newline="\n") as f:
             f.write(text)
 print(sum(len(v) for v in P.values()), "presets")

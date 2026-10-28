@@ -1,8 +1,8 @@
-// EffectForce Probe: a VST2 insert effect for MPC OS (Force / MPC standalone) that answers what
-// MPC does with an effect plugin before EffectForce is built on it (docs/PROBE.md).
+// EffectWerk Probe: a VST2 insert effect for MPC OS (Force / MPC standalone) that answers what
+// MPC does with an effect plugin before EffectWerk is built on it (docs/PROBE.md).
 //
 // The sound is a tempo-synced delay (dsp/delay.h), enough to hear tempo, tails, bypass and
-// latency. Everything MPC does is recorded (plugin/probe.h) and logged to /tmp/effectforce.log by
+// latency. Everything MPC does is recorded (plugin/probe.h) and logged to /tmp/effectwerk.log by
 // a monitor thread; four readouts on the page show the essentials without a shell.
 //
 // Threads: processReplacing runs on one of MPC's audio workers (which one changes between calls,
@@ -76,11 +76,11 @@ double threadCpuUs() {
 
 std::atomic<int> g_instances{0};
 
-// The latency test: instances created while <trace dir>/effectforce.latency exists report 100 ms
+// The latency test: instances created while <trace dir>/effectwerk.latency exists report 100 ms
 // and delay their output by as much.
 int latencyFromFlag() {
     struct stat st{};
-    return ::stat((traceDir() + "/effectforce.latency").c_str(), &st) == 0 ? kLatencyTest : 0;
+    return ::stat((traceDir() + "/effectwerk.latency").c_str(), &st) == 0 ? kLatencyTest : 0;
 }
 
 struct Plugin {

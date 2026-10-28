@@ -4,7 +4,7 @@ Status: ✅ done · 🔜 next · ⬜ planned · 💤 deferred
 
 ## What's next
 
-### Full review and performance, round three (2026-10-26), released as [0.0.4](https://github.com/Devko/EffectForce/releases/tag/v0.0.4)
+### Full review and performance, round three (2026-10-26), released as [0.0.4](https://github.com/Devko/EffectWerk/releases/tag/v0.0.4)
 
 Six reviews in parallel, as for 0.0.2 (the plugin glue and the engine; the surface, presets and files;
 Drive, Filter, EQ, Comp; Chorus, Phaser, Pulse, the rack and the looper; Grain; Delay and Reverb),
@@ -21,7 +21,7 @@ performance work measured in exact ARM instructions per block, every bench case'
 | Performance: a knob written no longer rebuilds every parameter (the bench never wrote one: automation with everything on cost 12% more than everything on); notify looks only at what was written; the looper, the reverb's lines, the splice search, the shimmer's tail, OTT, Drive | ✅ automation, everything on: -10.8%; the looper and the fader: -12% avg, -15% p99; everything on: -1.8% avg, -2.3% p99 (instructions). Bit for bit as before but the looper (-116 dB). 13477 checks on x86 (ASan/UBSan) and under qemu-arm, 13470 against the profile-guided objects |
 | The bench and the PGO trainer: automation, two knobs written every block | ✅ |
 | On the device: `make bench-device` with the new cases, 0.0.3 and 0.0.4 side by side | ✅ everything on p99 14.54 → 13.67%; automation with everything on 15.86% (WARN) → 13.90% ([Performance](PERFORMANCE.md#device-measurements)) |
-| [0.0.4](https://github.com/Devko/EffectForce/releases/tag/v0.0.4) published (2026-10-26): a regular release, CI's zip (glibc 2.31) installed on the Force and played; `tested.json` (Akai Force, MPC OS 3.9.0.31), which the catalog shows as "Tested on" | ✅ |
+| [0.0.4](https://github.com/Devko/EffectWerk/releases/tag/v0.0.4) published (2026-10-26): a regular release, CI's zip (glibc 2.31) installed on the Force and played; `tested.json` (Akai Force, MPC OS 3.9.0.31), which the catalog shows as "Tested on" | ✅ |
 | Not changed, below the bar: Arp entered on a chunk with a grid line in it plays that first sliver (under a millisecond, crossfaded) at the next step's interval | – |
 | Not done, for a round four (each moves the output by rounding, or wants the device first): the phaser's allpass chain as blocks of four (its loop-carried latency, not its instructions); the delay's read position in float per segment (re-pins the Tape hash); the phaser's sweep every 4th sample; Grain skipping its voices at mix 0 and a constant-fraction read at pitch 0; the Filter's set() by the fast math; settled sends and the rack's dry copy at mix 1; the LFOs and envelope only when a slot uses them; the looper's recorder in NEON | – |
 
@@ -39,7 +39,7 @@ link their wrapper, and never asked on a sound parameter's write; what we took o
 | Test: 32 Q-Link detents on sound parameters ask for no redraw; a fader sweep of 4096 frames asks at most twice, and its end is told | ✅ |
 | On the Force: Q-Links on track edit → automation (a knob, a choice, the fader), and the status line, the fader's bar and the scenes' line still follow | ✅ 2026-10-24 |
 
-### Full review (2026-10-07), released as [0.0.2](https://github.com/Devko/EffectForce/releases/tag/v0.0.2)
+### Full review (2026-10-07), released as [0.0.2](https://github.com/Devko/EffectWerk/releases/tag/v0.0.2)
 
 Six reviews in parallel (the plugin glue and threads; state, presets, files and the engine; Drive,
 Filter, EQ, Comp; Chorus, Phaser, Pulse and the rack; Grain and the looper; Delay and Reverb). No crash,
@@ -64,11 +64,11 @@ check that fails without its fix.
 | CHANGELOG.md; the release workflow takes the tag's `## X.Y.Z` section as the notes (the catalog shows them) and fails before publishing without one | ✅ |
 | `make test-arm-pgo` runs: the target sat above PGO_ON's definition, so make always took its plain branch, in CI too (the release job's "suite against the shipped objects" never ran). The Delay's Tape hash, which pins one compilation's bits, now skips against profile-guided objects and stays in the plain builds | ✅ |
 | Release candidate from CI (glibc 2.31, GCC 11): `catalog_check.py --catalog` OK, 0 warnings; needs glibc 2.29 and GCC 11's libstdc++ (GLIBCXX_3.4.29) | ✅ |
-| Vendored `release.py`: SubForce's local patch 6 (INSTALL.md gave user-data files a folder's slash) | ✅ |
+| Vendored `release.py`: SubWerk's local patch 6 (INSTALL.md gave user-data files a folder's slash) | ✅ |
 | README: requirements, installation, releases, status, credits; page images (docs/img, rendered offline from the skin) | ✅ |
 | CI's first real run of the suite against GCC 11's profile-guided objects: the Reverb's fingerprints (pinned to GCC 13's plain build) moved; they skip there now, as the Tape hash. 13413 checks pass | ✅ |
-| [v0.0.1](https://github.com/Devko/EffectForce/releases/tag/v0.0.1) published (2026-10-06): a regular release, notes from the changelog, the zip catalog-checked again as published | ✅ |
-| The catalog entry's PR to sd88me/mpc-vst-plugins (`catalog/plugins/effectforce.json`, checked with its registry check): [merged](https://github.com/sd88me/mpc-vst-plugins/pull/209) (2026-10-06) | ✅ |
+| [v0.0.1](https://github.com/Devko/EffectWerk/releases/tag/v0.0.1) published (2026-10-06): a regular release, notes from the changelog, the zip catalog-checked again as published | ✅ |
+| The catalog entry's PR to sd88me/mpc-vst-plugins (`catalog/plugins/effectwerk.json`, checked with its registry check): [merged](https://github.com/sd88me/mpc-vst-plugins/pull/209) (2026-10-06) | ✅ |
 | The release zip installed and played on the Force, then `tested.json` | 🔜 |
 
 ### Scene moves (2026-10-06, branch `scene-moves`)
@@ -132,7 +132,7 @@ Still to do, in order:
 - ✅ **Device bench** (2026-10-05): everything on at its heaviest with 8 mod slots, p99 11.3% of the
   block ([Performance](PERFORMANCE.md#device-measurements)).
 - ✅ **On the device** (2026-10-05, 0.0.1): installed and played; everything worked and the pages
-  open fast (MPC loads it next to SubForce without a complaint in its log).
+  open fast (MPC loads it next to SubWerk without a complaint in its log).
 - 🔜 **Still to try on the device:** save and reload a project, two instances, Delay Glide's Fade.
 - 🔜 **Probe items still open** ([Probe](PROBE.md#results)): pads, returns and master as insert
   places; automation playback.
@@ -171,7 +171,7 @@ Design record: [Design](DESIGN.md).
 
 | Feature | Why not (now) |
 |---|---|
-| Two instances of a module in one rack | The fixed parameter list (automation and saved projects stay valid) has one of each; two EffectForce inserts do it |
+| Two instances of a module in one rack | The fixed parameter list (automation and saved projects stay valid) has one of each; two EffectWerk inserts do it |
 | Sidechain input | MPC's VST2 host gives an insert 2 inputs |
 | Lookahead limiting, linear-phase EQ | MPC can't compensate latency (`acceptIOChanges`: no) |
 | Drawn curves (EQ, compressor) | MPC skins can't draw dynamic graphics |
@@ -195,7 +195,7 @@ Design record: [Design](DESIGN.md).
   it should be (more than a host block: a jump), not only by a new slice number.
 - 2026-10-05 — **An order saved with fewer modules** keeps its slots; the new modules (off in it) fill
   the rest in the default order.
-- 2026-10-05 — **Performance layer:** in EffectForce itself (one insert on the master has every effect,
+- 2026-10-05 — **Performance layer:** in EffectWerk itself (one insert on the master has every effect,
   the scenes and the looper), not a plugin of its own. Scenes lock parameters the Octatrack way (each
   scene only what it locks); a module a scene switches is a send, so tails ring out; the looper is a
   fixed stage (Pre or Post), not a chain slot; its buffers only where it is armed; new parameters

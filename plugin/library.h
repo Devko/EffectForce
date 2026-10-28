@@ -1,6 +1,6 @@
 #pragma once
 // File libraries: a process-wide listing of the files under some roots (plugin/paths.h) plus
-// built-in entries; EffectForce has one, the presets (plugin/presets.h). UI thread only: the audio
+// built-in entries; EffectWerk has one, the presets (plugin/presets.h). UI thread only: the audio
 // thread never touches a library.
 //
 //   key        what state, favorites and recent store: "<root label>:<relative path>"

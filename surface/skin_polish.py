@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EffectForce skin polish (PolyForce's, unchanged: the meters part is unused here): redraws, after sd88me's generator (gen_vst.py) has written the skin, the images its C
+"""EffectWerk skin polish (PolyWerk's, unchanged: the meters part is unused here): redraws, after sd88me's generator (gen_vst.py) has written the skin, the images its C
 renderer can't draw the way the design wants. `make skin` runs it right after gen_vst.py:
 
     skin_polish.py "<skin folder>/Plugin Skins" --layout surface/layout.conf --style surface/build/skin_style.json
@@ -13,7 +13,7 @@ renderer can't draw the way the design wants. `make skin` runs it right after ge
 3. Stepper arrows sh_arrow_<tab>_<key>_{prev,next}.png: shadow_skin crops them from the canvas as it stands
    after the LAST page mode was drawn, so a stepper inside a when= panel gets the wrong pixels. Redrawn: the
    h x h box rounded 5 of render_conf_preview.c's widget_stepper() with the design's centred triangle.
-4. Wave view columns sh_meter_<w>x<h>.png (a look-less meter, drawn by shadow_art as a slider strip: PolyForce
+4. Wave view columns sh_meter_<w>x<h>.png (a look-less meter, drawn by shadow_art as a slider strip: PolyWerk
    patch 5): 128 frames of max(w,h)^2, transparent around the w x h column; frame k is a bar from the zero line
    for the value k/127 (up above 0.5, down below), the zero line across the full width.
 5. Sub-pages: the layout has one [tab] per page, and the generator gives each its own button in MPC's tab strip.

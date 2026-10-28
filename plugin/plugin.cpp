@@ -1,4 +1,4 @@
-// EffectForce as a VST2 insert effect for MPC OS (Force / MPC standalone).
+// EffectWerk as a VST2 insert effect for MPC OS (Force / MPC standalone).
 //
 // The rack and its modulation (plugin/engine.h) behind the touchscreen pages generated from
 // surface/surface.py; plugin/surface.* decides what every parameter does, and the status line
@@ -199,7 +199,7 @@ float getParameter(AEffect* e, int32_t i) {
 }
 
 // The looper's buffers (11 MB) are made the first time it is armed, here on MPC's UI thread, so an
-// EffectForce that never uses it costs nothing more. Cheap once they exist.
+// EffectWerk that never uses it costs nothing more. Cheap once they exist.
 void armLooper(Plugin* p) {
     if (p->surface.get(P_LP_ON) > 0.5f) p->engine.armLooper();
 }

@@ -117,8 +117,8 @@ void Surface::set(int i, float n) {
     if (k == Kind::Button) {
         // A tap toggles the value MPC last read back, and a button always reads back 0 (it springs
         // back), so every tap arrives as a 1 with no release before the next: each 1 is a press.
-        // (Waiting for a release, as RackForce's rising-edge rule did, left a button dead after its
-        // first press on the Force: PolyForce's first device run.) A 0, a release or our own
+        // (Waiting for a release, as RackWerk's rising-edge rule did, left a button dead after its
+        // first press on the Force: PolyWerk's first device run.) A 0, a release or our own
         // spring-back, does nothing.
         if (n > 0.5f) {
             release_[i] = true;
@@ -302,7 +302,7 @@ int Surface::stepItem(float n, int normRange, int items, int cur) {
     // The Force sends the value it last read back (ours) plus its step, within one turn too
     // (sd88me/mpc-vst-plugins docs/NOTES.md, "Input probe"). So the direction is n against ours.
     // Against MPC's previous value, each detent after the first differed by the item the last one
-    // moved (1/1023, under kQuant), and a turn stalled after one item (PolyForce's device run).
+    // moved (1/1023, under kQuant), and a turn stalled after one item (PolyWerk's device run).
     const float delta = n - static_cast<float>(cur) / normRange;
     if (std::fabs(delta) <= kQuant) return cur;   // our own value back
     // One item per event, whatever the size of MPC's step (Q-Link detent 1/128, wheel click

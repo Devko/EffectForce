@@ -4,13 +4,22 @@ Releases are built by CI from a `vX.Y.Z` tag (see [Releases](README.md#releases)
 tag's version becomes the release's notes. While the version is 0.x the parameter list may still change
 between releases.
 
+## Unreleased: EffectForce is now EffectWerk <!-- werk-rename: keep -->
+
+**A new name, the same effect rack.** "Force" is the name of Akai's device, so it no longer belongs in this
+plugin's name. Nothing about the sound changes.
+
+- MPC's plugin list shows **EffectWerk**, and the plugin lives in `/sdcard/Synths/Devko - VST - EffectWerk`.
+- Your presets, favorites and recents move over by themselves: the installer carries them out of the old `Devko - VST - EffectForce` folder and removes it, and the first start renames `/media/AkaiForce/EffectForce Presets` to `EffectWerk Presets`. <!-- werk-rename: keep -->
+- Projects saved with EffectForce open with EffectWerk and their settings: the plugin keeps EffectForce's plugin ID, and it reads presets and projects saved under the old name (the same way checked with SubWerk on a Force). <!-- werk-rename: keep -->
+
 ## 0.0.4
 
 A third full review of the code, and a lighter audio thread (no crash, memory or audio-thread problem
 was found; each fix below has a test that fails without it).
 
 - **Q-Links and automation cost a fraction of the CPU they did:** every knob MPC wrote (a Q-Link
-  turned, automation playing back) made EffectForce work out every parameter again, and every write,
+  turned, automation playing back) made EffectWerk work out every parameter again, and every write,
   the crossfader's too, made it look through all of them for values to show MPC; with every module
   on, automation playing cost 12% more than the same sound standing still. Now a knob costs about
   what it changes. On the Force, every module on at its heaviest with automation playing went past the
@@ -28,7 +37,7 @@ was found; each fix below has a test that fails without it).
 ## 0.0.3
 
 **Melodic**, a new preset category (72 presets in all): ten chains for melodic techno and house, made for
-SubForce's melodic set and fine after any synth — Melodic Bass, Lead Delay Plate, Lead Throw, Pluck
+SubWerk's melodic set and fine after any synth — Melodic Bass, Lead Delay Plate, Lead Throw, Pluck
 Space, Arp Dotted, Stab Echo, Sequence Pump, Pad Wash, Drone Space, Riser Wash. They follow what that
 genre's synth presets do with their effects, measured over several hundred of them: the delay before
 the reverb, darkened repeats, plates and halls with no pre-delay at low mixes, a low cut on everything
@@ -36,7 +45,7 @@ but the bass. Level-matched like the rest.
 
 **Q-Links on track edit → automation:** MPC rebuilds its parameter screen whenever a plugin asks it to
 redraw its texts, and a Q-Link turned meanwhile can lose its value (found by a port author on the
-plugin catalog's wrapper, 2026-10-21). EffectForce never asked when a sound parameter changed; the
+plugin catalog's wrapper, 2026-10-21). EffectWerk never asked when a sound parameter changed; the
 texts that do change (the status line's CPU figures, the fader's bar, the scenes' and the looper's
 lines) now ask at most once per 50 ms, instead of up to every 12 ms. And the build stops if a parameter
 ever changes its index (`surface/params.lock`): projects, automation and Q-Link maps store them by index.

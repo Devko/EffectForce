@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes EffectForce's performance effects (presets/FX/NN_Bank/NN_Name.eff) from the lists below: the
+"""Writes EffectWerk's performance effects (presets/FX/NN_Bank/NN_Name.eff) from the lists below: the
 FX library the PERFORM page picks from (docs/DESIGN.md "Performance: scenes and the looper").
 
 An effect is a scene: the parameters it locks, nothing else. Tapping it on the PERFORM page puts it in
@@ -152,7 +152,7 @@ def fmt(v):
 
 
 def text(name, kv):
-    return "effectforce-fx 1\nname=%s\n" % name + "".join("%s=%s\n" % (k, fmt(v)) for k, v in kv.items())
+    return "effectwerk-fx 1\nname=%s\n" % name + "".join("%s=%s\n" % (k, fmt(v)) for k, v in kv.items())
 
 
 def find(name):

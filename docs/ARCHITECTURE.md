@@ -11,7 +11,7 @@
 
 ## Overview
 
-EffectForce is a single shared object, `effectforce.so`, that MPC loads through its VST2 host as an
+EffectWerk is a single shared object, `effectwerk.so`, that MPC loads through its VST2 host as an
 insert effect (2 inputs, 2 outputs), plus a touchscreen skin generated at build time.
 
 ```mermaid
@@ -19,12 +19,12 @@ flowchart LR
   S[surface/surface.py] -->|params, layout, C++ headers, factory presets| P[plugin/]
   S -->|params.json, layout.conf| G[skin generator] --> K[skin: TUI.json + PNGs]
   D[dsp/ modules and rack] --> P
-  P --> SO[effectforce.so]
+  P --> SO[effectwerk.so]
 ```
 
 - **`surface/surface.py`** is the single source of the parameter list, the pages and the factory
   presets' checks. It writes `params.json`, `layout.conf`, `vst.json`, `build/param_ids.h` and
-  `build/factory_presets.h`, after checking the layout (PolyForce's checker) and every preset, and
+  `build/factory_presets.h`, after checking the layout (PolyWerk's checker) and every preset, and
   the parameters' order against `params.lock`.
 - **`dsp/`** is the sound: ten modules with one contract (docs/DESIGN.md "Modules"), the rack that
   chains them, the LFOs and the envelope follower. No VST, no files, no threads.
@@ -36,9 +36,9 @@ flowchart LR
 | Path | Contents |
 |---|---|
 | `surface/surface.py` | Parameters, pages, factory preset checks; generates everything the skin and the C++ side need |
-| `surface/skin_polish.py` | PolyForce's: redraws knob strips, buttons and stepper arrows; makes each group's pages sub-pages of one tab |
+| `surface/skin_polish.py` | PolyWerk's: redraws knob strips, buttons and stepper arrows; makes each group's pages sub-pages of one tab |
 | `dsp/common.h` | The module contract, rate and chunk, `Transport`, sync divisions, `Ramp`, `DelayLine`, Hermite interpolation |
-| `dsp/fastmath.h`, `simd.h`, `halfband.h` | SubForce's fast math and four-float vectors; the 2x halfband interpolator and decimator |
+| `dsp/fastmath.h`, `simd.h`, `halfband.h` | SubWerk's fast math and four-float vectors; the 2x halfband interpolator and decimator |
 | `dsp/drive.*` | 2x oversampled shapers, compensation table, tilt, Crush |
 | `dsp/svf.h`, `filter.*`, `eq.*` | Simper's state-variable filter, the Filter and the EQ |
 | `dsp/comp.*` | The compressor and the 3-band OTT |
@@ -54,9 +54,9 @@ flowchart LR
 | `plugin/engine.*` | The chunk loop: the scenes' morph (the fader's glide), modulation sources, the matrix, the rack |
 | `plugin/scenes.*` | The eight scenes' locks (atomics, a generation counter) and the morph rules |
 | `plugin/rack_map.*` | 0..1 <-> real values, value text, parameters -> the rack's patch |
-| `plugin/surface.*` | SubForce's (PolyForce's, RackForce's): stepping, buttons, tiles, the browser, pushes to MPC; plus the CHAIN page, and the PERFORM page's scene tiles, EDIT A / B and CLEAR |
+| `plugin/surface.*` | SubWerk's (PolyWerk's, RackWerk's): stepping, buttons, tiles, the browser, pushes to MPC; plus the CHAIN page, and the PERFORM page's scene tiles, EDIT A / B and CLEAR |
 | `plugin/state.*`, `presets.*`, `library.*`, `paths.*` | Saved state, preset files and the factory set, file libraries, folders |
-| `plugin/trace.*` | Device diagnostics while `/tmp/effectforce.trace` exists |
+| `plugin/trace.*` | Device diagnostics while `/tmp/effectwerk.trace` exists |
 | `presets/Factory/` | Factory presets: `NN_Category/NN_Name.efp` |
 | `presets/FX/`, `tools/make_fx.py` | The FX library: `N_Bank/NN_Name.eff`, scenes the PERFORM page picks from |
 | `test/` | Every module's suite, the rack, modulation, the plugin through a fake MPC (`host.h`) |
@@ -65,7 +65,7 @@ flowchart LR
 | `tools/make_presets.py` | Writes the factory presets (then `make preset-levels` sets their Output) |
 | `tools/levels.cpp`, `loudness.h` | Level-matching the factory presets on a reference mix |
 | `probe/` | The probe that measured MPC first (docs/PROBE.md); builds on its own |
-| `third_party/mpc-vst-plugins/` | Vendored skin generator and installer (MIT), with PolyForce's marked local patches |
+| `third_party/mpc-vst-plugins/` | Vendored skin generator and installer (MIT), with PolyWerk's marked local patches |
 
 ## Signal flow
 
@@ -128,7 +128,7 @@ What MPC does with an insert effect was measured on the device first ([the probe
 
 - It calls `processReplacing` nonstop, in place, 128 frames at a time, playing or not.
 - Transport **Stop** suspends and resumes the plugin within ~100 ms; the slot's **ON button**
-  suspends it for as long as it is off. EffectForce keeps every buffer through a suspend under
+  suspends it for as long as it is off. EffectWerk keeps every buffer through a suspend under
   250 ms (tails ring on through Stop) and clears them after a longer one (`plugin/plugin.cpp`).
 - It never calls `effSetBypass`, and can't take a latency change at runtime: every module is
   zero-latency.
@@ -140,8 +140,8 @@ What MPC does with an insert effect was measured on the device first ([the probe
   their own or follow another parameter (the status line, the fader's bar, the scenes' and the
   looper's lines) ask through one gate, at most once per 50 ms (`Surface::kTextGap`).
 - The Force's input rules (a tap is a lone 1, a Q-Link detent is the read-back plus 1/128, a tile's
-  release echo ~0.7 s later) are SubForce's surface, unchanged; see PolyForce's
-  [Milestone 1 design](https://github.com/Devko/PolyForce/blob/main/docs/M1_DESIGN.md), §6.
+  release echo ~0.7 s later) are SubWerk's surface, unchanged; see PolyWerk's
+  [Milestone 1 design](https://github.com/Devko/PolyWerk/blob/main/docs/M1_DESIGN.md), §6.
 
 ## Parameters and saved state
 
@@ -154,7 +154,7 @@ What MPC does with an insert effect was measured on the device first ([the probe
 - **Kinds** (`surface.py`): sound parameters (saved, automatable), the chain's order (saved, moved
   only by MOVE, not automatable), the surface's own values (the selected slot, the browser), readouts,
   buttons, tiles, toggles, popup flags.
-- **Saved state** (projects and `.efp` preset files) is the text format `effectforce 1`: `key=value`
+- **Saved state** (projects and `.efp` preset files) is the text format `effectwerk 1`: `key=value`
   lines of real values (Hz, seconds, dB), options by name (`dly_mode=Ping-Pong`, `order_3=Comp`), and
   in a project the preset it came from; then the scenes' locks as `sceneN.key=value` lines (a moving
   lock `start>end`, its scene's timing as `sceneN.move=` and `sceneN.play=`). Ranges and

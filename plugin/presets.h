@@ -1,10 +1,10 @@
 #pragma once
 // Presets as files, plus the factory set built in.
 //
-//   *.efp under <plugin dir>/Presets and /media/AkaiForce/EffectForce Presets (EF_PRESET_ROOTS),
+//   *.efp under <plugin dir>/Presets and /media/AkaiForce/EffectWerk Presets (EF_PRESET_ROOTS),
 //   plus the factory presets (presets/Factory/<category>/, embedded at build time: one category
 //   per folder, keys "builtin:<name>"). A preset file is the plugin's own state text
-//   ("effectforce 1" + key=value lines), so a preset and a project restore the same way. Saving
+//   ("effectwerk 1" + key=value lines), so a preset and a project restore the same way. Saving
 //   writes <first root>/User/User NNN.efp: there is no text entry on the device, so names are
 //   numbered.
 #include "library.h"

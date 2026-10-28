@@ -25,7 +25,7 @@ public:
 
     std::string display(int id) const;  // a knob's or enum's text ("+3.0 dB", "1/8."); "" for a readout
 
-    std::string save() const;              // "effectforce-probe 1" and key=value lines, real values
+    std::string save() const;              // "effectwerk-probe 1" and key=value lines, real values
     bool load(const std::string& state);   // unknown keys skipped, missing ones keep their value
 
 private:

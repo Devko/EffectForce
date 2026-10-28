@@ -18,12 +18,12 @@ What we use it for (we do NOT link their `vst2_wrap.c` / `engine.h` wrapper — 
 Do not edit files here beyond the marked patches; patch around them so an upgrade stays a plain
 re-copy.
 
-## Local patches (PolyForce)
+## Local patches (PolyWerk)
 
-Copied into SubForce from [PolyForce](https://github.com/Devko/PolyForce) with its patches as they
-are (SubForce uses patches 1-4; it has no meters). EffectForce copied SubForce's copy unchanged.
+Copied into SubWerk from [PolyWerk](https://github.com/Devko/PolyWerk) with its patches as they
+are (SubWerk uses patches 1-4; it has no meters). EffectWerk copied SubWerk's copy unchanged.
 
-`tools/shadow_skin.py` carries five small, marked (`PolyForce local patch`) changes:
+`tools/shadow_skin.py` carries five small, marked (`PolyWerk local patch`) changes:
 1. `theme_title=` / `title_size=`: frame title colour and size (were fixed ACCENT_HI / 26 px).
 2. Popup list options are drawn with the real title font (`SHADOW_TITLE_FONT`) like enum
    segments, instead of the 9x9 bitmap font.
@@ -31,12 +31,12 @@ are (SubForce uses patches 1-4; it has no meters). EffectForce copied SubForce's
 4. `slider_v`/`slider_h` accept `cw=` (component width), so a tight row of sliders doesn't
    overlap hit areas and value labels.
 5. A `meter` without `strip=` builds with the C renderer: its strip is drawn as a vertical
-   slider's (`sh_meter_<w>x<h>.png`) for a post-step to redraw (PolyForce's wave view:
+   slider's (`sh_meter_<w>x<h>.png`) for a post-step to redraw (PolyWerk's wave view:
    `surface/skin_polish.py`). With the browser renderer a meter still needs `strip=`.
 Re-apply them after re-copying upstream.
 
-## Local patch (SubForce)
+## Local patch (SubWerk)
 
-6. `tools/release.py` (marked `SubForce local patch 6`): the generated `INSTALL.md` gave every
+6. `tools/release.py` (marked `SubWerk local patch 6`): the generated `INSTALL.md` gave every
    `--user-data` entry a trailing slash, files too (`preset_favorites.txt/`); now only folders get one.
-   Ported to EffectForce from SubForce on 2026-10-06, before the first release. Worth sending upstream.
+   Ported to EffectWerk from SubWerk on 2026-10-06, before the first release. Worth sending upstream.

@@ -1,4 +1,4 @@
-# EffectForce: an effect rack as a VST2 insert effect for MPC OS (Force / MPC standalone).
+# EffectWerk: an effect rack as a VST2 insert effect for MPC OS (Force / MPC standalone).
 # Builds on Linux or WSL. Native: g++ (tests, x86 bench). Device: arm-linux-gnueabihf-g++ 11 or newer
 # (libstdc++ is linked dynamically; MPC OS has it). Releases come from CI, built against glibc 2.31 so
 # they load on MPC OS 2.x and 3.x; a newer distribution's cross toolchain needs a newer glibc (3.x only).
@@ -34,7 +34,7 @@ SSH      := ssh -n $(SSH_OPTS)
 MV       := third_party/mpc-vst-plugins
 SURF     := surface
 SURF_OUT := $(SURF)/build
-SKIN_DIR := $(SURF_OUT)/skin/Devko - VST - EffectForce
+SKIN_DIR := $(SURF_OUT)/skin/Devko - VST - EffectWerk
 GEN      := $(SURF_OUT)/param_ids.h $(SURF_OUT)/factory_presets.h $(SURF_OUT)/fx_library.h
 SKIN     := $(SURF_OUT)/skin.stamp
 
@@ -47,7 +47,7 @@ INC      := -I$(SURF_OUT) -Iplugin
 # (every module drops NaNs from the host with it).
 ARM_OPT  := -O3 -march=armv7-a -mtune=cortex-a17 -mfpu=neon-vfpv4 -mfloat-abi=hard \
             -funsafe-math-optimizations -fno-math-errno -fno-tree-loop-distribute-patterns
-ARM_SO   := $(BUILD)/arm/effectforce.so
+ARM_SO   := $(BUILD)/arm/effectwerk.so
 ARM_BENCH := $(BUILD)/arm/efbench
 
 .PHONY: all surface skin preview test test-arm test-arm-pgo test-module test-module-arm bench levels preset-levels arm-plugin arm-bench \
@@ -123,10 +123,10 @@ test-module-arm:
 	$(ARM_RUN) $(BUILD)/arm/$(M)_test
 
 # x86 numbers say nothing about the Force; this only checks the bench and the .so path work.
-bench: $(BUILD)/effectforce.so $(BUILD)/efbench
-	$(BUILD)/efbench $(BUILD)/effectforce.so -s 1 -c -1
+bench: $(BUILD)/effectwerk.so $(BUILD)/efbench
+	$(BUILD)/efbench $(BUILD)/effectwerk.so -s 1 -c -1
 
-$(BUILD)/effectforce.so: $(SRC) $(HDR) $(GEN) plugin/exports.map | $(BUILD)
+$(BUILD)/effectwerk.so: $(SRC) $(HDR) $(GEN) plugin/exports.map | $(BUILD)
 	$(CXX) -std=c++17 -O3 -fno-tree-loop-distribute-patterns -fPIC -fvisibility=hidden -fno-gnu-unique -Wall -Wextra -pthread \
 		$(INC) -shared -Wl,--no-undefined -Wl,--version-script=plugin/exports.map $(SRC) -o $@
 
@@ -137,10 +137,10 @@ $(BUILD)/efbench: tools/bench.cpp $(HDR) $(GEN) | $(BUILD)
 # loud as it went in. `levels` reports, `preset-levels` writes the presets' out_gain and regenerates.
 $(BUILD)/eflevels: tools/levels.cpp tools/loudness.h plugin/vst2.h | $(BUILD)
 	$(CXX) -std=c++17 -O2 -Wall -Wextra $< -ldl -o $@
-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
-	$(BUILD)/eflevels $(BUILD)/effectforce.so presets/Factory
-preset-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
-	$(BUILD)/eflevels $(BUILD)/effectforce.so presets/Factory --write
+levels: $(BUILD)/effectwerk.so $(BUILD)/eflevels
+	$(BUILD)/eflevels $(BUILD)/effectwerk.so presets/Factory
+preset-levels: $(BUILD)/effectwerk.so $(BUILD)/eflevels
+	$(BUILD)/eflevels $(BUILD)/effectwerk.so presets/Factory --write
 	python3 $(SURF)/surface.py
 
 # --- device -----------------------------------------------------------------------------------
@@ -148,7 +148,7 @@ preset-levels: $(BUILD)/effectforce.so $(BUILD)/eflevels
 # instantiations and typeinfo -fvisibility leaves; -fno-gnu-unique keeps it unloadable);
 # --no-undefined because an unresolved symbol otherwise only shows up as MPC crashing on load.
 ARM_SO_FLAGS = -std=c++17 $(ARM_OPT) -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -fno-gnu-unique -Wall -Wextra -Wno-psabi -pthread $(INC)
-ARM_SO_LINK  = -shared -Wl,--no-undefined -Wl,-soname,effectforce.so -Wl,--version-script=plugin/exports.map
+ARM_SO_LINK  = -shared -Wl,--no-undefined -Wl,-soname,effectwerk.so -Wl,--version-script=plugin/exports.map
 
 ARM_SO_CMD   = $(ARM_CXX) $(ARM_SO_FLAGS) $(ARM_SO_LINK)
 
@@ -158,7 +158,7 @@ ARM_SO_CMD   = $(ARM_CXX) $(ARM_SO_FLAGS) $(ARM_SO_LINK)
 # then the .so is compiled from the same sources with the same flags plus that profile, which tells the
 # compiler which paths are hot. -fprofile-partial-training keeps functions the trainer never ran
 # optimised as usual. Objects keep one path (dir_name.o) in both rounds: GCC names the profile files
-# after it. A missing profile fails the build instead of quietly building without. (SubForce's.)
+# after it. A missing profile fails the build instead of quietly building without. (SubWerk's.)
 PGO      ?= auto
 ARM_RUNS := $(if $(strip $(ARM_RUN)),$(shell command -v $(firstword $(ARM_RUN)) 2>/dev/null),native)
 PGO_ON   := $(if $(filter auto,$(PGO)),$(if $(ARM_RUNS),1,0),$(PGO))
@@ -222,8 +222,8 @@ $(ARM_BENCH): tools/bench.cpp $(HDR) $(GEN)
 BENCH_ARGS ?= -s 3
 bench-device: $(ARM_SO) $(ARM_BENCH)
 	scp -q $(SSH_OPTS) $(ARM_SO) $(ARM_BENCH) $(FORCE):/tmp/
-	$(SSH) $(FORCE) 'r=0; /tmp/efbench /tmp/effectforce.so $(BENCH_ARGS) -c 1 || r=1; \
-		rm -f /tmp/efbench /tmp/effectforce.so; exit $$r'
+	$(SSH) $(FORCE) 'r=0; /tmp/efbench /tmp/effectwerk.so $(BENCH_ARGS) -c 1 || r=1; \
+		rm -f /tmp/efbench /tmp/effectwerk.so; exit $$r'
 
 # Exact ARM instructions per processReplacing call, without the Force (docs/PERFORMANCE.md "Instruction
 # counts"): the bench with its markers (-m) runs the plain .so (no profile; unstripped, -g, so a
@@ -238,7 +238,7 @@ COUNT_ARGS ?= -s 2
 CASES      ?=
 PROF       ?=
 COUNT_DIR  := $(BUILD)/arm/count
-COUNT_SO   := $(COUNT_DIR)/effectforce.so
+COUNT_SO   := $(COUNT_DIR)/effectwerk.so
 EFCOUNT    := $(BUILD)/libefcount.so
 comma      := ,
 bench-count: $(COUNT_SO) $(ARM_BENCH) $(EFCOUNT)
@@ -257,7 +257,7 @@ $(EFCOUNT): tools/efcount.c | $(BUILD)
 # Release zip: plugin + skin + sd88me's installer (stops MPC, backs up and edits MPC.settings,
 # restarts MPC). The plugin-list entry says Effect with 2 inputs: MPC lists it under insert effects.
 PLUGIN_VERSION ?= 0.0.4
-PKG      := EffectForce-$(PLUGIN_VERSION)
+PKG      := EffectWerk-$(PLUGIN_VERSION)
 plugin-package: $(ARM_SO) $(SKIN)
 	@# Everything shipped runs under BusyBox on the device: a CR in a script breaks it there.
 	@# grep: 1 = no CR found (good); 0 = found one; 2 = it couldn't read the scripts.
@@ -268,8 +268,8 @@ plugin-package: $(ARM_SO) $(SKIN)
 		echo "warning: this .so needs glibc $$g: it loads on MPC OS 3.x only, and the plugin catalog refuses it."; \
 		echo "         Release packages come from CI (glibc 2.31)."; fi
 	$(PY) $(MV)/tools/release.py --so $(ARM_SO) --skin "$(SKIN_DIR)" --entry $(SURF_OUT)/pluginlist-entry.xml \
-		--version $(PLUGIN_VERSION) --repo Devko/EffectForce --license MIT \
-		--about "EffectForce effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix; and an Octatrack-style performance mixer: two scenes on the crossfader, 64 effects that fade in (the sweeps and risers move on the bar), a looper on the grid." \
+		--version $(PLUGIN_VERSION) --repo Devko/EffectWerk --license MIT \
+		--about "EffectWerk effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix; and an Octatrack-style performance mixer: two scenes on the crossfader, 64 effects that fade in (the sweeps and risers move on the bar), a looper on the grid." \
 		--requires "root SSH (MockbaMod)" \
 		--user-data Presets --user-data preset_favorites.txt --user-data preset_recent.txt \
 		-o dist

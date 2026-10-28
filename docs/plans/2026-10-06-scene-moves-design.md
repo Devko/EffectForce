@@ -66,7 +66,7 @@ Decided with the user on 2026-10-06:
   lines, written only for a scene that has a move. Values stay real values and options names:
 
   ```
-  effectforce-fx 1
+  effectwerk-fx 1
   name=LP Sweep
   move=8 bars
   play=Once

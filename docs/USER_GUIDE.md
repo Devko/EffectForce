@@ -14,7 +14,7 @@
 ## Getting started
 
 1. Install it (`make plugin-install`, or the release zip's `install.sh`; both restart MPC).
-2. On a track, a pad, or wherever MPC offers insert effects, add **EffectForce** from the insert
+2. On a track, a pad, or wherever MPC offers insert effects, add **EffectWerk** from the insert
    effects.
 3. Open its screen. The **CHAIN** page shows the ten modules in their order; everything starts off.
 4. Pick a factory preset (**PRESETS** page, or the preset stepper at the top of CHAIN), or tap a
@@ -38,7 +38,7 @@ overlay shows the name without the page.
 | SPACE | **DELAY**, **GRAIN**, **REVERB** |
 | MOD | **LFO+ENV** (both LFOs, the envelope follower, the macros), **MATRIX** (8 slots) |
 
-The status line at the top of every page: how many modules run, and the CPU EffectForce takes (the
+The status line at the top of every page: how many modules run, and the CPU EffectWerk takes (the
 average and the peak of the last half second, in percent of MPC's audio block).
 
 Some of the pages, rendered offline from the skin (on the device MPC fills in the names, values and
@@ -204,7 +204,7 @@ LFO 1 synced to 1/8 → Filter Cutoff (a rhythmic filter).
 
 ## Performance: scenes and the looper
 
-The Octatrack's performance-mixer setup in one insert: put EffectForce on the **master** (or on a drum
+The Octatrack's performance-mixer setup in one insert: put EffectWerk on the **master** (or on a drum
 submix and a melodic submix, one each), and the Force's **crossfader** moves between two **scenes**: a
 clean one at A and an effect at B, picked from a library of 64. The **looper** records the next 4 or 8
 bars on the grid (or keeps the bar just played) and you crossfade into it, roll it, stop it, reverse it.
@@ -229,8 +229,8 @@ Two pages, both in the CHAIN tab: **PERFORM** (scenes, crossfader, the FX librar
 **Crossfader** (Q-Link 1 on the PERFORM page) runs from scene A (0%) to scene B (100%); the bar under it
 shows where it is. To play it with the Force's own crossfader, assign it there: MPC can learn any of a
 plugin's automatable parameters to the crossfader (hold **ASSIGN A** or **ASSIGN B** and move the
-parameter, here Crossfader). One crossfader can drive several EffectForce instances that way (a drum
-bus and a melodic bus, each with its own effects). EffectForce glides after the fader over 15 ms, so a
+parameter, here Crossfader). One crossfader can drive several EffectWerk instances that way (a drum
+bus and a melodic bus, each with its own effects). EffectWerk glides after the fader over 15 ms, so a
 fast flick is smooth and a Q-Link's steps don't click.
 
 ### The FX library
@@ -324,7 +324,7 @@ hall wash, a pump), **Loop Mixer 4 Bar** and **Loop Mixer 8 Bar** (REC records 4
 the loop; rolls, half speed, reverse, a build roll, a layered loop), **DJ Mixer** (filters and kills),
 **Dub Mixer**, **Build and Drop**, **Glitch Mixer**, **Rhythm Mixer**, **Space Mixer**, **Crush Mixer**.
 
-### More than one EffectForce
+### More than one EffectWerk
 
 Load as many as you like: one on a drum submix and one on a melodic submix with the same crossfader
 (the Octatrack template's two buses), one on a synth track for its own sound and one on the master for
@@ -336,7 +336,7 @@ looper's memory is only taken where it is armed.
 - **Factory presets** in twelve categories: Utility, Synth, Pads, Bass, Drums, Lo-Fi, Space, Creative,
   Texture (Grain), Rhythm (Pulse), Perform (scenes and the looper), Melodic.
 - **Melodic** holds chains for melodic techno and house, made for
-  [SubForce](https://github.com/Devko/SubForce)'s melodic set but fine after any synth. They follow what
+  [SubWerk](https://github.com/Devko/SubWerk)'s melodic set but fine after any synth. They follow what
   that genre's synth presets do with their effects, measured over several hundred of them: the delay
   before the reverb, its repeats darkened and fed back moderately, plates and halls with no pre-delay
   at low mixes, a low cut on everything but the bass, a slow chorus and an auto-pan on pads.
@@ -362,13 +362,13 @@ looper's memory is only taken where it is armed.
   `User NNN.efp` (there is no text entry on the device), **INIT** loads Init (everything off).
 - **The preset stepper** (CHAIN page, top right) walks all presets, one per Q-Link detent.
 - Preset files live in the plugin's folder under `Presets/` and on the SSD under
-  `EffectForce Presets/`; folders become categories. MPC's own preset save (the disk icon in its
+  `EffectWerk Presets/`; folders become categories. MPC's own preset save (the disk icon in its
   header) works too: it stores the whole state.
 
 ## How it behaves in MPC
 
 - **Zero latency.** Nothing looks ahead, so nothing needs compensating.
-- **Tails ring on through Stop.** MPC briefly suspends an insert when the transport stops; EffectForce
+- **Tails ring on through Stop.** MPC briefly suspends an insert when the transport stops; EffectWerk
   keeps its delay lines and reverb through that. Switching the insert's slot **off** for longer
   clears them, so switching it back on never replays old echoes.
 - **Projects** save the whole rack (every module, the order, the matrix, the scenes) and the preset it

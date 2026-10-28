@@ -157,7 +157,7 @@ int main() {
     for (int k = 0; k < kNumFx; ++k) {
         const std::string fx = kFxLibrary[k].text;
         if (fx.find('>') == std::string::npos) continue;
-        std::string state = "effectforce 1\nlp_on=On\nscene_b=2\n";
+        std::string state = "effectwerk 1\nlp_on=On\nscene_b=2\n";
         for (size_t at = fx.find('\n') + 1; at < fx.size();) {   // its lines, past the header, as scene 2's
             const size_t end = std::min(fx.find('\n', at), fx.size());
             state += "scene2." + fx.substr(at, end - at) + "\n";

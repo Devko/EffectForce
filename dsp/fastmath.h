@@ -1,7 +1,7 @@
 #pragma once
 // Small, branch-light math for the audio thread: libm's exp2f / tanf cost ~10x as much and the
-// modules call these per sample. SubForce's dsp/fastmath.h, unchanged but for the namespace; its
-// error bounds are checked in SubForce's test/engine_test.cpp, the ones EffectForce relies on in
+// modules call these per sample. SubWerk's dsp/fastmath.h, unchanged but for the namespace; its
+// error bounds are checked in SubWerk's test/engine_test.cpp, the ones EffectWerk relies on in
 // test/dsp_test.cpp.
 #include "simd.h"
 
@@ -107,7 +107,7 @@ inline float softclip(float x) {
 
 // tanh(x) / x, a Pade approximant: within 1% of the real ratio up to |x| = 5 and 19% at 12
 // (x times it then reads 1.19 for tanh's 1.0); it falls toward 1/15 instead of 0, so far past
-// any level the engine reaches a stage keeps growing slowly. (SubForce's, for its ladder's per-stage
+// any level the engine reaches a stage keeps growing slowly. (SubWerk's, for its ladder's per-stage
 // gains.)
 inline float tanhXdX(float x) {
     const float a = x * x;

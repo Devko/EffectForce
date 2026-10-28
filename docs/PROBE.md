@@ -1,6 +1,6 @@
 # The probe
 
-Before EffectForce is designed around MPC's insert slots, the **EffectForce Probe** finds out
+Before EffectWerk is designed around MPC's insert slots, the **EffectWerk Probe** finds out
 what MPC actually does with a VST2 effect on the Force. It is a small tempo delay (gain, delay
 time, feedback, mix) that records every call MPC makes and logs it.
 
@@ -14,7 +14,7 @@ time, feedback, mix) that records every call MPC makes and logs it.
 
 ## What it answers
 
-| # | Question | Why it matters for EffectForce |
+| # | Question | Why it matters for EffectWerk |
 |---|---|---|
 | 1 | Does MPC load it as an insert, and where: track, pad, program, return, master? | Where the rack can live |
 | 2 | Do effects get tempo and transport (`audioMasterGetTime`)? | Synced delays, LFOs, gates |
@@ -40,7 +40,7 @@ time, feedback, mix) that records every call MPC makes and logs it.
 The readouts only change while MPC calls `process`: if they freeze, that is an answer too (the log
 says when the calls stopped).
 
-**In the log**, `/tmp/effectforce.log` on the device (`make -C probe probe-log`): every instance's start
+**In the log**, `/tmp/effectwerk.log` on the device (`make -C probe probe-log`): every instance's start
 and end, MPC's host name, version and canDo answers, every dispatcher call (once for the getters
 MPC calls on every redraw), process starting, stopping (no call for 300 ms) and resuming,
 `input silent for 1 / 10 / 60 s, process still called`, transport changes, parameter changes and
@@ -58,8 +58,8 @@ make -C probe plugin-install
 
 Then, in MPC:
 
-1. **Insert:** on a track with an instrument (PolyForce, SubForce, a drum program), add
-   *EffectForce Probe* as an insert effect and open its screen. Play: echoes on the eighth note.
+1. **Insert:** on a track with an instrument (PolyWerk, SubWerk, a drum program), add
+   *EffectWerk Probe* as an insert effect and open its screen. Play: echoes on the eighth note.
 2. **Tempo:** change MPC's tempo; the echo time follows. Press Play and Stop: the Timing readout
    follows.
 3. **Tails:** play one short note and let the echoes ring (feedback around 70%). Then the same
@@ -88,7 +88,7 @@ marked *pending*; none of them blocks the design (docs/DESIGN.md).
 | 1 | Loads as an insert; where | **Yes**, track insert slot 1, with MPC's own header (preset name from `effGetProgramName`, MPC's preset load/save, the slot's ON button). Pads, returns, master: *pending* | Played by hand; screenshot |
 | 2 | Tempo and transport | **Yes.** Flags `0x7FC4` stopped, `0x7FC6` playing: tempo, ppq, bars, cycle position, time signature, nanoseconds and SMPTE all valid; cycle active (the loop). The delay follows MPC's tempo | Log, readout, by ear |
 | 3 | Tails | **`process` never stops**: 346-347 calls/s (44100 / 128, real time) through 60 s and more of silence, playing or stopped. **But Stop suspends and resumes the plugin** within 100 ms: `effMainsChanged(0)`, `effStopProcess`, then sample rate, block size, `effMainsChanged(1)`, speaker arrangement, `effStartProcess`. A plugin that clears its buffers on resume loses every tail at Stop. Whether the echoes rang on after Stop (the probe doesn't clear): *pending, by ear* | Log 14:57:46 |
-| 4 | Latency compensation | Not tested (the flag test wasn't run), and not needed: EffectForce is zero-latency. MPC answers `acceptIOChanges` with no, so a latency could only be reported at creation | Host canDo |
+| 4 | Latency compensation | Not tested (the flag test wasn't run), and not needed: EffectWerk is zero-latency. MPC answers `acceptIOChanges` with no, so a latency could only be reported at creation | Host canDo |
 | 5 | Bypass | **The slot's ON button never calls `effSetBypass`** (after `canDo("bypass")` said no): off suspends the plugin (`effMainsChanged(0)`), on resumes it (`effMainsChanged(1)`, `effStartProcess`). The tail stops when it is switched off, and none comes back when it is switched on | Readout after six toggles: BYPASS 0, SUSPEND 17 (was 5), START 9 (was 3), STOP 1; by ear |
 | 6 | Saved state | *Pending* (not tried) | Readout SAVE 0 LOAD 0 |
 | 7 | Buffers, blocks, stereo | **In place** (in == out), **always 128 frames**, stereo arrangement (2 in, 2 out) accepted; two audio worker threads take turns. The input so far was L = R (the source's output; a stereo source still to try) | Log, readout |

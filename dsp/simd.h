@@ -1,5 +1,5 @@
 #pragma once
-// Four floats at a time for the per-sample hot spots (SubForce's dsp/simd.h, unchanged but for the
+// Four floats at a time for the per-sample hot spots (SubWerk's dsp/simd.h, unchanged but for the
 // namespace; there: the ladder, the cutoff coefficients; here: the reverb's delay network). NEON on
 // the device, GCC's generic vectors elsewhere, so the x86 tests run the same arithmetic lane by
 // lane.
