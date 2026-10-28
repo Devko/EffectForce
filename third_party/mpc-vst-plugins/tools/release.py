@@ -44,6 +44,8 @@ ap.add_argument("--license", help="SPDX license id of the plugin (for the catalo
 ap.add_argument("--requires", default="", help="extra requirements, one line (e.g. 'MockbaMod firmware')")
 ap.add_argument("--user-data", action="append", default=[], metavar="REL",
                 help="path inside the plugin folder where the USER puts their own files (ROMs, kits); the installer keeps it on upgrade and moves it in from the old /sdcard/vst layout")
+ap.add_argument("--previous-name", default="", metavar="NAME",   # SubWerk local patch 7
+                help="the plugin's old name: the installer moves the --user-data out of '<vendor> - VST - NAME' and removes that folder")
 ap.add_argument("-o", "--out", default="dist")
 a = ap.parse_args()
 
@@ -55,6 +57,11 @@ if os.path.basename(a.so) != so_name:
 skin_name = os.path.basename(os.path.normpath(a.skin))
 if skin_name != "%s - VST - %s" % (attr["manufacturer"], name):
     raise SystemExit("skin folder must be named '%s - VST - %s'" % (attr["manufacturer"], name))
+# SubWerk local patch 7: the installer deletes the folder this names, so only a plain name, and not the current one
+if a.previous_name and (not re.fullmatch(r"[A-Za-z0-9]([A-Za-z0-9 ._-]*[A-Za-z0-9._-])?", a.previous_name)
+                        or ".." in a.previous_name or a.previous_name == name):
+    raise SystemExit("--previous-name must be the plugin's old name (letters, digits, spaces, . _ -; no / or ..), "
+                     "not its current one: %r" % a.previous_name)
 for need in ("version.xml", "Plugin Skins/TUI.json"):
     if not os.path.exists(os.path.join(a.skin, need)):
         raise SystemExit("skin is missing " + need)
@@ -90,9 +97,10 @@ for d in a.user_data:
     if not re.fullmatch(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*", d) or ".." in d.split("/"):
         raise SystemExit("--user-data must be a relative path of letters, digits, . _ - and / (no spaces or ..): %r" % d)
 legacy_so = "/sdcard/vst/" + so_name   # where the previous layout installed the .so (and its data, next to it)
+prev_skin = "%s - VST - %s" % (attr["manufacturer"], a.previous_name) if a.previous_name else ""   # SubWerk local patch 7
 sub = {"@NAME@": name, "@SO_NAME@": so_name, "@SKIN@": skin_name,
        "@EXTRAS@": " ".join("'%s'" % e for e in extras), "@VERSION@": a.version,
-       "@UID@": attr["uid"], "@LEGACY_SO@": legacy_so, "@USER_DATA@": " ".join(a.user_data)}
+       "@UID@": attr["uid"], "@LEGACY_SO@": legacy_so, "@USER_DATA@": " ".join(a.user_data), "@PREV_SKIN@": prev_skin}
 for script in ("install.sh", "uninstall.sh"):
     text = open(os.path.join(HERE, "release", script)).read()
     for k, v in sub.items():
@@ -114,6 +122,8 @@ user_md = ("\nYour own files go in %s inside the plugin folder (`/sdcard/Synths/
            "and uninstall, and moves them there from the old `/sdcard/vst` location if you had installed the plugin that way.\n"
            % (", ".join("`%s`" % (d if "." in os.path.basename(d) else d + "/") for d in a.user_data),  # SubWerk local patch 6: files get no slash
               skin_name)) if a.user_data else ""
+prev_md = (" So is one installed under its old name, in `/sdcard/Synths/%s/`: your own files move into the new folder "
+           "and the old one is removed." % prev_skin) if prev_skin else ""   # SubWerk local patch 7
 install_md = """# {name} {ver}
 
 {about}A native MPC OS plugin ({kind}) with its own MPC screen skin, loaded by MPC's built-in plugin host.
@@ -133,7 +143,7 @@ install_md = """# {name} {ver}
 The installer checks the device, **stops MPC** (save your project first), copies `portable/{skin}/` (the plugin, its skin
 and its data, as one folder) into `/sdcard/Synths`, backs up `MPC.settings`, adds the plugin to MPC's plugin list from the
 folder's `plugin-meta.xml` and starts MPC again. Running it again upgrades in place, keeping your own files.
-An older install of this plugin (the previous layout, with the `.so` in `/sdcard/vst`) is replaced, not duplicated.
+An older install of this plugin (the previous layout, with the `.so` in `/sdcard/vst`) is replaced, not duplicated.{prev_md}
 `-y` skips the confirmation prompt; `-t <folder>` installs into another Synths folder (for example on a card).
 {user_md}
 Then add **{name}** to a track from the plugin browser ({where}). Its screen appears in the plugin view,
@@ -168,7 +178,7 @@ rebuild the whole plugin list from the plugin folders in `Synths` keep this plug
 
 See `SHA256SUMS`. Made with [mpc-vst-plugins](https://github.com/sd88me/mpc-vst-plugins).
 """.format(name=name, ver=a.version, about=(a.about + "\n\n") if a.about else "", kind=kind, top=top, so=so_name,
-           skin=skin_name, extra_md=extra_md, bench=b, user_md=user_md,
+           skin=skin_name, extra_md=extra_md, bench=b, user_md=user_md, prev_md=prev_md,
            where="Instrument plugins" if kind == "instrument" else "Insert effects")
 open(os.path.join(root, "INSTALL.md"), "w").write(install_md)
 

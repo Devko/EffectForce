@@ -35,8 +35,21 @@ are (SubWerk uses patches 1-4; it has no meters). EffectWerk copied SubWerk's co
    `surface/skin_polish.py`). With the browser renderer a meter still needs `strip=`.
 Re-apply them after re-copying upstream.
 
-## Local patch (SubWerk)
+## Local patches (SubWerk)
 
 6. `tools/release.py` (marked `SubWerk local patch 6`): the generated `INSTALL.md` gave every
    `--user-data` entry a trailing slash, files too (`preset_favorites.txt/`); now only folders get one.
    Ported to EffectWerk from SubWerk on 2026-10-06, before the first release. Worth sending upstream.
+7. `tools/release.py` and `tools/release/install.sh` (marked `SubWerk local patch 7`): the -Werk
+   rename. `release.py --previous-name <old name>` tells the installer the plugin's old folder
+   (`<vendor> - VST - <old name>`); the installer carries the `--user-data` out of it into the new
+   folder and removes it once MPC.settings is written. The new folder's own copies win, except while
+   MPC.settings still points into the old folder (an earlier run stopped before the settings were
+   written, so the old plugin kept running and saving there). A folder whose `plugin-meta.xml` has
+   another uid is left alone, with a warning. `release.py` refuses an old name that isn't a plain
+   name (letters, digits, spaces, `. _ -`; no `/` or `..`) or that is the current name. The settings
+   entry needs nothing new: the uid didn't change, and entries with the same uid were already
+   replaced. `test/install_test.sh` and `test/release_test.sh` (`make test-install`) cover it.
+   Expected side effect: `tools/catalog_check.py` regenerates `install.sh` from the template without
+   `@PREV_SKIN@` and so warns that it differs from the current template.
+   Ported from SubWerk on 2026-10-28.

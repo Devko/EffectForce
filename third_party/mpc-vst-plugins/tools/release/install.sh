@@ -3,12 +3,14 @@
 #   sh install.sh [-y] [-t <synths-dir>]
 # Copies portable/@SKIN@/ (the skin, the plugin and its data as ONE folder) into a Synths folder (default /sdcard/Synths),
 # backs up MPC.settings, registers the plugin from the folder's plugin-meta.xml with %payload-path% replaced by that
-# Synths folder, and restarts MPC. An older install (same uid, or the old /sdcard/vst layout) is replaced, not
-# duplicated: its .so and the packaged data are removed and the user's own files (USER_DATA below, if any) are moved
-# into the plugin folder. Files the user added inside the folder are kept across upgrades. Safe to run again.
+# Synths folder, and restarts MPC. An older install (same uid, the old /sdcard/vst layout, or the folder under the
+# plugin's old name) is replaced, not duplicated: its .so and the packaged data are removed and the user's own files
+# (USER_DATA below, if any) are moved into the plugin folder. Files the user added inside the folder are kept across
+# upgrades. Safe to run again.
 set -e
 cd "$(dirname "$0")"
 NAME='@NAME@'; SO='@SO_NAME@'; SKIN='@SKIN@'; UID_HEX='@UID@'; LEGACY_SO='@LEGACY_SO@'; USER_DATA='@USER_DATA@'; EXTRAS='@EXTRAS@'
+PREV_SKIN='@PREV_SKIN@'   # SubWerk local patch 7: the plugin's folder under its old name (release.py --previous-name), or empty
 SYNTHS=/sdcard/Synths; YES=0; DEFER=0
 die() { echo "error: $*" >&2; exit 1; }
 while [ $# -gt 0 ]; do
@@ -25,6 +27,11 @@ FILE="$SYNTHS/$SKIN/$SO"
 OLDFILE="$MPC_LEGACY_ROOT$LEGACY_SO"   # MPC_LEGACY_ROOT is empty on a device; tests point it at a scratch folder
 OLDROOT="$MPC_LEGACY_ROOT$(dirname "$LEGACY_SO")"   # the previous layout kept the data next to the .so, in /sdcard/vst
 LEGACY=0; [ -f "$OLDFILE" ] && LEGACY=1; MIGRATED=""
+PREV="$SYNTHS/$PREV_SKIN"; PREVIOUS=0   # SubWerk local patch 7
+[ -n "$PREV_SKIN" ] && [ "$PREV_SKIN" != "$SKIN" ] && [ -d "$PREV" ] && PREVIOUS=1
+if [ $PREVIOUS = 1 ] && [ -f "$PREV/plugin-meta.xml" ] && ! grep -q " uid=\"$UID_HEX\"" "$PREV/plugin-meta.xml"; then
+    PREVIOUS=0; echo "warning: $PREV belongs to another plugin (not uid $UID_HEX); left as it is"
+fi
 
 # MPC_INSTALL_TEST=1 skips the device checks so tests can run against a copy of MPC.settings.
 if [ -z "$MPC_INSTALL_TEST" ]; then
@@ -87,8 +94,14 @@ if [ -f MODES ]; then   # a zip unpacked on Windows or copied file by file loses
         fi
     done < MODES
 fi
+# SubWerk local patch 7: the same layout under the old name. While MPC.settings still points into it, the old plugin is
+# the live one (an earlier run stopped before the settings were written), so its files are the newest even over the
+# new folder's copies; otherwise the new folder's win.
+LIVE=0; [ $PREVIOUS = 1 ] && grep -qF "file=\"$PREV/" "$SETTINGS" && LIVE=1
 for d in $USER_DATA; do
-    if [ -e "$NEW/$d" ]; then          # an earlier install of this layout: its files win over the shipped ones
+    if [ $PREVIOUS = 1 ] && [ -e "$PREV/$d" ] && { [ $LIVE = 1 ] || [ ! -e "$NEW/$d" ]; }; then   # SubWerk local patch 7
+        rm -rf "$STAGE/$d"; mkdir -p "$(dirname "$STAGE/$d")"; cp -a "$PREV/$d" "$STAGE/$d"
+    elif [ -e "$NEW/$d" ]; then          # an earlier install of this layout: its files win over the shipped ones
         rm -rf "$STAGE/$d"; mkdir -p "$(dirname "$STAGE/$d")"; cp -a "$NEW/$d" "$STAGE/$d"
     elif [ $LEGACY = 1 ] && [ -d "$OLDROOT/$d" ]; then   # the old layout: merged over what the package ships
         mkdir -p "$STAGE/$d"; cp -a "$OLDROOT/$d/." "$STAGE/$d/"; MIGRATED="$MIGRATED $d"
@@ -127,6 +140,10 @@ if [ $LEGACY = 1 ] && [ "$LEGACY_SO" != "$FILE" ]; then
         case " $USER_DATA " in *" $e "*) continue ;; esac
         if [ -e "$OLDROOT/$e" ]; then rm -rf "$OLDROOT/$e" && echo "removed the old packaged data $(dirname "$LEGACY_SO")/$e"; fi
     done
+fi
+# SubWerk local patch 7: the install under the old name; its user files are already in the new folder (step 1)
+if [ $PREVIOUS = 1 ]; then
+    rm -rf "$PREV" && echo "moved your files from $PREV_SKIN into $SKIN"
 fi
 sync
 

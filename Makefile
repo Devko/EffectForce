@@ -52,7 +52,7 @@ ARM_BENCH := $(BUILD)/arm/efbench
 
 .PHONY: all surface skin preview test test-arm test-arm-pgo test-module test-module-arm bench levels preset-levels arm-plugin arm-bench \
         bench-device bench-count rebuild-check \
-        plugin-package plugin-install plugin-uninstall clean
+        plugin-package test-install plugin-install plugin-uninstall clean
 # A recipe that fails leaves no half-written target behind for the next make to trust.
 .DELETE_ON_ERROR:
 all: test arm-plugin
@@ -272,7 +272,14 @@ plugin-package: $(ARM_SO) $(SKIN)
 		--about "EffectWerk effect rack (preview): drive, filter, EQ, compressor / OTT, chorus, phaser / flanger, tremolo / auto-pan / gate, granular textures, delay and a reverb with shimmer, in any order, with macros, LFOs, an envelope follower and a mod matrix; and an Octatrack-style performance mixer: two scenes on the crossfader, 64 effects that fade in (the sweeps and risers move on the bar), a looper on the grid." \
 		--requires "root SSH (MockbaMod)" \
 		--user-data Presets --user-data preset_favorites.txt --user-data preset_recent.txt \
-		-o dist
+		--previous-name "$(strip $(PREV_NAME))" -o dist
+
+# The package's installer against scratch folders: an upgrade from the old name moves the user's files over; and
+# release.py refuses an old name that isn't one. (Used as $(strip $(PREV_NAME)): make keeps the space before a comment.)
+PREV_NAME := EffectForce # werk-rename: keep
+test-install: plugin-package
+	sh test/install_test.sh dist/EffectWerk-$(PLUGIN_VERSION)-mpc-armv7.zip "$(strip $(PREV_NAME))"
+	sh test/release_test.sh "$(PY)" $(MV)/tools/release.py $(ARM_SO) "$(SKIN_DIR)" $(SURF_OUT)/pluginlist-entry.xml
 
 # Install on a device: stops MPC, backs up + edits MPC.settings, restarts MPC. Save the MPC
 # project first. Usage: make plugin-install FORCE=root@<ip>
