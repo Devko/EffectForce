@@ -4,14 +4,18 @@ Releases are built by CI from a `vX.Y.Z` tag (see [Releases](README.md#releases)
 tag's version becomes the release's notes. While the version is 0.x the parameter list may still change
 between releases.
 
-## Unreleased: EffectForce is now EffectWerk <!-- werk-rename: keep -->
+## 0.0.5
 
-**A new name, the same effect rack.** "Force" is the name of Akai's device, so it no longer belongs in this
-plugin's name. Nothing about the sound changes.
+**EffectForce is now EffectWerk: a new name, the same effect rack.** <!-- werk-rename: keep -->
+"Force" is the name of Akai's device, so it no longer belongs in this plugin's name. The sound stays the same, apart
+from the Delay fix below.
 
 - MPC's plugin list shows **EffectWerk**, and the plugin lives in `/sdcard/Synths/Devko - VST - EffectWerk`.
 - Your presets, favorites and recents move over by themselves: the installer carries them out of the old `Devko - VST - EffectForce` folder and removes it, and the first start renames `/media/AkaiForce/EffectForce Presets` to `EffectWerk Presets`. <!-- werk-rename: keep -->
 - Projects saved with EffectForce open with EffectWerk and their settings: the plugin keeps EffectForce's plugin ID, and it reads presets and projects saved under the old name (the same way checked with SubWerk on a Force). <!-- werk-rename: keep -->
+- **Delay: no NaN in the line on the Force.** Two input samples of one sign beyond 1.7e38 could put a NaN into the
+  delay line in Stereo and Ping-Pong on the Force's ARM build, where it went round the feedback until a reset. The
+  line's input is now held within range first; the dry signal is unchanged, so Mix at 0 is still the input bit for bit.
 
 ## 0.0.4
 

@@ -148,6 +148,7 @@ from v0.1 it is append-only.
 | [0.0.2](https://github.com/Devko/EffectWerk/releases/tag/v0.0.2) — the full review's fixes | ✅ |
 | 0.0.3 — Melodic: ten chains for melodic techno (72 presets) | ✅ |
 | 0.0.4 — the third review: Q-Links and automation cost a knob, not the whole patch; Grain, presets, Filter fixes | ✅ |
+| 0.0.5 — the new name, EffectWerk (presets, favorites and saved projects carry over); a Delay fix on ARM | ✅ |
 | In the plugin catalog (the registry entry's PR) | 🔜 |
 | v0.1 — parameter list frozen (append-only from then on) | ⬜ |
 
