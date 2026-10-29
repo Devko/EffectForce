@@ -47,6 +47,10 @@ void testState() {
     CHECK(std::fabs(c.value(P_FLT_CUT) - 100.0f) < 0.1f && std::fabs(c.value(P_FLT_RES) - 0.5f) < 1e-4f);
     CHECK(std::fabs(c.value(P_DLY_FB) - 0.7f) < 1e-4f && c.value(P_DLY_MODE) == 0.0f);   // left as they were
     CHECK(c.value(P_REV_MODE) == 2.0f);                                                   // an option by index
+    // A project or preset saved before the rename starts with the old header: it loads, the next save writes the new one.
+    Host old;
+    CHECK(old.load("effectforce 1\nflt_cut=500\n") == 1 && std::fabs(old.value(P_FLT_CUT) - 500.0f) < 0.1f);   // werk-rename: keep
+    CHECK(old.chunk().compare(0, 13, "effectwerk 1\n") == 0);
     // Out of range values clamp; BOM and CRLF are fine; other text is refused.
     CHECK(c.load("\xEF\xBB\xBF" "effectwerk 1\r\nflt_cut=99999\r\n") == 1 && std::fabs(c.value(P_FLT_CUT) - 20000.0f) < 1.0f);
     CHECK(c.load("subwerk 1\nvolume=0\n") == 0 && c.load("") == 0 && c.load("effectwerk x\n") == 0);

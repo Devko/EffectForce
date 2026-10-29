@@ -3,11 +3,13 @@
 // drives an insert effect (128-frame blocks in place, 0..1 params, the Force's taps and turns).
 // Built with ASan/UBSan by `make test`, for the Force's CPU under qemu by `make test-arm`.
 #include "host.h"
+#include "../plugin/paths.h"
 #include "../plugin/surface.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 int eft::g_fail = 0, eft::g_pass = 0;
@@ -255,6 +257,22 @@ void testStress() {
 } // namespace
 } // namespace eft
 
+// The SSD preset folder of the old name moves to the new one, once, and never over a folder already there.
+static void testLegacyDir() {
+    std::printf("== the old SSD preset folder\n");
+    namespace fs = std::filesystem;
+    const std::string old = eft::fixtureDir() + "/legacy/old", now = eft::fixtureDir() + "/legacy/new";
+    fs::create_directories(old);
+    std::ofstream(old + "/a.sfp") << "x";
+    CHECK(ef::migrateLegacyDir(old, now) && fs::exists(now + "/a.sfp") && !fs::exists(old));   // it moves
+    fs::create_directories(old);
+    std::ofstream(old + "/b.sfp") << "y";
+    CHECK(!ef::migrateLegacyDir(old, now) && fs::exists(old + "/b.sfp") && fs::exists(now + "/a.sfp") &&
+          !fs::exists(now + "/b.sfp"));   // the new one exists: both stay as they are
+    fs::remove_all(old);
+    CHECK(!ef::migrateLegacyDir(old, now + "2") && !fs::exists(now + "2"));   // no old one: nothing happens
+}
+
 int main() {
     using namespace eft;
     const std::string root = fixtureDir();
@@ -298,6 +316,7 @@ int main() {
     fxTests();
     presetTests();
     testStress();
+    testLegacyDir();
 
     std::error_code ec;
     std::filesystem::remove_all(root, ec);

@@ -6,7 +6,8 @@
 //                 against glibc >= 2.34 that binds GLIBC_2.34. "" when it can't tell (tests).
 //   presetRoots() preset folders, in order: <plugin dir>/Presets ("plugin"), then the SSD
 //                 /media/AkaiForce/EffectWerk Presets ("ssd"). A missing folder simply contributes
-//                 nothing. EF_PRESET_ROOTS (colon-separated) replaces both.
+//                 nothing. EF_PRESET_ROOTS (colon-separated) replaces both. Without it, the first
+//                 call moves the old name's SSD folder to the new one (migrateLegacyDir).
 //   dataDir()     the presets' favorites and recent lists: the plugin folder. EF_DATA_DIR
 //                 overrides; "" = nothing is persisted. User presets go to the first preset root.
 #include <string>
@@ -32,5 +33,8 @@ std::string resolveKey(const std::string& key, const std::vector<Root>& roots);
 bool writeFileAtomic(const std::string& path, const std::string& text, bool durable = true);
 // A whole (small) file: presets, lists. False if it is missing or over maxBytes.
 bool readFile(const std::string& path, std::string& out, size_t maxBytes = 1u << 20);
+// Renames the folder `from` to `to` if `from` is a folder and nothing is at `to` yet (the -Werk
+// rename's SSD presets); true if it moved. Never merges or replaces.
+bool migrateLegacyDir(const std::string& from, const std::string& to);
 
 } // namespace ef
